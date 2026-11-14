@@ -9,22 +9,25 @@ This roadmap sequences work using confirmed product requirements. It contains no
 - Product requirements, architecture notes, and Codex instructions.
 - Local setup instructions for the API and storefront.
 
-## Stage 1 — Resolve first-release decisions (current gate)
+## Stage 1 — Resolve remaining checkout decisions (in progress)
 
-Confirm these before defining catalog/order persistence or checkout fields:
+Confirmed: the catalog is one product with selectable variants, and PostgreSQL is the first-release database provider.
 
-- Product shape: one exact SKU, one product with variants, or a single-product landing page with bundles.
-- First database provider and the required first-release provider support.
+Still confirm these before implementing checkout fields and order behavior:
+
 - Checkout customer/address fields, guest checkout, order confirmation, and cancellation behavior.
+- Variant option dimensions (such as size/color), quantity limits, and inventory decrement/reservation rules.
 - Initial store language and base/display currency rules.
 
-The first two decisions are needed to design the initial catalog and persistence model. The remaining decisions can be confirmed before their corresponding features are implemented.
+The catalog schema and read API can now be implemented without guessing checkout behavior. Remaining choices can be confirmed before their corresponding features are implemented.
 
-## Stage 2 — Commerce vertical slice
+## Stage 2 — Commerce vertical slice (catalog in progress)
 
-Build a working path through product setup, public product display, COD checkout, order creation, and order status management. Keep API contracts explicit and versionable. Validate customer input and preserve the price and product details recorded when the order was placed.
+Build a working path through product setup, public product display, COD checkout, order creation, and order status management. Keep API contracts explicit and versionable. Validate customer input and preserve the price and product details recorded when the order was placed. Catalog persistence and a public read contract are the first increment; secure product editing and order placement depend on the approved admin authentication and checkout rules.
 
 Acceptance: an administrator can configure the approved product shape; a customer can submit a valid COD order over HTTPS; the order is persisted with a stable status and can be reviewed by an authorized administrator.
+
+The catalog persistence and public read endpoint are implemented as the first increment. The endpoint returns `404` until a published product exists. Product editing remains gated on the admin authentication design; checkout remains gated on the open customer/address and order policy decisions.
 
 ## Stage 3 — Store administration and security
 

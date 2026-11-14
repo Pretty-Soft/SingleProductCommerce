@@ -1,7 +1,17 @@
 using System.Net;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.EntityFrameworkCore;
+using OneCart.Api.Catalog;
+using OneCart.Api.Data;
 
 var builder = WebApplication.CreateBuilder(args);
+var storeConnectionString = builder.Configuration.GetConnectionString("Store")
+    ?? throw new InvalidOperationException(
+        "Configure ConnectionStrings:Store with the PostgreSQL connection string.");
+
+builder.Services.AddDbContext<StoreDbContext>(options =>
+    options.UseNpgsql(storeConnectionString));
+builder.Services.AddScoped<StorefrontCatalogService>();
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
@@ -54,5 +64,13 @@ app.MapGet("/health", () => Results.Ok(new
     status = "ok",
     service = "OneCart.Api"
 }));
+
+app.MapGet("/api/v1/store/product", async (
+    StorefrontCatalogService catalog,
+    CancellationToken cancellationToken) =>
+{
+    var product = await catalog.GetPublishedProductAsync(cancellationToken);
+    return product is null ? Results.NotFound() : Results.Ok(product);
+});
 
 app.Run();

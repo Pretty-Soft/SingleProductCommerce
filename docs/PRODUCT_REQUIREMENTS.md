@@ -20,7 +20,7 @@ The project should be developed with human review and release quality in mind. C
 - Support a single-product commerce storefront.
 - Present product information and a clear purchase path on desktop and mobile.
 - Keep product content and store settings manageable without editing application source.
-- **Open decision:** Whether “single product” means exactly one purchasable SKU, one featured product with optional variants, or a single-product landing page with configurable bundles.
+- The catalog is one product with selectable variants. Each variant can have its own SKU, display name/options, price, active state, and stock quantity.
 
 ### Orders and payments
 
@@ -65,6 +65,7 @@ The project should be developed with human review and release quality in mind. C
 
 - **Backend:** C# and ASP.NET Core 10.
 - **Frontend:** React with TypeScript.
+- **First-release database:** PostgreSQL.
 - **Persistence direction:** configurable relational, document, or hybrid database support.
 - **Named database targets from planning:** SQL Server, PostgreSQL, MySQL, and MongoDB.
 - **Architecture quality:** SOLID principles and maintainable separation of concerns.
@@ -96,10 +97,10 @@ These are recommendations for a maintainable first release, not finalized produc
 
 ## 6. Open decisions to resolve before corresponding implementation
 
-- Exact meaning of “single product”; variants, bundles, quantity limits, and inventory rules.
+- Variant option structure (for example size/color), quantity limits, and inventory decrement/reservation rules.
 - Customer checkout fields, address format, guest checkout, order confirmation, and cancellation policy.
 - Admin roles, account recovery, and optional administrator MFA.
-- Which database is the default and which providers are required for the first release.
+- Which additional database providers, beyond the confirmed first-release PostgreSQL provider, are required for release.
 - Whether “hybrid” means multiple providers used together, relational plus document storage, or another deployment pattern.
 - Supported languages and translation ownership.
 - Store base currency, display currency, conversion source, rounding, and historical order-price rules.
@@ -109,9 +110,11 @@ These are recommendations for a maintainable first release, not finalized produc
 - License activation behavior, offline installations, and local resale obligations.
 - Marketplace and direct-sale packaging, support, and update commitments.
 
-## 7. Acceptance baseline for the current starter
+## 7. Current implementation baseline
 
 - Repository contains an ASP.NET Core 10 API project and a React/TypeScript frontend shell.
+- The catalog model is one product with selectable variants, persisted in PostgreSQL for the first release.
+- The public API can read the single published product and its active variants over HTTPS.
 - Product scope and confirmed technology direction are documented here.
 - Unresolved requirements remain visible and are not invented by implementation.
 - Starter documentation explains how to run the two applications locally.

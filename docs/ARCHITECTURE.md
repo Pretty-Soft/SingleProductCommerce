@@ -14,9 +14,11 @@ The frontend should communicate through explicit JSON API contracts. Keep public
 
 ## Persistence
 
-The product goal names SQL Server, PostgreSQL, MySQL, MongoDB, and hybrid configurations. Do not add superficial provider switches. For each claimed provider, define schema/migration behavior, transactions, indexes, concurrency behavior, backup/restore guidance, and automated integration coverage.
+PostgreSQL is the confirmed first-release provider. SQL Server, MySQL, MongoDB, and hybrid configurations remain broader product goals, not current support claims. Do not add superficial provider switches. For each claimed provider, define schema/migration behavior, transactions, indexes, concurrency behavior, backup/restore guidance, and automated integration coverage.
 
-Select a first-release default only after the owner confirms operational needs. A relational provider is recommended for orders and inventory because transaction boundaries matter; the exact vendor remains open.
+The initial catalog uses Entity Framework Core migrations. `StoreProduct` represents the single storefront product; `ProductVariant` stores the selectable SKU, display name, price/currency code, active state, and stock quantity. The public catalog query returns only the published product and active variants, and exposes availability without exposing exact stock counts.
+
+The catalog shape is one product with selectable variants. Variant option dimensions and inventory reservation/decrement rules remain open and must be confirmed before checkout is implemented.
 
 ## Installer and deployment
 
@@ -28,4 +30,4 @@ The API accepts requests only when ASP.NET Core sees an HTTPS scheme. The local 
 
 ## Current implementation boundary
 
-The starter API exposes a health endpoint only. The starter frontend is a shell. Neither contains commerce, authentication, persistence, or installer functionality yet.
+The API exposes health and read-only published catalog endpoints. Product administration, checkout/orders, authentication, and installer workflows are not implemented yet. The frontend remains a shell.

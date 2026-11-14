@@ -14,8 +14,17 @@ OneCart Commerce is a commercial, single-product commerce platform. This reposit
 
 - .NET 10 SDK
 - Node.js 20.19+ or 22.12+ and npm
+- PostgreSQL
 
 ## Run locally
+
+Configure the PostgreSQL connection string in local .NET user secrets. Replace the password with the one configured for your local PostgreSQL server; do not commit it.
+
+```powershell
+dotnet user-secrets set --project backend/OneCart.Api "ConnectionStrings:Store" "Host=localhost;Port=5432;Database=onecart;Username=postgres;Password=YOUR_LOCAL_PASSWORD"
+dotnet tool restore
+dotnet ef database update --project backend/OneCart.Api
+```
 
 Create and trust the local ASP.NET Core development certificate once:
 
@@ -39,7 +48,7 @@ npm install
 npm run dev
 ```
 
-The API health check is available at `/health`. The current frontend is only a starter shell; commerce workflows are not implemented yet.
+The API health check is available at `/health`. The public catalog read endpoint is `GET /api/v1/store/product`; it returns `404` until an administrator workflow publishes a product. Admin product editing and checkout are not implemented yet. The current frontend is only a starter shell.
 
 ## Project direction
 
