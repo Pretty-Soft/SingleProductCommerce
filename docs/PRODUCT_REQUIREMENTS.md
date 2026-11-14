@@ -38,6 +38,9 @@ The project should be developed with human review and release quality in mind. C
 ### Orders and payments
 
 - Support Cash on Delivery (COD) as the confirmed payment method.
+- Allow guest checkout with customer name, phone number, and delivery address.
+- Save a new order in Pending status and show its order number after placement. Administrators may update or cancel an order.
+- Decrease inventory atomically when an order is placed, restore it if an administrator cancels the order, and do not impose an additional per-order quantity cap.
 - Capture and manage customer orders through the admin experience.
 - Track order status and provide the administrator with order and sales visibility.
 - Do not assume online payment gateways are in scope.
@@ -54,9 +57,9 @@ The project should be developed with human review and release quality in mind. C
 ### Languages, currency, and theme
 
 - Support multiple storefront languages managed through administration.
-- Support multiple currencies with administrator-configured exchange rates.
+- The administrator selects one active currency for the whole store. New cart lines retain the currency active when they were added. COD orders cannot mix currencies and currency conversion is not performed.
 - Provide a dynamic theme system for colors, typography, layouts, and live preview.
-- **Open decision:** Translation workflow, fallback language, currency conversion/rounding rules, and whether exchange rates are manually entered or imported.
+- **Open decision:** Translation workflow and fallback language; currency catalog, whether currency conversion/exchange rates are needed, rounding rules, and how changing the store currency affects existing product prices and historical orders; theme customization boundaries.
 
 ### Installation and hosting
 
@@ -123,13 +126,13 @@ These are recommendations for a maintainable first release, not finalized produc
 - Product media upload format, size limits, storage, processing, and replacement/retention rules.
 - Storefront branding/theme controls, configurable trust/service details, and which content blocks may be hidden or reordered.
 - Additional social networks beyond the native share sheet/copy-link action, and WhatsApp contact display location, phone-number format/validation, and default message content.
-- Guest checkout with customer name, phone number, and delivery address is confirmed. **Open decision:** Address field structure/validation, order confirmation behavior, and cancellation policy. Quantity limits and inventory decrement/reservation rules also remain open under the variant requirements above.
+- Guest checkout with customer name, phone number, and delivery address is confirmed. New orders start Pending, display an order number, and can be updated/cancelled by an administrator. **Open decision:** Address field structure and validation, phone-number validation, the available admin status transitions, and currency/price snapshot rules.
 - Admin roles, account recovery, and optional administrator MFA.
 - Detailed permission mapping for the initial `SystemAdmin`, `CatalogManager`, `OrderManager`, and `StoreManager` roles; current role names are built-in starting defaults.
 - Which additional database providers, beyond the confirmed first-release PostgreSQL provider, are required for release.
 - Whether “hybrid” means multiple providers used together, relational plus document storage, or another deployment pattern.
 - Supported languages and translation ownership.
-- Store base currency, display currency, conversion source, rounding, and historical order-price rules.
+- Whether cart lines retain their numeric unit price from add time or update to the current catalog price. What happens to existing product prices and historical order totals when the admin changes the one active store currency; the owner will provide the conversion rule.
 - Theme customization boundaries and whether custom CSS is allowed.
 - Installer and upgrade strategy for IIS, Linux, and Docker.
 - Certificate provisioning, renewal, and trusted reverse-proxy addresses for supported hosting environments.
@@ -143,8 +146,9 @@ These are recommendations for a maintainable first release, not finalized produc
 - SQL Server has an experimental provider configuration and isolated initial migration set for local evaluation; it is not included in the supported-provider claim.
 - The public API can read the single published product and its active variants over HTTPS.
 - The System Admin panel can edit product content, variants, required/optional attribute groups, and option-level price adjustments; catalog edits create before/after audit records. Other role permissions remain open.
-- The storefront displays a published product and selectable variants/attributes, updates the displayed total for option price adjustments, and supports a session-only cart with quantity editing and estimated subtotals. Guest checkout fields (name, phone, delivery address) are confirmed; COD order submission remains pending confirmation and cancellation policy decisions.
+- The storefront displays a published product and selectable variants/attributes, updates the displayed total for option price adjustments, and supports a session-only cart with quantity editing and estimated subtotals. Guest checkout fields, Pending status, on-screen order number, admin update/cancel, atomic stock decrement/restoration, and no additional quantity cap are confirmed; COD order submission is not implemented yet.
 - The System Admin panel can configure percentage/fixed flash-sale discounts and schedules, sharing, and WhatsApp contact details. The storefront shows regular/sale prices only during the sale window, with a countdown while active, and provides share and WhatsApp contact actions.
+- The store uses one administrator-selected currency across product variants, cart totals, and orders; mixed-currency carts/orders are rejected. Currency change behavior for existing prices and historical orders remains open.
 - System Admin can upload and manage up to eight product images plus one brand logo, edit image alternative text/order, configure the brand name and product-page headline/subtitle, and manage up to eight trust/service details. JPEG/PNG/WebP up to 10 MB are accepted by the current implementation; local file storage defaults to `backend/OneCart.Api/App_Data/product-images` and is configurable with `ProductMedia:RootPath`. These format, size, storage, processing, and replacement choices are implementation defaults pending the open decision below; image transformations/CDN storage are not implemented.
 - The sale schedule is entered in the administrator's local time and stored in UTC. Percentage discounts currently round the displayed sale price to four decimal places and apply to the selected variant's base price; attribute add-on prices are then added at their configured amounts. Confirmation of currency-specific rounding and attribute-discount interaction remains open.
 - Only System Admin accounts can create users and assign roles through the admin panel.

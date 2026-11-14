@@ -84,7 +84,7 @@ function Storefront() {
         .flatMap((group) => group.options)
         .filter((option) => item.optionIds.includes(option.id))
         .reduce((sum, option) => sum + option.priceAdjustment, 0);
-    totals[variant.currencyCode] = (totals[variant.currencyCode] ?? 0) + unitPrice * item.quantity;
+    totals[item.currencyCode] = (totals[item.currencyCode] ?? 0) + unitPrice * item.quantity;
     return totals;
   }, {});
 
@@ -101,7 +101,13 @@ function Storefront() {
   function addToCart() {
     if (!selectedVariant || !selectedVariant.isAvailable || !requiredAttributesSelected) return;
     const optionIds = selectedOptions.map((option) => option.id).sort();
-    setCartItems((current) => addCartSelection(current, selectedVariant.id, optionIds, quantity));
+    const result = addCartSelection(cartItems, selectedVariant.id, optionIds, quantity, selectedVariant.currencyCode);
+    if (result.error) {
+      setCartMessage(result.error);
+      setCartOpen(true);
+      return;
+    }
+    setCartItems(result.items);
     setCartMessage(`${quantity} ${quantity === 1 ? "item" : "items"} added to your cart.`);
     setCartOpen(true);
   }
@@ -304,7 +310,7 @@ function Storefront() {
                       <div className="cart-item-copy">
                         <strong>{product.name} · {variant.displayName}</strong>
                         {chosenOptions.length > 0 && <small>{chosenOptions.map((option) => option.name).join(", ")}</small>}
-                        <span>{formatPrice(unitPrice, variant.currencyCode)} each</span>
+                        <span>{formatPrice(unitPrice, item.currencyCode)} each</span>
                       </div>
                       <div className="cart-item-actions" aria-label={`Quantity for ${variant.displayName}`}>
                         <button type="button" aria-label="Decrease quantity" onClick={() => changeCartQuantity(item.key, -1)}>−</button>
