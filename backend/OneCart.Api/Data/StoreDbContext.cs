@@ -58,8 +58,8 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
         auditEvents.HasKey(auditEvent => auditEvent.Id);
         auditEvents.Property(auditEvent => auditEvent.ActorEmail).HasMaxLength(256).IsRequired();
         auditEvents.Property(auditEvent => auditEvent.Action).HasMaxLength(100).IsRequired();
-        auditEvents.Property(auditEvent => auditEvent.TargetEmail).HasMaxLength(256).IsRequired();
-        auditEvents.Property(auditEvent => auditEvent.Details).HasMaxLength(4000).IsRequired();
+        auditEvents.Property(auditEvent => auditEvent.Target).HasMaxLength(256).IsRequired();
+        auditEvents.Property(auditEvent => auditEvent.Details).HasColumnType("text").IsRequired();
         auditEvents.Property(auditEvent => auditEvent.CreatedAtUtc).IsRequired();
         auditEvents.HasIndex(auditEvent => auditEvent.CreatedAtUtc);
     }

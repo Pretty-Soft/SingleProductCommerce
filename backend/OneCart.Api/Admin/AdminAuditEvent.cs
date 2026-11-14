@@ -10,9 +10,9 @@ public sealed class AdminAuditEvent
 
     public string Action { get; set; } = string.Empty;
 
-    public Guid TargetUserId { get; set; }
+    public Guid TargetId { get; set; }
 
-    public string TargetEmail { get; set; } = string.Empty;
+    public string Target { get; set; } = string.Empty;
 
     public string Details { get; set; } = string.Empty;
 

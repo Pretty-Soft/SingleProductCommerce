@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import AdminCatalogEditor from "./AdminCatalogEditor";
 import { adminRequest, AdminRole, AdminUser, refreshCsrfToken } from "./adminApi";
 
 type RoleChanges = Record<string, string[]>;
@@ -259,6 +260,8 @@ export default function AdminApp() {
                 </button>
               </form>
             </section>
+
+            <AdminCatalogEditor />
 
             <section className="admin-card">
               <div className="section-heading">

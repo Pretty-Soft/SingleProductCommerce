@@ -21,17 +21,17 @@ Still confirm these before implementing checkout fields and order behavior:
 
 The catalog schema and read API can now be implemented without guessing checkout behavior. Remaining choices can be confirmed before their corresponding features are implemented.
 
-## Stage 2 — Commerce vertical slice (catalog in progress)
+## Stage 2 — Commerce vertical slice (catalog setup in progress)
 
 Build a working path through product setup, public product display, COD checkout, order creation, and order status management. Keep API contracts explicit and versionable. Validate customer input and preserve the price and product details recorded when the order was placed. Catalog persistence and a public read contract are the first increment; secure product editing and order placement depend on the approved admin authentication and checkout rules.
 
 Acceptance: an administrator can configure the approved product shape; a customer can submit a valid COD order over HTTPS; the order is persisted with a stable status and can be reviewed by an authorized administrator.
 
-The catalog persistence and public read endpoint are implemented as the first increment. The endpoint returns `404` until a published product exists. Product editing remains gated on the admin authentication design; checkout remains gated on the open customer/address and order policy decisions.
+The catalog persistence, public read endpoint, protected product editor, variant management, and public product display are implemented. The endpoint returns `404` until a published product with an active variant exists. The editor is temporarily restricted to System Admin while detailed role permissions remain open. Checkout remains gated on the open customer/address and order policy decisions.
 
 ## Stage 3 — Store administration and security (user management in progress)
 
-Use built-in email/password accounts with secure cookies, anti-forgery protection, and lockout. Bootstrap the first System Admin from a local command; only System Admins can create accounts and assign the initial roles. Then add product/store settings, order and customer views, inventory controls, and audit records for sensitive changes. Define account recovery and MFA behavior before implementing those flows.
+Use built-in email/password accounts with secure cookies, anti-forgery protection, and lockout. Bootstrap the first System Admin from a local command; only System Admins can create accounts and assign the initial roles. User management and audit records for account changes are implemented. Product edits are also audited. Then add store settings, order and customer views, and inventory controls. Define account recovery and MFA behavior before implementing those flows.
 
 Acceptance: protected operations enforce authorization server-side, validate inputs, and produce audit records where required.
 

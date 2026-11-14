@@ -34,4 +34,4 @@ Administrator accounts use ASP.NET Core Identity with PostgreSQL persistence and
 
 ## Current implementation boundary
 
-The API exposes health and read-only published catalog endpoints plus SystemAdmin-only user and role assignment APIs. The frontend includes admin sign-in and user management. Product administration, checkout/orders, audit history, and installer workflows are not implemented yet.
+The API exposes health and read-only published catalog endpoints, SystemAdmin-only product editing, and SystemAdmin-only user and role assignment APIs. Product edits and account/role changes create audit records. The frontend includes the public product display, admin sign-in, product/variant editor, and user management. Checkout/orders, audit history UI, store settings, and installer workflows are not implemented yet. Catalog permissions are limited to System Admin pending the open role-mapping decision.

@@ -76,8 +76,8 @@ public static class AdminBootstrapper
             ActorUserId = user.Id,
             ActorEmail = email,
             Action = "system_admin.bootstrap",
-            TargetUserId = user.Id,
-            TargetEmail = email,
+            TargetId = user.Id,
+            Target = email,
             Details = "First SystemAdmin account created by the local bootstrap command.",
             CreatedAtUtc = DateTimeOffset.UtcNow
         });

@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using OneCart.Api.Catalog;
 using OneCart.Api.Data;
 
 namespace OneCart.Api.Admin;
@@ -54,6 +55,15 @@ public static class AdminEndpoints
             .AddEndpointFilter(RequireChangedPasswordAsync);
 
         group.MapPut("/users/{userId:guid}/roles", UpdateUserRolesAsync)
+            .RequireAuthorization(policy => policy.RequireRole(AdminRoles.SystemAdmin))
+            .AddEndpointFilter(ValidateAntiforgeryAsync)
+            .AddEndpointFilter(RequireChangedPasswordAsync);
+
+        group.MapGet("/catalog/product", GetAdminProductAsync)
+            .RequireAuthorization(policy => policy.RequireRole(AdminRoles.SystemAdmin))
+            .AddEndpointFilter(RequireChangedPasswordAsync);
+
+        group.MapPut("/catalog/product", SaveAdminProductAsync)
             .RequireAuthorization(policy => policy.RequireRole(AdminRoles.SystemAdmin))
             .AddEndpointFilter(ValidateAntiforgeryAsync)
             .AddEndpointFilter(RequireChangedPasswordAsync);
@@ -177,12 +187,42 @@ public static class AdminEndpoints
                 auditEvent.Id,
                 auditEvent.ActorEmail,
                 auditEvent.Action,
-                auditEvent.TargetEmail,
+                auditEvent.Target,
                 auditEvent.Details,
                 auditEvent.CreatedAtUtc))
             .ToListAsync();
 
         return Results.Ok(events);
+    }
+
+    private static async Task<IResult> GetAdminProductAsync(
+        AdminCatalogService catalog,
+        CancellationToken cancellationToken)
+    {
+        var product = await catalog.GetProductAsync(cancellationToken);
+        return product is null ? Results.NotFound() : Results.Ok(product);
+    }
+
+    private static async Task<IResult> SaveAdminProductAsync(
+        AdminProductRequest request,
+        AdminCatalogService catalog,
+        UserManager<AdminUser> userManager,
+        HttpContext context)
+    {
+        var userId = userManager.GetUserId(context.User);
+        if (!Guid.TryParse(userId, out var actorId))
+        {
+            return Results.Unauthorized();
+        }
+
+        var result = await catalog.SaveProductAsync(
+            request,
+            actorId,
+            userManager.GetUserName(context.User) ?? string.Empty,
+            context.RequestAborted);
+        return result.Errors is not null
+            ? Results.ValidationProblem(result.Errors)
+            : Results.Ok(result.Product);
     }
 
     private static async Task<IResult> CreateUserAsync(
@@ -245,8 +285,8 @@ public static class AdminEndpoints
             ActorUserId = Guid.Parse(userManager.GetUserId(context.User)!),
             ActorEmail = userManager.GetUserName(context.User) ?? string.Empty,
             Action = "admin_user.create",
-            TargetUserId = user.Id,
-            TargetEmail = email,
+            TargetId = user.Id,
+            Target = email,
             Details = JsonSerializer.Serialize(new { roles = roleNames }),
             CreatedAtUtc = DateTimeOffset.UtcNow
         });
@@ -319,8 +359,8 @@ public static class AdminEndpoints
             ActorUserId = Guid.Parse(userManager.GetUserId(context.User)!),
             ActorEmail = userManager.GetUserName(context.User) ?? string.Empty,
             Action = "admin_user.roles.update",
-            TargetUserId = target.Id,
-            TargetEmail = target.Email ?? string.Empty,
+            TargetId = target.Id,
+            Target = target.Email ?? string.Empty,
             Details = JsonSerializer.Serialize(new { previousRoles = currentRoles, roles = roleNames }),
             CreatedAtUtc = DateTimeOffset.UtcNow
         });
@@ -393,7 +433,7 @@ public static class AdminEndpoints
         Guid Id,
         string ActorEmail,
         string Action,
-        string TargetEmail,
+        string Target,
         string Details,
         DateTimeOffset CreatedAtUtc);
     public sealed record AdminUserResponse(

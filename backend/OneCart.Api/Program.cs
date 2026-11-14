@@ -15,6 +15,7 @@ var storeConnectionString = builder.Configuration.GetConnectionString("Store")
 builder.Services.AddDbContext<StoreDbContext>(options =>
     options.UseNpgsql(storeConnectionString));
 builder.Services.AddScoped<StorefrontCatalogService>();
+builder.Services.AddScoped<AdminCatalogService>();
 builder.Services.AddIdentity<AdminUser, IdentityRole<Guid>>(options =>
     {
         options.User.RequireUniqueEmail = true;
