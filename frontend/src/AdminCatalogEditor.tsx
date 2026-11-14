@@ -88,8 +88,8 @@ const emptyProduct = (): EditableProduct => ({
   whatsAppEnabled: false,
   whatsAppPhoneNumber: "",
   whatsAppPrefillMessage: "Hello, I have a question about this product.",
-  brandName: "OneCart",
-  storefrontHeadline: "",
+  brandName: "Pretty Shop",
+  storefrontHeadline: "Your trust, Your Love",
   storefrontSubtitle: "",
   images: [],
   trustItems: []
@@ -345,16 +345,19 @@ export default function AdminCatalogEditor() {
           </div>
           <div className="catalog-fields">
             <label>
-              Store / brand name
+              Shop name
               <input maxLength={120} required value={product.brandName} onChange={(event) => updateProduct("brandName", event.target.value)} />
+              <small className="field-help">Shown in the store header and brand area.</small>
             </label>
             <label>
-              Storefront headline
-              <input maxLength={200} value={product.storefrontHeadline} onChange={(event) => updateProduct("storefrontHeadline", event.target.value)} placeholder="Uses the product name when blank" />
+              Storefront slogan
+              <input maxLength={200} value={product.storefrontHeadline} onChange={(event) => updateProduct("storefrontHeadline", event.target.value)} placeholder="Your trust, Your Love" />
+              <small className="field-help">A short promise shown above the product description.</small>
             </label>
             <label>
-              Storefront subtitle
-              <input maxLength={500} value={product.storefrontSubtitle} onChange={(event) => updateProduct("storefrontSubtitle", event.target.value)} placeholder="Short product value statement" />
+              Supporting line (optional)
+              <input maxLength={500} value={product.storefrontSubtitle} onChange={(event) => updateProduct("storefrontSubtitle", event.target.value)} placeholder="Add one short supporting sentence" />
+              <small className="field-help">Appears below the storefront slogan.</small>
             </label>
             <label>
               Product name

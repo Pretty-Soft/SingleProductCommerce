@@ -178,11 +178,16 @@ function Storefront() {
   return (
     <main className="page">
       <header className="topbar">
-        <a className="brand" href="/" aria-label="OneCart Commerce home">
+        <a className="brand" href="/" aria-label={`${product?.brandName ?? "Pretty Shop"} home`}>
           {product?.brandLogoUrl
             ? <img className="brand-logo" src={getMediaUrl(product.brandLogoUrl)} alt="" />
-            : <span className="brand-mark">{(product?.brandName ?? "OneCart").slice(0, 1).toUpperCase()}</span>}
-          <span>{product?.brandName ?? "OneCart"}</span>
+            : <span className="brand-mark">{(product?.brandName ?? "Pretty Shop").slice(0, 1).toUpperCase()}</span>}
+          <span className="brand-copy">
+            <span className="brand-name">{product?.brandName ?? "Pretty Shop"}</span>
+            {(product?.storefrontHeadline ?? "Your trust, Your Love") && (
+              <span className="brand-headline">{product?.storefrontHeadline ?? "Your trust, Your Love"}</span>
+            )}
+          </span>
         </a>
         <div className="store-header-actions">
           {product && <button className="cart-toggle" type="button" onClick={() => setCartOpen((open) => !open)} aria-expanded={cartOpen}>Cart <span>{cartItemCount}</span></button>}
@@ -191,16 +196,14 @@ function Storefront() {
       </header>
 
       {loading ? (
-        <section className="hero" aria-live="polite"><p className="eyebrow">OneCart Commerce</p><h1>Loading store…</h1></section>
+        <section className="hero" aria-live="polite"><h1>Loading store…</h1></section>
       ) : error ? (
-        <section className="hero" role="alert"><p className="eyebrow">OneCart Commerce</p><h1>Store temporarily unavailable</h1><p className="intro">{error}</p></section>
+        <section className="hero" role="alert"><h1>Store temporarily unavailable</h1><p className="intro">{error}</p></section>
       ) : product ? (
         <section className={`store-product${product.images.length > 0 ? " has-images" : ""}`} aria-labelledby="hero-title">
           <div className="product-copy">
-            <p className="eyebrow">{product.brandName}</p>
-            <h1 id="hero-title">{product.storefrontHeadline || product.name}</h1>
+            <h1 id="hero-title">{product.name}</h1>
             {product.storefrontSubtitle && <p className="product-subtitle">{product.storefrontSubtitle}</p>}
-            {product.storefrontHeadline && <p className="product-name-note">{product.name}</p>}
             <p className="intro">{product.description}</p>
           </div>
           {selectedImage && (
@@ -319,7 +322,6 @@ function Storefront() {
         </section>
       ) : (
         <section className="hero">
-          <p className="eyebrow">Single product commerce</p>
           <h1>Your product story starts here.</h1>
           <p className="intro">This store is ready for its first product. A System Admin can configure and publish it from the admin panel.</p>
           <a className="button store-admin-link" href="/admin">Open admin</a>
