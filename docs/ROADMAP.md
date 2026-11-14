@@ -49,7 +49,7 @@ Acceptance: a clean installation and a supported upgrade can be completed from d
 
 ## Stage 6 — Additional persistence providers
 
-Add each required provider only after the first complete workflow establishes the persistence contract. Verify migrations, transaction behavior, indexes, concurrency, installation, backup/restore, and integration behavior per provider before advertising support.
+An experimental SQL Server provider and isolated initial migration set exist for local evaluation. Keep PostgreSQL as the default. Complete provider-specific installation, transaction, index, concurrency, backup/restore, and integration verification before advertising SQL Server support. Add any other required provider only after the first complete workflow establishes the persistence contract.
 
 Acceptance: the published support matrix matches verified provider capabilities. “Hybrid” remains undefined until the owner confirms its intended meaning.
 

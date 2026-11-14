@@ -6,8 +6,8 @@
     <UserSecretsId>OneCartCommerce-Api-Local</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
-    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.4" />
+    <ProjectReference Include="..\OneCart.Persistence\OneCart.Persistence.csproj" />
+    <ProjectReference Include="..\OneCart.SqlServer.Migrations\OneCart.SqlServer.Migrations.csproj" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.4">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>

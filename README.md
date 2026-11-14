@@ -5,6 +5,8 @@ OneCart Commerce is a commercial, single-product commerce platform. This reposit
 ## Current starter
 
 - `backend/OneCart.Api`: ASP.NET Core 10 API with a health endpoint.
+- `backend/OneCart.Persistence`: catalog and identity persistence with provider selection.
+- `backend/OneCart.SqlServer.Migrations`: experimental SQL Server migration set, isolated from PostgreSQL migrations.
 - `frontend`: React and TypeScript storefront shell powered by Vite.
 - `docs/PRODUCT_REQUIREMENTS.md`: requirements recovered from the product planning conversation, with open decisions marked clearly.
 - `docs/ROADMAP.md`: proposed implementation sequence and decision gates.
@@ -14,11 +16,12 @@ OneCart Commerce is a commercial, single-product commerce platform. This reposit
 
 - .NET 10 SDK
 - Node.js 20.19+ or 22.12+ and npm
-- PostgreSQL
+- PostgreSQL for the default first-release path
+- SQL Server for the experimental local option
 
 ## Run locally
 
-Configure the PostgreSQL connection string in local .NET user secrets. Replace the password with the one configured for your local PostgreSQL server; do not commit it.
+PostgreSQL remains the default and first-release database provider. Configure its connection string in local .NET user secrets. Replace the password with the one configured for your local PostgreSQL server; do not commit it.
 
 ```powershell
 dotnet user-secrets set --project backend/OneCart.Api "ConnectionStrings:Store" "Host=localhost;Port=5432;Database=onecart;Username=postgres;Password=YOUR_LOCAL_PASSWORD"
@@ -44,6 +47,12 @@ Backend (HTTPS only):
 dotnet run --project backend/OneCart.Api
 ```
 
+Run the focused persistence and validation tests with:
+
+```powershell
+dotnet test backend/OneCart.Persistence.Tests/OneCart.Persistence.Tests.csproj
+```
+
 The API listens at `https://localhost:7241`. Plain HTTP API requests are rejected. The production API base URL must also use `https://` with a certificate trusted by clients. When TLS terminates at a reverse proxy, configure only that proxy's IP under `ForwardedHeaders:KnownProxies`; do not trust forwarded headers from arbitrary clients.
 
 Frontend:
@@ -55,6 +64,19 @@ npm run dev
 ```
 
 The API health check is available at `/health`. The public catalog read endpoint is `GET /api/v1/store/product`; it returns `404` until a published product has an active variant. Open `/admin` in the frontend to sign in, manage users, and edit the product catalog as a System Admin. Product and variant changes are audited. Catalog editing is limited to System Admin until detailed role permissions are decided. New accounts receive a temporary password and must change it at first sign-in. The frontend uses secure cookie authentication and anti-forgery tokens; production deployments must configure `Cors:AllowedOrigins` for the exact frontend origin.
+
+## Experimental SQL Server development path
+
+SQL Server is an experimental local development option and is not yet a supported release provider. Installation, transaction behavior, backup/restore, and integration coverage still need verification. PostgreSQL remains the default when `Database:Provider` is unset.
+
+For a local SQL Server instance, configure the provider and connection string in local user secrets. This example uses Windows authentication and trusts the local server certificate; hosted environments need a valid database certificate and a least-privilege login:
+
+```powershell
+dotnet user-secrets set --project backend/OneCart.Api "Database:Provider" "SqlServer"
+dotnet user-secrets set --project backend/OneCart.Api "ConnectionStrings:Store" "Server=localhost\SQLEXPRESS;Database=OneCart;Trusted_Connection=True;Encrypt=True;TrustServerCertificate=True"
+dotnet ef database update --project backend/OneCart.SqlServer.Migrations --startup-project backend/OneCart.Api --context OneCart.Api.Data.StoreDbContext
+dotnet run --project backend/OneCart.Api -- --bootstrap-system-admin zs.islam93@gmail.com
+```
 
 ## Project direction
 

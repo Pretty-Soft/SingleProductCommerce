@@ -19,14 +19,18 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
     {
         base.OnModelCreating(modelBuilder);
 
+        var isSqlServer = Database.IsSqlServer();
+
         var products = modelBuilder.Entity<StoreProduct>();
         products.ToTable("store_products", table =>
         {
-            table.HasCheckConstraint("ck_store_products_name_not_empty", "length(\"Name\") > 0");
+            table.HasCheckConstraint(
+                "ck_store_products_name_not_empty",
+                isSqlServer ? "LEN([Name]) > 0" : "length(\"Name\") > 0");
         });
         products.HasIndex(product => product.IsPublished)
             .IsUnique()
-            .HasFilter("\"IsPublished\" = TRUE");
+            .HasFilter(isSqlServer ? "[IsPublished] = 1" : "\"IsPublished\" = TRUE");
         products.HasKey(product => product.Id);
         products.Property(product => product.Name).HasMaxLength(200).IsRequired();
         products.Property(product => product.Slug).HasMaxLength(180).IsRequired();
@@ -42,8 +46,8 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
         var variants = modelBuilder.Entity<ProductVariant>();
         variants.ToTable("product_variants", table =>
         {
-            table.HasCheckConstraint("ck_product_variants_price_non_negative", "\"Price\" >= 0");
-            table.HasCheckConstraint("ck_product_variants_stock_non_negative", "\"StockQuantity\" >= 0");
+            table.HasCheckConstraint("ck_product_variants_price_non_negative", isSqlServer ? "[Price] >= 0" : "\"Price\" >= 0");
+            table.HasCheckConstraint("ck_product_variants_stock_non_negative", isSqlServer ? "[StockQuantity] >= 0" : "\"StockQuantity\" >= 0");
         });
         variants.HasKey(variant => variant.Id);
         variants.Property(variant => variant.Sku).HasMaxLength(64).IsRequired();
@@ -59,7 +63,9 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
         auditEvents.Property(auditEvent => auditEvent.ActorEmail).HasMaxLength(256).IsRequired();
         auditEvents.Property(auditEvent => auditEvent.Action).HasMaxLength(100).IsRequired();
         auditEvents.Property(auditEvent => auditEvent.Target).HasMaxLength(256).IsRequired();
-        auditEvents.Property(auditEvent => auditEvent.Details).HasColumnType("text").IsRequired();
+        auditEvents.Property(auditEvent => auditEvent.Details)
+            .HasColumnType(isSqlServer ? "nvarchar(max)" : "text")
+            .IsRequired();
         auditEvents.Property(auditEvent => auditEvent.CreatedAtUtc).IsRequired();
         auditEvents.HasIndex(auditEvent => auditEvent.CreatedAtUtc);
     }

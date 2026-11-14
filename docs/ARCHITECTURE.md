@@ -3,6 +3,8 @@
 ## Starter layout
 
 - `backend/OneCart.Api`: ASP.NET Core HTTP entry point.
+- `backend/OneCart.Persistence`: relational context, catalog/admin persistence, and provider selection.
+- `backend/OneCart.SqlServer.Migrations`: isolated experimental SQL Server migrations.
 - `frontend`: React and TypeScript single-page application.
 - `docs`: product and implementation documentation.
 
@@ -14,7 +16,7 @@ The frontend should communicate through explicit JSON API contracts. Keep public
 
 ## Persistence
 
-PostgreSQL is the confirmed first-release provider. SQL Server, MySQL, MongoDB, and hybrid configurations remain broader product goals, not current support claims. Do not add superficial provider switches. For each claimed provider, define schema/migration behavior, transactions, indexes, concurrency behavior, backup/restore guidance, and automated integration coverage.
+PostgreSQL is the confirmed first-release provider and the default when `Database:Provider` is omitted. SQL Server has a separate experimental migration assembly and can be selected for local development, but it is not a supported release provider until installation, transaction behavior, backup/restore guidance, and automated integration coverage are verified. MySQL, MongoDB, and hybrid configurations remain broader product goals, not current support claims. Keep provider-specific behavior behind the persistence boundary and do not add superficial provider switches.
 
 The initial catalog uses Entity Framework Core migrations. `StoreProduct` represents the single storefront product; `ProductVariant` stores the selectable SKU, display name, price/currency code, active state, and stock quantity. The public catalog query returns only the published product and active variants, and exposes availability without exposing exact stock counts.
 
@@ -30,7 +32,7 @@ The API accepts requests only when ASP.NET Core sees an HTTPS scheme. The local 
 
 ## Administrator authentication
 
-Administrator accounts use ASP.NET Core Identity with PostgreSQL persistence and secure cookies. Mutating browser API calls require an anti-forgery request token. Credentialed CORS accepts only configured frontend origins (development permits the local Vite origins). Public registration is not mapped. The first System Admin is created by the one-time local bootstrap command, which prompts for a password; later account creation and role assignment require SystemAdmin authorization. New accounts must change their temporary password on first sign-in.
+Administrator accounts use ASP.NET Core Identity with the configured relational provider and secure cookies. Mutating browser API calls require an anti-forgery request token. Credentialed CORS accepts only configured frontend origins (development permits the local Vite origins). Public registration is not mapped. The first System Admin is created by the one-time local bootstrap command, which prompts for a password; later account creation and role assignment require SystemAdmin authorization. New accounts must change their temporary password on first sign-in.
 
 ## Current implementation boundary
 

@@ -118,6 +118,7 @@ These are recommendations for a maintainable first release, not finalized produc
 
 - Repository contains an ASP.NET Core 10 API project and a React/TypeScript frontend shell.
 - The catalog model is one product with selectable variants, persisted in PostgreSQL for the first release.
+- SQL Server has an experimental provider configuration and isolated initial migration set for local evaluation; it is not included in the supported-provider claim.
 - The public API can read the single published product and its active variants over HTTPS.
 - The System Admin panel can edit product content and variants; catalog edits create before/after audit records. Other role permissions remain open.
 - The storefront displays a published product and selectable variants. COD order submission remains pending the checkout policy decisions.

@@ -10,10 +10,13 @@ using OneCart.Api.Data;
 var builder = WebApplication.CreateBuilder(args);
 var storeConnectionString = builder.Configuration.GetConnectionString("Store")
     ?? throw new InvalidOperationException(
-        "Configure ConnectionStrings:Store with the PostgreSQL connection string.");
+        "Configure ConnectionStrings:Store for the selected Database:Provider.");
 
 builder.Services.AddDbContext<StoreDbContext>(options =>
-    options.UseNpgsql(storeConnectionString));
+    StoreDatabaseProvider.Configure(
+        options,
+        StoreDatabaseProvider.GetProviderName(builder.Configuration["Database:Provider"]),
+        storeConnectionString));
 builder.Services.AddScoped<StorefrontCatalogService>();
 builder.Services.AddScoped<AdminCatalogService>();
 builder.Services.AddIdentity<AdminUser, IdentityRole<Guid>>(options =>

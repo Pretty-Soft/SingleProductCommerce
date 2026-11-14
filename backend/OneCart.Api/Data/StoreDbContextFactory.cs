@@ -18,12 +18,14 @@ public sealed class StoreDbContextFactory : IDesignTimeDbContextFactory<StoreDbC
 
         var connectionString = configuration.GetConnectionString("Store")
             ?? throw new InvalidOperationException(
-                "Configure ConnectionStrings:Store before running Entity Framework commands.");
+                "Configure ConnectionStrings:Store for the selected Database:Provider before running Entity Framework commands.");
 
-        var options = new DbContextOptionsBuilder<StoreDbContext>()
-            .UseNpgsql(connectionString)
-            .Options;
+        var optionsBuilder = new DbContextOptionsBuilder<StoreDbContext>();
+        StoreDatabaseProvider.Configure(
+            optionsBuilder,
+            StoreDatabaseProvider.GetProviderName(configuration["Database:Provider"]),
+            connectionString);
 
-        return new StoreDbContext(options);
+        return new StoreDbContext(optionsBuilder.Options);
     }
 }

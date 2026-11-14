@@ -29,7 +29,7 @@ public sealed class AdminCatalogService(StoreDbContext database)
         var product = await database.Products
             .Include(candidate => candidate.Variants)
             .SingleOrDefaultAsync(cancellationToken);
-        var errors = Validate(request, product);
+        var errors = ValidateProduct(request, product);
         if (errors.Count > 0)
         {
             return AdminCatalogSaveResult.Invalid(errors);
@@ -105,7 +105,7 @@ public sealed class AdminCatalogService(StoreDbContext database)
         return AdminCatalogSaveResult.Saved(ToResponse(product));
     }
 
-    private Dictionary<string, string[]> Validate(AdminProductRequest request, StoreProduct? product)
+    public static Dictionary<string, string[]> ValidateProduct(AdminProductRequest request, StoreProduct? product)
     {
         var errors = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         void AddError(string field, string message)
