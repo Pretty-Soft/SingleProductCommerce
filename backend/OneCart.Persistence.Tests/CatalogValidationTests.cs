@@ -14,6 +14,30 @@ public sealed class CatalogValidationTests
     }
 
     [Fact]
+    public void Locks_store_currency_change_after_initial_setup()
+    {
+        var existingProduct = new StoreProduct { CurrencyCode = "USD" };
+        var request = ValidPublishedProduct() with { CurrencyCode = "BDT" };
+
+        var errors = AdminCatalogService.ValidateProduct(request, existingProduct);
+
+        Assert.Contains(nameof(AdminProductRequest.CurrencyCode), errors.Keys);
+    }
+
+    [Fact]
+    public void Requires_all_variants_to_use_the_store_currency()
+    {
+        var request = ValidPublishedProduct() with
+        {
+            Variants = [Variant() with { CurrencyCode = "BDT" }]
+        };
+
+        var errors = AdminCatalogService.ValidateProduct(request, null);
+
+        Assert.Contains("Variants[0]", errors.Keys);
+    }
+
+    [Fact]
     public void Rejects_duplicate_skus_and_negative_stock()
     {
         var request = ValidPublishedProduct() with
@@ -123,7 +147,8 @@ public sealed class CatalogValidationTests
         "onecart-sample",
         "A sample product description.",
         true,
-        [Variant()]);
+        [Variant()],
+        CurrencyCode: "USD");
 
     private static AdminProductVariantRequest Variant(
         Guid? id = null,

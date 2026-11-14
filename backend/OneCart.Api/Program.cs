@@ -1,11 +1,13 @@
 using System.Net;
 using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using OneCart.Api.Admin;
 using OneCart.Api.Catalog;
 using OneCart.Api.Data;
+using OneCart.Api.Orders;
 
 var builder = WebApplication.CreateBuilder(args);
 var storeConnectionString = builder.Configuration.GetConnectionString("Store")
@@ -20,6 +22,12 @@ builder.Services.AddDbContext<StoreDbContext>(options =>
 builder.Services.AddScoped<StorefrontCatalogService>();
 builder.Services.AddScoped<AdminCatalogService>();
 builder.Services.AddScoped<ProductMediaService>();
+builder.Services.AddScoped<CartQuoteService>();
+builder.Services.AddScoped<CheckoutService>();
+builder.Services.AddScoped<OrderManagementService>();
+builder.Services.AddDataProtection();
+builder.Services.AddSingleton(services => services.GetRequiredService<IDataProtectionProvider>()
+    .CreateProtector("OneCart.CartQuote.v1"));
 builder.Services.AddSingleton<IProductImageStorage>(services =>
 {
     var environment = services.GetRequiredService<IWebHostEnvironment>();
@@ -165,6 +173,7 @@ app.MapGet("/api/v1/store/product/images/{imageId:guid}", async (
         : Results.File(image.Content, image.ContentType, enableRangeProcessing: false);
 });
 app.MapAdminEndpoints();
+app.MapOrderEndpoints();
 
 if (args.Length == 2 && args[0] == "--bootstrap-system-admin")
 {

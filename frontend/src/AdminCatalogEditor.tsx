@@ -16,6 +16,7 @@ interface EditableProduct {
   name: string;
   slug: string;
   description: string;
+  currencyCode: string;
   isPublished: boolean;
   variants: EditableVariant[];
   attributeGroups: EditableAttributeGroup[];
@@ -78,6 +79,7 @@ const emptyProduct = (): EditableProduct => ({
   name: "",
   slug: "",
   description: "",
+  currencyCode: "",
   isPublished: false,
   variants: [emptyVariant()],
   attributeGroups: [],
@@ -318,6 +320,29 @@ export default function AdminCatalogEditor() {
       </div>
       {loading ? <p className="admin-muted">Loading catalog…</p> : (
         <form className="catalog-form" onSubmit={handleSave}>
+          <div className="store-currency-setting">
+            <label>
+              Store currency
+              <input
+                maxLength={3}
+                minLength={3}
+                pattern="[A-Za-z]{3}"
+                required
+                value={product.currencyCode}
+                disabled={Boolean(product.id)}
+                placeholder="e.g. BDT"
+                onChange={(event) => {
+                  const currencyCode = event.target.value.toUpperCase();
+                  setProduct((current) => ({
+                    ...current,
+                    currencyCode,
+                    variants: current.variants.map((variant) => ({ ...variant, currencyCode }))
+                  }));
+                }}
+              />
+            </label>
+            <p className="admin-muted">Applies to all variant prices and orders. Changing it after setup is locked until the price conversion rule is configured.</p>
+          </div>
           <div className="catalog-fields">
             <label>
               Store / brand name
@@ -432,7 +457,7 @@ export default function AdminCatalogEditor() {
           <div className="section-heading variant-heading">
             <div>
               <h3>Variants</h3>
-              <p className="admin-muted">Each variant has its own SKU, display name, price, currency and stock count.</p>
+              <p className="admin-muted">Each variant has its own SKU, display name, price, and stock count. All prices use the store currency.</p>
             </div>
             <button className="button button-quiet" type="button" onClick={() => updateProduct("variants", [...product.variants, emptyVariant()])} disabled={busy || product.variants.length >= 100}>
               Add variant
@@ -454,10 +479,6 @@ export default function AdminCatalogEditor() {
                 <label>
                   Price
                   <input type="number" min="0" step="0.0001" required value={variant.price} onChange={(event) => updateVariant(index, { price: Number(event.target.value) })} />
-                </label>
-                <label>
-                  Currency code
-                  <input maxLength={3} minLength={3} pattern="[A-Za-z]{3}" required placeholder="e.g. USD" value={variant.currencyCode} onChange={(event) => updateVariant(index, { currencyCode: event.target.value.toUpperCase() })} />
                 </label>
                 <label>
                   Stock quantity

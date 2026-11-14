@@ -3,7 +3,7 @@
 **Status:** Initial baseline for implementation  
 **Source:** Product planning conversation linked in the project kickoff  
 **Product name:** OneCart Commerce (working name)  
-**Last captured:** 2026-11-14
+**Last captured:** 2026-11-15
 
 This document records requirements that were stated in the planning conversation. Implementation suggestions and unknowns are labeled separately; they are not silently treated as confirmed requirements.
 
@@ -41,6 +41,7 @@ The project should be developed with human review and release quality in mind. C
 - Allow guest checkout with customer name, phone number, and delivery address.
 - Save a new order in Pending status and show its order number after placement. Administrators may update or cancel an order.
 - Decrease inventory atomically when an order is placed, restore it if an administrator cancels the order, and do not impose an additional per-order quantity cap.
+- Retain the signed unit-price and currency quote captured when each cart line is added. Checkout must not accept client-edited prices, must preserve order-line price/product snapshots, and must reject mixed-currency carts/orders.
 - Capture and manage customer orders through the admin experience.
 - Track order status and provide the administrator with order and sales visibility.
 - Do not assume online payment gateways are in scope.
@@ -57,9 +58,10 @@ The project should be developed with human review and release quality in mind. C
 ### Languages, currency, and theme
 
 - Support multiple storefront languages managed through administration.
-- The administrator selects one active currency for the whole store. New cart lines retain the currency active when they were added. COD orders cannot mix currencies and currency conversion is not performed.
+- The administrator selects one active currency for the whole store. A cart line retains both its numeric unit price and currency from when it was added. COD orders cannot mix currencies and currency conversion is not performed.
+- After initial product/currency setup, changing the store currency is locked until the owner defines the price-conversion rule. Existing order currency and totals remain historical snapshots.
 - Provide a dynamic theme system for colors, typography, layouts, and live preview.
-- **Open decision:** Translation workflow and fallback language; currency catalog, whether currency conversion/exchange rates are needed, rounding rules, and how changing the store currency affects existing product prices and historical orders; theme customization boundaries.
+- **Open decision:** Translation workflow and fallback language; currency catalog and rounding rules; the owner-provided conversion rule for changing existing product prices when the store currency changes; theme customization boundaries.
 
 ### Installation and hosting
 
@@ -120,19 +122,19 @@ These are recommendations for a maintainable first release, not finalized produc
 - Product attribute types and presentation controls (for example dropdown, radio, checkbox), whether multiple choices may be selected per attribute, and how required/optional rules are configured.
 - Whether attribute combinations need compatibility rules, combination-specific SKUs/stock, or only independent price adjustments.
 - Whether product-page wishlist, compare, email-a-friend, and reviews are included in the first release, and their account, privacy, moderation, and notification rules.
-- How attribute price adjustments interact with variants, discounts, taxes, currency conversion, and order-price snapshots.
+- How attribute price adjustments interact with variants, discounts, taxes, and currency conversion.
 - Discount configuration rules: whether to retain both percentage and fixed-amount modes, whether promotions apply to all variants or selected ones, sale-price validation, currency-specific rounding, and how a fixed amount applies when variants use different currencies.
 - Flash-sale schedule input timezone, boundary behavior, and whether administrators can schedule multiple or overlapping promotions.
 - Product media upload format, size limits, storage, processing, and replacement/retention rules.
 - Storefront branding/theme controls, configurable trust/service details, and which content blocks may be hidden or reordered.
 - Additional social networks beyond the native share sheet/copy-link action, and WhatsApp contact display location, phone-number format/validation, and default message content.
-- Guest checkout with customer name, phone number, and delivery address is confirmed. New orders start Pending, display an order number, and can be updated/cancelled by an administrator. **Open decision:** Address field structure and validation, phone-number validation, the available admin status transitions, and currency/price snapshot rules.
+- Guest checkout with customer name, phone number, and delivery address is confirmed. New COD orders start Pending and display an order number. Admins can update or cancel orders. Placement atomically reduces stock; cancellation restores it; there is no additional per-order quantity cap. Cart lines preserve the signed add-time unit price and currency, and mixed-currency carts/orders are rejected. **Open decision:** Address field structure and validation, phone-number validation, and the exact allowed admin status transitions.
 - Admin roles, account recovery, and optional administrator MFA.
 - Detailed permission mapping for the initial `SystemAdmin`, `CatalogManager`, `OrderManager`, and `StoreManager` roles; current role names are built-in starting defaults.
 - Which additional database providers, beyond the confirmed first-release PostgreSQL provider, are required for release.
 - Whether “hybrid” means multiple providers used together, relational plus document storage, or another deployment pattern.
 - Supported languages and translation ownership.
-- Whether cart lines retain their numeric unit price from add time or update to the current catalog price. What happens to existing product prices and historical order totals when the admin changes the one active store currency; the owner will provide the conversion rule.
+- How the owner-provided conversion rule will translate existing product prices when the admin changes the one active store currency. Historical order totals and their currencies remain unchanged.
 - Theme customization boundaries and whether custom CSS is allowed.
 - Installer and upgrade strategy for IIS, Linux, and Docker.
 - Certificate provisioning, renewal, and trusted reverse-proxy addresses for supported hosting environments.
@@ -144,11 +146,11 @@ These are recommendations for a maintainable first release, not finalized produc
 - Repository contains an ASP.NET Core 10 API project and a React/TypeScript frontend shell.
 - The catalog model is one product with selectable variants, persisted in PostgreSQL for the first release.
 - SQL Server has an experimental provider configuration and isolated initial migration set for local evaluation; it is not included in the supported-provider claim.
-- The public API can read the single published product and its active variants over HTTPS.
+- The public API can read the single published product and its active variants over HTTPS. Signed cart quotes and guest COD checkout are implemented: orders start Pending, persist price/product snapshots, show a generated order number, and atomically reduce inventory. Authorized admins can review orders, move Pending orders to Processing or Cancelled, move Processing orders to Completed or Cancelled, and cancellation restores stock exactly once. These status transitions are current implementation behavior; broader transition policy remains an open product decision.
 - The System Admin panel can edit product content, variants, required/optional attribute groups, and option-level price adjustments; catalog edits create before/after audit records. Other role permissions remain open.
-- The storefront displays a published product and selectable variants/attributes, updates the displayed total for option price adjustments, and supports a session-only cart with quantity editing and estimated subtotals. Guest checkout fields, Pending status, on-screen order number, admin update/cancel, atomic stock decrement/restoration, and no additional quantity cap are confirmed; COD order submission is not implemented yet.
+- The storefront displays a published product and selectable variants/attributes, updates the displayed total for option price adjustments, and supports a session-only cart with quantity editing and estimated subtotals. Guest COD checkout captures name, phone, and address; shows a Pending order number; and decrements stock atomically. Admin order cancellation restores stock.
 - The System Admin panel can configure percentage/fixed flash-sale discounts and schedules, sharing, and WhatsApp contact details. The storefront shows regular/sale prices only during the sale window, with a countdown while active, and provides share and WhatsApp contact actions.
-- The store uses one administrator-selected currency across product variants, cart totals, and orders; mixed-currency carts/orders are rejected. Currency change behavior for existing prices and historical orders remains open.
+- The store uses one administrator-selected currency across product variants, cart totals, and orders; mixed-currency carts/orders are rejected. A signed quote locks each cart line's numeric unit price and currency at add time. Currency changes are locked after product setup until the owner defines the conversion rule; existing orders retain their historical currency and totals.
 - System Admin can upload and manage up to eight product images plus one brand logo, edit image alternative text/order, configure the brand name and product-page headline/subtitle, and manage up to eight trust/service details. JPEG/PNG/WebP up to 10 MB are accepted by the current implementation; local file storage defaults to `backend/OneCart.Api/App_Data/product-images` and is configurable with `ProductMedia:RootPath`. These format, size, storage, processing, and replacement choices are implementation defaults pending the open decision below; image transformations/CDN storage are not implemented.
 - The sale schedule is entered in the administrator's local time and stored in UTC. Percentage discounts currently round the displayed sale price to four decimal places and apply to the selected variant's base price; attribute add-on prices are then added at their configured amounts. Confirmation of currency-specific rounding and attribute-discount interaction remains open.
 - Only System Admin accounts can create users and assign roles through the admin panel.

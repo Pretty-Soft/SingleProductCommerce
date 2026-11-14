@@ -10,6 +10,7 @@ export interface StorefrontProduct {
   name: string;
   slug: string;
   description: string;
+  currencyCode: string;
   brandName: string;
   storefrontHeadline: string;
   storefrontSubtitle: string;
@@ -21,6 +22,22 @@ export interface StorefrontProduct {
   images: StorefrontProductImage[];
   brandLogoUrl: string | null;
   trustItems: StorefrontTrustItem[];
+}
+
+export interface CartPriceQuote {
+  token: string;
+  currencyCode: string;
+  unitPrice: number;
+  quotedAtUtc: string;
+}
+
+export interface StoreOrderConfirmation {
+  orderNumber: string;
+  status: string;
+  currencyCode: string;
+  total: number;
+  createdAtUtc: string;
+  lines: Array<{ productName: string; variantName: string; quantity: number; unitPrice: number }>;
 }
 
 export interface StorefrontProductImage {
@@ -74,6 +91,39 @@ export async function getPublishedProduct(): Promise<StorefrontProduct | null> {
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`The catalog could not be loaded (${response.status}).`);
   return (await response.json()) as StorefrontProduct;
+}
+
+export async function quoteCartSelection(variantId: string, attributeOptionIds: string[]): Promise<CartPriceQuote> {
+  const response = await fetch(`${apiBase}/api/v1/store/cart/quote`, {
+    method: "POST",
+    credentials: "omit",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ variantId, attributeOptionIds })
+  });
+  return readResponse<CartPriceQuote>(response);
+}
+
+export async function placeStoreOrder(request: {
+  customerName: string;
+  phoneNumber: string;
+  deliveryAddress: string;
+  lines: Array<{ quoteToken: string; quantity: number }>;
+}): Promise<StoreOrderConfirmation> {
+  const response = await fetch(`${apiBase}/api/v1/store/orders`, {
+    method: "POST",
+    credentials: "omit",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request)
+  });
+  return readResponse<StoreOrderConfirmation>(response);
+}
+
+async function readResponse<T>(response: Response): Promise<T> {
+  const body = await response.json().catch(() => null) as { detail?: string; error?: string; title?: string } | null;
+  if (!response.ok) {
+    throw new Error(body?.detail ?? body?.error ?? body?.title ?? `Store request failed (${response.status}).`);
+  }
+  return body as T;
 }
 
 export function getMediaUrl(path: string): string {

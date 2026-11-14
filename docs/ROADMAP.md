@@ -9,18 +9,18 @@ This roadmap sequences work using confirmed product requirements. It contains no
 - Product requirements, architecture notes, and Codex instructions.
 - Local setup instructions for the API and storefront.
 
-## Stage 1 — Resolve remaining checkout decisions (in progress)
+## Stage 1 — Resolve core checkout decisions (complete; some policies remain open)
 
 Confirmed: the catalog is one product with selectable variants, and PostgreSQL is the first-release database provider.
 
-Still confirm these before completing order submission and inventory behavior:
+Still open for owner decision:
 
-- Address structure/validation, phone-number validation, and admin status transitions. Guest checkout with customer name, phone, and delivery address is confirmed; orders start Pending, display an order number, and admins can update or cancel them.
+- Address structure/validation, phone-number validation, and exact admin status transitions. Guest checkout with customer name, phone, and delivery address is confirmed; orders start Pending, display an order number, and admins can update or cancel them.
 - Variant option dimensions (such as size/color). Stock will be decremented atomically when an order is placed and restored when an admin cancels it; no extra per-order quantity cap is required.
 - Initial store language and translation fallback.
-- Currency change behavior for existing prices and historical orders; the owner will provide a conversion rule. One active currency for the whole store is confirmed, and cart lines retain the currency active at add time.
+- Currency conversion rule for changing existing product prices. One active currency for the whole store is confirmed, cart lines retain numeric price and currency from add time, mixed-currency carts/orders are rejected, and historical order totals remain unchanged.
 
-The catalog schema and read API can now be implemented without guessing checkout behavior. Remaining choices can be confirmed before their corresponding features are implemented.
+The core order workflow proceeds with the confirmed rules. Remaining policies stay explicit until the owner decides them.
 
 ## Stage 2 — Commerce vertical slice (catalog setup in progress)
 
@@ -28,9 +28,9 @@ Build a working path through product setup, public product display, COD checkout
 
 Acceptance: an administrator can configure the approved product shape; a customer can submit a valid COD order over HTTPS; the order is persisted with a stable status and can be reviewed by an authorized administrator.
 
-The catalog persistence, public read endpoint, protected product editor, variant management, configurable required/optional product attributes, scheduled percentage/fixed flash-sale discounts, live sale countdown, social sharing, WhatsApp contact, configurable branding, product image/logo uploads, trust/service content, and session-only shopping cart are implemented. The endpoint returns `404` until a published product with an active variant exists. The editor is temporarily restricted to System Admin while detailed role permissions remain open. COD order creation is the next implementation slice; the order lifecycle and inventory rules are confirmed, while address/phone validation, currency change, and price snapshot rules remain open.
+The catalog persistence, public read endpoint, protected product editor, variant management, configurable required/optional product attributes, scheduled percentage/fixed flash-sale discounts, live sale countdown, social sharing, WhatsApp contact, configurable branding, product image/logo uploads, trust/service content, and session-only shopping cart are implemented. Signed price quotes and guest COD checkout now create Pending orders, capture order-line snapshots, decrement inventory atomically, and show an order number. System Admins can review orders and change their status; cancellation restores stock. The editor is restricted to System Admin while detailed role permissions remain open. Address/phone validation, exact status transitions, and currency conversion policy remain open.
 
-## Stage 3 — Store administration and security (user management in progress)
+## Stage 3 — Store administration and security (user management and order management in progress)
 
 Use built-in email/password accounts with secure cookies, anti-forgery protection, and lockout. Bootstrap the first System Admin from a local command; only System Admins can create accounts and assign the initial roles. User management, recent audit history, and audit records for account and product changes are implemented. Then add store settings, order and customer views, and inventory controls. Define account recovery and MFA behavior before implementing those flows.
 

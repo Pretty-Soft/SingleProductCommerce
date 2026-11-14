@@ -482,6 +482,11 @@ namespace OneCart.SqlServer.Migrations.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(8000)
@@ -570,6 +575,119 @@ namespace OneCart.SqlServer.Migrations.Migrations
                             t.HasCheckConstraint("ck_store_products_flash_sale_window", "[FlashSaleEnabled] = 0 OR ([FlashSaleStartsAtUtc] IS NOT NULL AND [FlashSaleEndsAtUtc] IS NOT NULL AND [FlashSaleEndsAtUtc] > [FlashSaleStartsAtUtc])");
 
                             t.HasCheckConstraint("ck_store_products_name_not_empty", "LEN([Name]) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("OneCart.Api.Orders.StoreOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<string>("CustomerName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("DeliveryAddress")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("OrderNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<decimal>("Total")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("OrderNumber")
+                        .IsUnique();
+
+                    b.ToTable("store_orders", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_store_orders_status", "[Status] IN (N'Pending', N'Processing', N'Completed', N'Cancelled')");
+
+                            t.HasCheckConstraint("ck_store_orders_total_non_negative", "[Total] >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("OneCart.Api.Orders.StoreOrderLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SelectedOptionsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Sku")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<Guid>("VariantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("VariantName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("VariantId");
+
+                    b.ToTable("store_order_lines", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_store_order_lines_quantity_positive", "[Quantity] > 0");
+
+                            t.HasCheckConstraint("ck_store_order_lines_unit_price_non_negative", "[UnitPrice] >= 0");
                         });
                 });
 
@@ -679,9 +797,33 @@ namespace OneCart.SqlServer.Migrations.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("OneCart.Api.Orders.StoreOrderLine", b =>
+                {
+                    b.HasOne("OneCart.Api.Orders.StoreOrder", "Order")
+                        .WithMany("Lines")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("OneCart.Api.Catalog.ProductVariant", "Variant")
+                        .WithMany("OrderLines")
+                        .HasForeignKey("VariantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Order");
+
+                    b.Navigation("Variant");
+                });
+
             modelBuilder.Entity("OneCart.Api.Catalog.ProductAttributeGroup", b =>
                 {
                     b.Navigation("Options");
+                });
+
+            modelBuilder.Entity("OneCart.Api.Catalog.ProductVariant", b =>
+                {
+                    b.Navigation("OrderLines");
                 });
 
             modelBuilder.Entity("OneCart.Api.Catalog.StoreProduct", b =>
@@ -693,6 +835,11 @@ namespace OneCart.SqlServer.Migrations.Migrations
                     b.Navigation("TrustItems");
 
                     b.Navigation("Variants");
+                });
+
+            modelBuilder.Entity("OneCart.Api.Orders.StoreOrder", b =>
+                {
+                    b.Navigation("Lines");
                 });
 #pragma warning restore 612, 618
         }

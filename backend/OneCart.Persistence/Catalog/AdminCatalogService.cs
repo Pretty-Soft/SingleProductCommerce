@@ -43,6 +43,22 @@ public sealed class AdminCatalogService(StoreDbContext database)
             return AdminCatalogSaveResult.Invalid(errors);
         }
 
+        if (product is not null)
+        {
+            var removedVariantIds = product.Variants
+                .Where(existing => request.Variants.All(requested => requested.Id != existing.Id))
+                .Select(existing => existing.Id)
+                .ToArray();
+            if (removedVariantIds.Length > 0 && await database.StoreOrderLines
+                .AnyAsync(line => removedVariantIds.Contains(line.VariantId), cancellationToken))
+            {
+                return AdminCatalogSaveResult.Invalid(new Dictionary<string, string[]>
+                {
+                    [nameof(request.Variants)] = ["A variant referenced by an order cannot be removed. Deactivate it instead."]
+                });
+            }
+        }
+
         var before = product is null ? null : CreateAuditSnapshot(product);
 
         product ??= new StoreProduct
@@ -57,6 +73,7 @@ public sealed class AdminCatalogService(StoreDbContext database)
         product.BrandName = (request.BrandName ?? "OneCart").Trim();
         product.StorefrontHeadline = request.StorefrontHeadline?.Trim() ?? string.Empty;
         product.StorefrontSubtitle = request.StorefrontSubtitle?.Trim() ?? string.Empty;
+        product.CurrencyCode = request.CurrencyCode!.Trim().ToUpperInvariant();
         product.IsPublished = request.IsPublished;
         var flashSale = request.FlashSale ?? AdminFlashSaleRequest.Disabled;
         product.FlashSaleEnabled = flashSale.Enabled;
@@ -94,7 +111,7 @@ public sealed class AdminCatalogService(StoreDbContext database)
             variant.Sku = requestedVariant.Sku.Trim().ToUpperInvariant();
             variant.DisplayName = requestedVariant.DisplayName.Trim();
             variant.Price = requestedVariant.Price;
-            variant.CurrencyCode = requestedVariant.CurrencyCode.Trim().ToUpperInvariant();
+            variant.CurrencyCode = product.CurrencyCode;
             variant.StockQuantity = requestedVariant.StockQuantity;
             variant.IsActive = requestedVariant.IsActive;
         }
@@ -257,6 +274,17 @@ public sealed class AdminCatalogService(StoreDbContext database)
         if ((request.StorefrontSubtitle?.Trim().Length ?? 0) > 500)
         {
             AddError(nameof(request.StorefrontSubtitle), "Storefront subtitle must be 500 characters or fewer.");
+        }
+
+        var storeCurrency = request.CurrencyCode?.Trim().ToUpperInvariant() ?? string.Empty;
+        if (storeCurrency.Length != 3 || storeCurrency.Any(character => character < 'A' || character > 'Z'))
+        {
+            AddError(nameof(request.CurrencyCode), "Choose a three-letter store currency code.");
+        }
+        else if (product is not null && !string.IsNullOrWhiteSpace(product.CurrencyCode)
+            && !string.Equals(product.CurrencyCode, storeCurrency, StringComparison.Ordinal))
+        {
+            AddError(nameof(request.CurrencyCode), "Changing store currency is locked until a price conversion rule is configured.");
         }
 
         var trustItems = request.TrustItems?.Where(item => item is not null).ToList() ?? [];
@@ -484,6 +512,10 @@ public sealed class AdminCatalogService(StoreDbContext database)
             {
                 AddError(field, "Currency code must contain three letters.");
             }
+            else if (!string.Equals(normalizedCurrencyCode, storeCurrency, StringComparison.Ordinal))
+            {
+                AddError(field, "All variant prices must use the store currency selected above.");
+            }
 
             if (variant.Price < 0 || variant.Price > 99999999999999.9999m || decimal.Round(variant.Price, 4) != variant.Price)
             {
@@ -509,6 +541,7 @@ public sealed class AdminCatalogService(StoreDbContext database)
         product.Name,
         product.Slug,
         product.Description,
+        product.CurrencyCode,
         product.BrandName,
         product.StorefrontHeadline,
         product.StorefrontSubtitle,
@@ -520,7 +553,7 @@ public sealed class AdminCatalogService(StoreDbContext database)
                 variant.Sku,
                 variant.DisplayName,
                 variant.Price,
-                variant.CurrencyCode,
+                product.CurrencyCode,
                 variant.StockQuantity,
                 variant.IsActive))
             .ToArray(),
@@ -562,6 +595,7 @@ public sealed class AdminCatalogService(StoreDbContext database)
         product.Name,
         product.Slug,
         product.Description,
+        product.CurrencyCode,
         product.BrandName,
         product.StorefrontHeadline,
         product.StorefrontSubtitle,
@@ -623,7 +657,8 @@ public sealed record AdminProductRequest(
     string? BrandName = "OneCart",
     string? StorefrontHeadline = null,
     string? StorefrontSubtitle = null,
-    IReadOnlyList<AdminProductTrustItemRequest>? TrustItems = null);
+    IReadOnlyList<AdminProductTrustItemRequest>? TrustItems = null,
+    string? CurrencyCode = null);
 
 public sealed record AdminFlashSaleRequest(
     bool Enabled,
@@ -665,6 +700,7 @@ public sealed record AdminProductResponse(
     string Name,
     string Slug,
     string Description,
+    string CurrencyCode,
     string BrandName,
     string StorefrontHeadline,
     string StorefrontSubtitle,

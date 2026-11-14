@@ -53,6 +53,7 @@ public sealed class SqlServerCatalogIntegrationTests
                     [new AdminProductAttributeOptionRequest(null, "16 GB", 25m, true, 0)])]);
             request = request with
             {
+                CurrencyCode = "USD",
                 FlashSale = new AdminFlashSaleRequest(
                     true,
                     "Integration sale",

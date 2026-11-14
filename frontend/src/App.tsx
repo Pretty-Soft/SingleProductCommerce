@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import AdminApp from "./AdminApp";
-import { getMediaUrl, getPublishedProduct, StorefrontProduct } from "./storeApi";
+import { getMediaUrl, getPublishedProduct, placeStoreOrder, quoteCartSelection, StorefrontProduct, StoreOrderConfirmation } from "./storeApi";
 import { addCartSelection, CartLine, changeCartSelectionQuantity, removeCartSelection } from "./cart";
 
 export default function App() {
@@ -25,6 +25,13 @@ function Storefront() {
   const [cartItems, setCartItems] = useState<CartLine[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [cartMessage, setCartMessage] = useState("");
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
+  const [customerName, setCustomerName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [orderConfirmation, setOrderConfirmation] = useState<StoreOrderConfirmation | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -79,12 +86,7 @@ function Storefront() {
   const cartSubtotals = cartItems.reduce<Record<string, number>>((totals, item) => {
     const variant = product?.variants.find((candidate) => candidate.id === item.variantId);
     if (!product || !variant) return totals;
-    const unitPrice = (flashSaleActive && variant.salePrice != null ? variant.salePrice : variant.price)
-      + product.attributeGroups
-        .flatMap((group) => group.options)
-        .filter((option) => item.optionIds.includes(option.id))
-        .reduce((sum, option) => sum + option.priceAdjustment, 0);
-    totals[item.currencyCode] = (totals[item.currencyCode] ?? 0) + unitPrice * item.quantity;
+    totals[item.currencyCode] = (totals[item.currencyCode] ?? 0) + item.unitPrice * item.quantity;
     return totals;
   }, {});
 
@@ -98,18 +100,27 @@ function Storefront() {
     });
   }
 
-  function addToCart() {
+  async function addToCart() {
     if (!selectedVariant || !selectedVariant.isAvailable || !requiredAttributesSelected) return;
+    setCheckoutError("");
+    setCheckoutBusy(true);
     const optionIds = selectedOptions.map((option) => option.id).sort();
-    const result = addCartSelection(cartItems, selectedVariant.id, optionIds, quantity, selectedVariant.currencyCode);
-    if (result.error) {
-      setCartMessage(result.error);
+    try {
+      const quote = await quoteCartSelection(selectedVariant.id, optionIds);
+      const result = addCartSelection(cartItems, selectedVariant.id, optionIds, quantity, quote);
+      if (result.error) {
+        setCartMessage(result.error);
+        setCartOpen(true);
+        return;
+      }
+      setCartItems(result.items);
+      setCartMessage(`${quantity} ${quantity === 1 ? "item" : "items"} added to your cart at the quoted price.`);
       setCartOpen(true);
-      return;
+    } catch (reason) {
+      setCartMessage(reason instanceof Error ? reason.message : "Could not price this cart selection.");
+    } finally {
+      setCheckoutBusy(false);
     }
-    setCartItems(result.items);
-    setCartMessage(`${quantity} ${quantity === 1 ? "item" : "items"} added to your cart.`);
-    setCartOpen(true);
   }
 
   function changeCartQuantity(key: string, change: number) {
@@ -118,6 +129,31 @@ function Storefront() {
 
   function removeCartItem(key: string) {
     setCartItems((current) => removeCartSelection(current, key));
+  }
+
+  async function submitOrder(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setCheckoutBusy(true);
+    setCheckoutError("");
+    try {
+      const order = await placeStoreOrder({
+        customerName,
+        phoneNumber,
+        deliveryAddress,
+        lines: cartItems.map((item) => ({ quoteToken: item.quoteToken, quantity: item.quantity }))
+      });
+      setOrderConfirmation(order);
+      setCartItems([]);
+      setCheckoutOpen(false);
+      setCustomerName("");
+      setPhoneNumber("");
+      setDeliveryAddress("");
+      setCartMessage("");
+    } catch (reason) {
+      setCheckoutError(reason instanceof Error ? reason.message : "The order could not be placed. Review your cart and try again.");
+    } finally {
+      setCheckoutBusy(false);
+    }
   }
 
   async function shareProduct() {
@@ -258,7 +294,7 @@ function Storefront() {
                   : formatPrice(selectedVariant.price - selectedVariant.salePrice, selectedVariant.currencyCode)} during this sale
               </p>
             )}
-            <button type="button" disabled={!selectedVariant?.isAvailable || !requiredAttributesSelected} onClick={addToCart}>
+            <button type="button" disabled={!selectedVariant?.isAvailable || !requiredAttributesSelected || checkoutBusy} onClick={() => void addToCart()}>
               Add to cart
             </button>
             <p className="note">{!requiredAttributesSelected ? "Choose an option for every required attribute." : !selectedVariant?.isAvailable ? "This option is currently out of stock." : "Cash on Delivery checkout will be available after store setup is complete."}</p>
@@ -303,14 +339,12 @@ function Storefront() {
                   const variant = product.variants.find((candidate) => candidate.id === item.variantId);
                   if (!variant) return null;
                   const chosenOptions = product.attributeGroups.flatMap((group) => group.options.filter((option) => item.optionIds.includes(option.id)));
-                  const unitPrice = (flashSaleActive && variant.salePrice != null ? variant.salePrice : variant.price)
-                    + chosenOptions.reduce((sum, option) => sum + option.priceAdjustment, 0);
                   return (
                     <li className="cart-item" key={item.key}>
                       <div className="cart-item-copy">
                         <strong>{product.name} · {variant.displayName}</strong>
                         {chosenOptions.length > 0 && <small>{chosenOptions.map((option) => option.name).join(", ")}</small>}
-                        <span>{formatPrice(unitPrice, item.currencyCode)} each</span>
+                        <span>{formatPrice(item.unitPrice, item.currencyCode)} each</span>
                       </div>
                       <div className="cart-item-actions" aria-label={`Quantity for ${variant.displayName}`}>
                         <button type="button" aria-label="Decrease quantity" onClick={() => changeCartQuantity(item.key, -1)}>−</button>
@@ -324,11 +358,33 @@ function Storefront() {
               </ul>
               <div className="cart-summary">
                 <div><strong>Estimated subtotal</strong>{Object.entries(cartSubtotals).map(([currency, amount]) => <strong key={currency}>{formatPrice(amount, currency)}</strong>)}</div>
-                <p>Prices and availability are confirmed when COD checkout is enabled.</p>
+                <p>Price and currency are locked from when each cart line was added. Stock is confirmed when you place the order.</p>
+                {!checkoutOpen && <button type="button" onClick={() => { setCheckoutError(""); setCheckoutOpen(true); }}>Cash on Delivery checkout</button>}
               </div>
+              {checkoutOpen && (
+                <form className="checkout-form" onSubmit={(event) => void submitOrder(event)}>
+                  <h3>Delivery details</h3>
+                  <label>Customer name<input autoComplete="name" maxLength={200} required value={customerName} onChange={(event) => setCustomerName(event.target.value)} /></label>
+                  <label>Phone number<input type="tel" autoComplete="tel" maxLength={50} required value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} /></label>
+                  <label>Delivery address<textarea autoComplete="street-address" maxLength={1000} required rows={3} value={deliveryAddress} onChange={(event) => setDeliveryAddress(event.target.value)} /></label>
+                  {checkoutError && <p className="form-error" role="alert">{checkoutError}</p>}
+                  <p className="note">Your order will be saved as Pending. Pay by Cash on Delivery when it arrives.</p>
+                  <button type="submit" disabled={checkoutBusy || cartItems.length === 0}>{checkoutBusy ? "Placing order…" : "Place COD order"}</button>
+                  <button className="button-secondary" type="button" onClick={() => setCheckoutOpen(false)} disabled={checkoutBusy}>Back to cart</button>
+                </form>
+              )}
             </>
           )}
           {cartMessage && <p className="share-message" role="status">{cartMessage}</p>}
+          {orderConfirmation && (
+            <div className="order-confirmation" role="status">
+              <p className="eyebrow">Order placed</p>
+              <h3>Thank you. Your COD order is pending.</h3>
+              <p>Order number: <strong>{orderConfirmation.orderNumber}</strong></p>
+              <p>Total: <strong>{formatPrice(orderConfirmation.total, orderConfirmation.currencyCode)}</strong></p>
+              <p>Keep your order number for reference. Payment is due on delivery.</p>
+            </div>
+          )}
         </section>
       )}
 

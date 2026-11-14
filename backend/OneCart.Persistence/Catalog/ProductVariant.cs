@@ -19,4 +19,6 @@ public sealed class ProductVariant
     public int StockQuantity { get; set; }
 
     public bool IsActive { get; set; }
+
+    public ICollection<OneCart.Api.Orders.StoreOrderLine> OrderLines { get; } = new List<OneCart.Api.Orders.StoreOrderLine>();
 }

@@ -507,7 +507,7 @@ public static class AdminEndpoints
             .GroupBy(error => error.Code)
             .ToDictionary(group => group.Key, group => group.Select(error => error.Description).ToArray()));
 
-    private static async ValueTask<object?> ValidateAntiforgeryAsync(
+    internal static async ValueTask<object?> ValidateAntiforgeryAsync(
         EndpointFilterInvocationContext context,
         EndpointFilterDelegate next)
     {
@@ -524,7 +524,7 @@ public static class AdminEndpoints
         return await next(context);
     }
 
-    private static async ValueTask<object?> RequireChangedPasswordAsync(
+    internal static async ValueTask<object?> RequireChangedPasswordAsync(
         EndpointFilterInvocationContext context,
         EndpointFilterDelegate next)
     {

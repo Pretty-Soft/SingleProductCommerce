@@ -16,6 +16,8 @@ public sealed class StoreProduct
 
     public string StorefrontSubtitle { get; set; } = string.Empty;
 
+    public string CurrencyCode { get; set; } = "";
+
     public bool FlashSaleEnabled { get; set; }
 
     public string FlashSaleLabel { get; set; } = string.Empty;

@@ -42,7 +42,7 @@ public sealed class StorefrontCatalogService(StoreDbContext database)
                 variant.DisplayName,
                 variant.Price,
                 saleConfigured ? CalculateSalePrice(variant.Price, product.FlashSaleDiscountType, product.FlashSaleDiscountValue) : null,
-                variant.CurrencyCode,
+                product.CurrencyCode,
                 variant.StockQuantity > 0))
             .ToArray();
 
@@ -56,6 +56,7 @@ public sealed class StorefrontCatalogService(StoreDbContext database)
             product.Name,
             product.Slug,
             product.Description,
+            product.CurrencyCode,
             product.BrandName,
             product.StorefrontHeadline,
             product.StorefrontSubtitle,
@@ -93,7 +94,7 @@ public sealed class StorefrontCatalogService(StoreDbContext database)
                 .ToArray());
     }
 
-    private static decimal CalculateSalePrice(decimal price, string discountType, decimal discountValue)
+    public static decimal CalculateSalePrice(decimal price, string discountType, decimal discountValue)
     {
         var discount = discountType switch
         {

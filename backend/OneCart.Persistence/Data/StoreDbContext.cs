@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using OneCart.Api.Admin;
 using OneCart.Api.Catalog;
+using OneCart.Api.Orders;
 
 namespace OneCart.Api.Data;
 
@@ -20,6 +21,10 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
 
     public DbSet<ProductTrustItem> ProductTrustItems => Set<ProductTrustItem>();
+
+    public DbSet<StoreOrder> StoreOrders => Set<StoreOrder>();
+
+    public DbSet<StoreOrderLine> StoreOrderLines => Set<StoreOrderLine>();
 
     public DbSet<AdminAuditEvent> AdminAuditEvents => Set<AdminAuditEvent>();
 
@@ -55,6 +60,7 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
         products.Property(product => product.BrandName).HasMaxLength(120).HasDefaultValue("OneCart").IsRequired();
         products.Property(product => product.StorefrontHeadline).HasMaxLength(200).IsRequired();
         products.Property(product => product.StorefrontSubtitle).HasMaxLength(500).IsRequired();
+        products.Property(product => product.CurrencyCode).HasMaxLength(3).IsRequired();
         products.Property(product => product.FlashSaleLabel).HasMaxLength(100).IsRequired();
         products.Property(product => product.FlashSaleDiscountType).HasMaxLength(20).HasDefaultValue("percentage").IsRequired();
         products.Property(product => product.FlashSaleDiscountValue).HasPrecision(18, 4);
@@ -92,6 +98,10 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
         variants.Property(variant => variant.Price).HasPrecision(18, 4);
         variants.Property(variant => variant.CurrencyCode).HasMaxLength(3).IsRequired();
         variants.Property(variant => variant.StockQuantity).IsRequired();
+        variants.HasMany(variant => variant.OrderLines)
+            .WithOne(line => line.Variant)
+            .HasForeignKey(line => line.VariantId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         var attributeGroups = modelBuilder.Entity<ProductAttributeGroup>();
         attributeGroups.ToTable("product_attribute_groups", table =>
@@ -143,6 +153,47 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
         trustItems.Property(item => item.Title).HasMaxLength(80).IsRequired();
         trustItems.Property(item => item.Description).HasMaxLength(300).IsRequired();
         trustItems.Property(item => item.DisplayOrder).IsRequired();
+
+        var orders = modelBuilder.Entity<StoreOrder>();
+        orders.ToTable("store_orders", table =>
+        {
+            table.HasCheckConstraint("ck_store_orders_total_non_negative", isSqlServer ? "[Total] >= 0" : "\"Total\" >= 0");
+            table.HasCheckConstraint("ck_store_orders_status", isSqlServer
+                ? "[Status] IN (N'Pending', N'Processing', N'Completed', N'Cancelled')"
+                : "\"Status\" IN ('Pending', 'Processing', 'Completed', 'Cancelled')");
+        });
+        orders.HasKey(order => order.Id);
+        orders.HasIndex(order => order.OrderNumber).IsUnique();
+        orders.HasIndex(order => order.CreatedAtUtc);
+        orders.Property(order => order.OrderNumber).HasMaxLength(40).IsRequired();
+        orders.Property(order => order.Status).HasMaxLength(20).IsRequired();
+        orders.Property(order => order.CustomerName).HasMaxLength(200).IsRequired();
+        orders.Property(order => order.PhoneNumber).HasMaxLength(50).IsRequired();
+        orders.Property(order => order.DeliveryAddress).HasMaxLength(1000).IsRequired();
+        orders.Property(order => order.CurrencyCode).HasMaxLength(3).IsRequired();
+        orders.Property(order => order.Total).HasPrecision(18, 4).IsRequired();
+        orders.Property(order => order.CreatedAtUtc).IsRequired();
+        orders.Property(order => order.UpdatedAtUtc).IsRequired();
+        orders.HasMany(order => order.Lines)
+            .WithOne(line => line.Order)
+            .HasForeignKey(line => line.OrderId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        var orderLines = modelBuilder.Entity<StoreOrderLine>();
+        orderLines.ToTable("store_order_lines", table =>
+        {
+            table.HasCheckConstraint("ck_store_order_lines_quantity_positive", isSqlServer ? "[Quantity] > 0" : "\"Quantity\" > 0");
+            table.HasCheckConstraint("ck_store_order_lines_unit_price_non_negative", isSqlServer ? "[UnitPrice] >= 0" : "\"UnitPrice\" >= 0");
+        });
+        orderLines.HasKey(line => line.Id);
+        orderLines.HasIndex(line => line.OrderId);
+        orderLines.HasIndex(line => line.VariantId);
+        orderLines.Property(line => line.ProductName).HasMaxLength(200).IsRequired();
+        orderLines.Property(line => line.Sku).HasMaxLength(64).IsRequired();
+        orderLines.Property(line => line.VariantName).HasMaxLength(200).IsRequired();
+        orderLines.Property(line => line.SelectedOptionsJson).HasColumnType(isSqlServer ? "nvarchar(max)" : "text").IsRequired();
+        orderLines.Property(line => line.Quantity).IsRequired();
+        orderLines.Property(line => line.UnitPrice).HasPrecision(18, 4).IsRequired();
 
         var auditEvents = modelBuilder.Entity<AdminAuditEvent>();
         auditEvents.ToTable("admin_audit_events");

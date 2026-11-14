@@ -5,6 +5,7 @@ public sealed record StorefrontProductResponse(
     string Name,
     string Slug,
     string Description,
+    string CurrencyCode,
     string BrandName,
     string StorefrontHeadline,
     string StorefrontSubtitle,
