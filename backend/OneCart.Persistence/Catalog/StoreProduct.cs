@@ -10,7 +10,7 @@ public sealed class StoreProduct
 
     public string Description { get; set; } = string.Empty;
 
-    public string BrandName { get; set; } = "OneCart";
+    public string BrandName { get; set; } = "Pretty Shop";
 
     public string StorefrontHeadline { get; set; } = string.Empty;
 

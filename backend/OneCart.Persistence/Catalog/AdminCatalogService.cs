@@ -70,7 +70,7 @@ public sealed class AdminCatalogService(StoreDbContext database)
         product.Name = request.Name.Trim();
         product.Slug = request.Slug.Trim();
         product.Description = request.Description.Trim();
-        product.BrandName = (request.BrandName ?? "OneCart").Trim();
+        product.BrandName = (request.BrandName ?? "Pretty Shop").Trim();
         product.StorefrontHeadline = request.StorefrontHeadline?.Trim() ?? string.Empty;
         product.StorefrontSubtitle = request.StorefrontSubtitle?.Trim() ?? string.Empty;
         product.CurrencyCode = request.CurrencyCode!.Trim().ToUpperInvariant();
@@ -654,7 +654,7 @@ public sealed record AdminProductRequest(
     bool WhatsAppEnabled = false,
     string? WhatsAppPhoneNumber = null,
     string? WhatsAppPrefillMessage = null,
-    string? BrandName = "OneCart",
+    string? BrandName = "Pretty Shop",
     string? StorefrontHeadline = null,
     string? StorefrontSubtitle = null,
     IReadOnlyList<AdminProductTrustItemRequest>? TrustItems = null,
