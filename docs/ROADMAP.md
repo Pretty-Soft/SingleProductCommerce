@@ -1,0 +1,57 @@
+# OneCart Commerce — Implementation Roadmap
+
+This roadmap sequences work using confirmed product requirements. It contains no delivery dates. Open product choices remain gates; recommendations are not approvals.
+
+## Stage 0 — Repository starter (complete)
+
+- ASP.NET Core 10 API shell with HTTPS-only request enforcement.
+- React and TypeScript storefront shell.
+- Product requirements, architecture notes, and Codex instructions.
+- Local setup instructions for the API and storefront.
+
+## Stage 1 — Resolve first-release decisions (current gate)
+
+Confirm these before defining catalog/order persistence or checkout fields:
+
+- Product shape: one exact SKU, one product with variants, or a single-product landing page with bundles.
+- First database provider and the required first-release provider support.
+- Checkout customer/address fields, guest checkout, order confirmation, and cancellation behavior.
+- Initial store language and base/display currency rules.
+
+The first two decisions are needed to design the initial catalog and persistence model. The remaining decisions can be confirmed before their corresponding features are implemented.
+
+## Stage 2 — Commerce vertical slice
+
+Build a working path through product setup, public product display, COD checkout, order creation, and order status management. Keep API contracts explicit and versionable. Validate customer input and preserve the price and product details recorded when the order was placed.
+
+Acceptance: an administrator can configure the approved product shape; a customer can submit a valid COD order over HTTPS; the order is persisted with a stable status and can be reviewed by an authorized administrator.
+
+## Stage 3 — Store administration and security
+
+Add administrator authentication and approved roles, product/store settings, order and customer views, inventory controls, and audit records for sensitive changes. Define account recovery and MFA behavior before implementing those flows.
+
+Acceptance: protected operations enforce authorization server-side, validate inputs, and produce audit records where required.
+
+## Stage 4 — Localization and presentation settings
+
+Implement administrator-managed languages and translations, currency configuration and conversion rules, theme editing, and preview. Follow the owner-approved fallback language, rounding, and custom styling policies.
+
+Acceptance: storefront content can be presented in configured languages and currencies; theme settings preview and persist without source edits.
+
+## Stage 5 — Installation and supported hosting
+
+Design the guided installer and upgrade path, then document deployment, TLS certificate provisioning and renewal, trusted proxy configuration, backups, restores, and minimum server requirements for the approved IIS, Linux, and Docker targets.
+
+Acceptance: a clean installation and a supported upgrade can be completed from documented steps without editing application source; public API traffic requires trusted HTTPS.
+
+## Stage 6 — Additional persistence providers
+
+Add each required provider only after the first complete workflow establishes the persistence contract. Verify migrations, transaction behavior, indexes, concurrency, installation, backup/restore, and integration behavior per provider before advertising support.
+
+Acceptance: the published support matrix matches verified provider capabilities. “Hybrid” remains undefined until the owner confirms its intended meaning.
+
+## Stage 7 — Commercial release readiness
+
+Complete unit, integration, end-to-end, security, installation, upgrade, and deployment verification. Prepare administrator, installation, customization, and API documentation; packaging; licensing behavior if approved; support/update policy; and target-market review.
+
+Acceptance: release artifacts can be installed and operated using the supplied documentation, with no placeholder user-facing or security-critical flows.

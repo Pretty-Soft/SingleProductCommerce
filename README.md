@@ -7,6 +7,7 @@ OneCart Commerce is a commercial, single-product commerce platform. This reposit
 - `backend/OneCart.Api`: ASP.NET Core 10 API with a health endpoint.
 - `frontend`: React and TypeScript storefront shell powered by Vite.
 - `docs/PRODUCT_REQUIREMENTS.md`: requirements recovered from the product planning conversation, with open decisions marked clearly.
+- `docs/ROADMAP.md`: proposed implementation sequence and decision gates.
 - `AGENTS.md`: project-specific instructions for future Codex work.
 
 ## Prerequisites
