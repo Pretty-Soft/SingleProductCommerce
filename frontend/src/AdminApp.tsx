@@ -288,95 +288,94 @@ export default function AdminApp() {
               ))}
             </div>
 
-            <div id="accounts" className="admin-nav-target">
-            <section className="admin-card">
-              <div className="section-heading">
-                <div>
-                  <h2>Create account</h2>
-                  <p className="admin-muted">The user must replace the temporary password at first sign-in.</p>
-                </div>
-              </div>
-              <form className="user-form" onSubmit={handleCreateUser}>
-                <label>
-                  Email address
-                  <input type="email" autoComplete="off" required value={email} onChange={(event) => setEmail(event.target.value)} />
-                </label>
-                <label>
-                  Temporary password
-                  <input type="password" autoComplete="new-password" minLength={12} required value={password} onChange={(event) => setPassword(event.target.value)} />
-                </label>
-                <fieldset>
-                  <legend>Assign role</legend>
-                  <div className="role-options">
-                    {roles.map((role) => (
-                      <label className="role-option" key={role.id}>
-                        <input
-                          type="checkbox"
-                          checked={selectedRoles.includes(role.name)}
-                          onChange={(event) => setSelectedRoles((current) => event.target.checked
-                            ? [...current, role.name]
-                            : current.filter((name) => name !== role.name))}
-                        />
-                        <span>{role.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-                <button className="button" type="submit" disabled={busy || selectedRoles.length === 0}>
-                  Create user
-                </button>
-              </form>
-            </section>
+            <div id="catalog" className="admin-nav-target"><AdminCatalogEditor /></div>
 
-            <section className="admin-card">
-              <div className="section-heading">
-                <div>
-                  <h2>Existing users</h2>
-                  <p className="admin-muted">Assign one or more built-in roles. The last System Admin cannot be demoted.</p>
+            <div id="orders" className="admin-nav-target"><AdminOrders /></div>
+
+            <div id="accounts" className="admin-nav-target">
+              <section className="admin-card">
+                <div className="section-heading">
+                  <div>
+                    <h2>Create account</h2>
+                    <p className="admin-muted">The user must replace the temporary password at first sign-in.</p>
+                  </div>
                 </div>
-                <span className="user-count">{users.length} accounts</span>
-              </div>
-              <div className="user-list">
-                {users.map((user) => (
-                  <article className="user-row" key={user.id}>
-                    <div className="user-summary">
-                      <strong>{user.email}</strong>
-                      <span>{user.mustChangePassword ? "Must change password" : user.roles.join(", ")}</span>
-                    </div>
-                    <div className="role-editor">
+                <form className="user-form" onSubmit={handleCreateUser}>
+                  <label>
+                    Email address
+                    <input type="email" autoComplete="off" required value={email} onChange={(event) => setEmail(event.target.value)} />
+                  </label>
+                  <label>
+                    Temporary password
+                    <input type="password" autoComplete="new-password" minLength={12} required value={password} onChange={(event) => setPassword(event.target.value)} />
+                  </label>
+                  <fieldset>
+                    <legend>Assign role</legend>
+                    <div className="role-options">
                       {roles.map((role) => (
                         <label className="role-option" key={role.id}>
                           <input
                             type="checkbox"
-                            checked={(roleChanges[user.id] ?? user.roles).includes(role.name)}
-                            onChange={(event) => setRoleChanges((current) => {
-                              const selected = current[user.id] ?? user.roles;
-                              return {
-                                ...current,
-                                [user.id]: event.target.checked
-                                  ? [...selected, role.name]
-                                  : selected.filter((name) => name !== role.name)
-                              };
-                            })}
+                            checked={selectedRoles.includes(role.name)}
+                            onChange={(event) => setSelectedRoles((current) => event.target.checked
+                              ? [...current, role.name]
+                              : current.filter((name) => name !== role.name))}
                           />
                           <span>{role.name}</span>
                         </label>
                       ))}
                     </div>
-                    <button className="button button-quiet" onClick={() => void handleSaveRoles(user.id)} disabled={busy || (roleChanges[user.id] ?? user.roles).length === 0}>
-                      Save roles
-                    </button>
-                  </article>
-                ))}
-                {users.length === 0 && <p className="admin-muted">No accounts yet.</p>}
-              </div>
-            </section>
+                  </fieldset>
+                  <button className="button" type="submit" disabled={busy || selectedRoles.length === 0}>
+                    Create user
+                  </button>
+                </form>
+              </section>
 
+              <section className="admin-card">
+                <div className="section-heading">
+                  <div>
+                    <h2>Existing users</h2>
+                    <p className="admin-muted">Assign one or more built-in roles. The last System Admin cannot be demoted.</p>
+                  </div>
+                  <span className="user-count">{users.length} accounts</span>
+                </div>
+                <div className="user-list">
+                  {users.map((user) => (
+                    <article className="user-row" key={user.id}>
+                      <div className="user-summary">
+                        <strong>{user.email}</strong>
+                        <span>{user.mustChangePassword ? "Must change password" : user.roles.join(", ")}</span>
+                      </div>
+                      <div className="role-editor">
+                        {roles.map((role) => (
+                          <label className="role-option" key={role.id}>
+                            <input
+                              type="checkbox"
+                              checked={(roleChanges[user.id] ?? user.roles).includes(role.name)}
+                              onChange={(event) => setRoleChanges((current) => {
+                                const selected = current[user.id] ?? user.roles;
+                                return {
+                                  ...current,
+                                  [user.id]: event.target.checked
+                                    ? [...selected, role.name]
+                                    : selected.filter((name) => name !== role.name)
+                                };
+                              })}
+                            />
+                            <span>{role.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <button className="button button-quiet" onClick={() => void handleSaveRoles(user.id)} disabled={busy || (roleChanges[user.id] ?? user.roles).length === 0}>
+                        Save roles
+                      </button>
+                    </article>
+                  ))}
+                  {users.length === 0 && <p className="admin-muted">No accounts yet.</p>}
+                </div>
+              </section>
             </div>
-
-            <div id="catalog" className="admin-nav-target"><AdminCatalogEditor /></div>
-
-            <div id="orders" className="admin-nav-target"><AdminOrders /></div>
 
             <section className="admin-card admin-nav-target" id="audit">
               <div className="section-heading">
