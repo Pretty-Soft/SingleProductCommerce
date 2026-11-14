@@ -30,6 +30,7 @@ The project should be developed with human review and release quality in mind. C
 - Administrators must be able to configure the storefront presentation and product-page content, including branding, headline/copy, product media, and trust/service details, without editing source code.
 - Initial storefront branding is “Pretty Shop” with the headline “Your trust, Your Love.” Show the headline beneath the shop name in the top bar only; use the product name as the main product-page heading.
 - Keep the storefront product-name text restrained at 14–16 px, with product details and supporting line capped at 12–14 px; the shop name and slogan should remain compact in the top bar.
+- Use a full-width storefront layout that adapts across desktop, tablet, and mobile screens, stacking product content and purchase controls when the available width is limited.
 - Show the regular (old) price and sale (new) price together when a discount is active, with a clear discount indicator.
 - Support administrator-configured flash sales with a start/end schedule and a visible countdown while the sale is active. The sale price and countdown must stop when the configured sale window ends.
 - Discount and flash-sale settings must be manageable from the admin module, with an enable/disable control and a clear preview of the resulting customer-facing price.
