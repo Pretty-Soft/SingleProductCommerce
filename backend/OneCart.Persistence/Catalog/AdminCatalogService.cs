@@ -12,6 +12,8 @@ public sealed class AdminCatalogService(StoreDbContext database)
         var product = await database.Products
             .AsNoTracking()
             .Include(candidate => candidate.Variants.OrderBy(variant => variant.DisplayName))
+            .Include(candidate => candidate.AttributeGroups.OrderBy(group => group.DisplayOrder))
+                .ThenInclude(group => group.Options.OrderBy(option => option.DisplayOrder))
             .SingleOrDefaultAsync(cancellationToken);
 
         return product is null ? null : ToResponse(product);
@@ -28,6 +30,8 @@ public sealed class AdminCatalogService(StoreDbContext database)
 
         var product = await database.Products
             .Include(candidate => candidate.Variants)
+            .Include(candidate => candidate.AttributeGroups)
+                .ThenInclude(group => group.Options)
             .SingleOrDefaultAsync(cancellationToken);
         var errors = ValidateProduct(request, product);
         if (errors.Count > 0)
@@ -81,6 +85,62 @@ public sealed class AdminCatalogService(StoreDbContext database)
         {
             database.ProductVariants.Remove(variant);
             product.Variants.Remove(variant);
+        }
+
+        var existingGroups = product.AttributeGroups.ToDictionary(group => group.Id);
+        var retainedGroupIds = new HashSet<Guid>();
+        foreach (var requestedGroup in request.AttributeGroups ?? [])
+        {
+            ProductAttributeGroup group;
+            if (requestedGroup.Id is Guid groupId)
+            {
+                group = existingGroups[groupId];
+                retainedGroupIds.Add(groupId);
+            }
+            else
+            {
+                group = new ProductAttributeGroup { Id = Guid.NewGuid(), Product = product };
+                product.AttributeGroups.Add(group);
+            }
+
+            group.Name = requestedGroup.Name.Trim();
+            group.IsRequired = requestedGroup.IsRequired;
+            group.AllowMultiple = requestedGroup.AllowMultiple;
+            group.DisplayOrder = requestedGroup.DisplayOrder;
+
+            var existingOptions = group.Options.ToDictionary(option => option.Id);
+            var retainedOptionIds = new HashSet<Guid>();
+            foreach (var requestedOption in requestedGroup.Options ?? [])
+            {
+                ProductAttributeOption option;
+                if (requestedOption.Id is Guid optionId)
+                {
+                    option = existingOptions[optionId];
+                    retainedOptionIds.Add(optionId);
+                }
+                else
+                {
+                    option = new ProductAttributeOption { Id = Guid.NewGuid(), AttributeGroup = group };
+                    group.Options.Add(option);
+                }
+
+                option.Name = requestedOption.Name.Trim();
+                option.PriceAdjustment = requestedOption.PriceAdjustment;
+                option.IsActive = requestedOption.IsActive;
+                option.DisplayOrder = requestedOption.DisplayOrder;
+            }
+
+            foreach (var option in existingOptions.Values.Where(option => !retainedOptionIds.Contains(option.Id)))
+            {
+                database.ProductAttributeOptions.Remove(option);
+                group.Options.Remove(option);
+            }
+        }
+
+        foreach (var group in existingGroups.Values.Where(group => !retainedGroupIds.Contains(group.Id)))
+        {
+            database.ProductAttributeGroups.Remove(group);
+            product.AttributeGroups.Remove(group);
         }
 
         if (database.Entry(product).State == EntityState.Detached)
@@ -154,6 +214,94 @@ public sealed class AdminCatalogService(StoreDbContext database)
         if (request.IsPublished && variants.All(variant => !variant.IsActive))
         {
             AddError(nameof(request.Variants), "A published product needs at least one active variant.");
+        }
+
+        var groups = request.AttributeGroups?.Where(group => group is not null).ToList() ?? [];
+        if (request.AttributeGroups?.Any(group => group is null) == true)
+        {
+            AddError(nameof(request.AttributeGroups), "Attribute groups cannot contain empty entries.");
+        }
+        if (groups.Count > 30)
+        {
+            AddError(nameof(request.AttributeGroups), "A product can have up to 30 attribute groups.");
+        }
+        if (groups.Where(group => group.Id.HasValue).Select(group => group.Id).Distinct().Count() != groups.Count(group => group.Id.HasValue))
+        {
+            AddError(nameof(request.AttributeGroups), "An attribute group can only appear once in the product.");
+        }
+        var groupNames = groups.Select(group => group.Name?.Trim() ?? string.Empty).ToArray();
+        if (groupNames.Where(value => value.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).Count()
+            != groupNames.Count(value => value.Length > 0))
+        {
+            AddError(nameof(request.AttributeGroups), "Attribute group names must be unique.");
+        }
+
+        for (var groupIndex = 0; groupIndex < groups.Count; groupIndex++)
+        {
+            var group = groups[groupIndex];
+            var field = $"AttributeGroups[{groupIndex}]";
+            if (string.IsNullOrWhiteSpace(group.Name) || group.Name.Trim().Length > 100)
+            {
+                AddError(field, "Attribute group name is required and must be 100 characters or fewer.");
+            }
+            if (group.DisplayOrder < 0)
+            {
+                AddError(field, "Attribute group order cannot be negative.");
+            }
+            if (group.Id is Guid groupId && (product is null || product.AttributeGroups.All(existing => existing.Id != groupId)))
+            {
+                AddError(field, "Attribute group does not belong to this product.");
+            }
+
+            var options = group.Options?.Where(option => option is not null).ToList() ?? [];
+            if (group.Options?.Any(option => option is null) == true)
+            {
+                AddError(field, "Choices cannot contain empty entries.");
+            }
+            if (options.Count is 0 or > 100)
+            {
+                AddError(field, "Add between 1 and 100 choices to each attribute group.");
+            }
+            if (request.IsPublished && group.IsRequired && options.All(option => !option.IsActive))
+            {
+                AddError(field, "A required group on a published product needs an active choice.");
+            }
+            if (options.Where(option => option.Id.HasValue).Select(option => option.Id).Distinct().Count() != options.Count(option => option.Id.HasValue))
+            {
+                AddError(field, "A choice can only appear once in its attribute group.");
+            }
+            var optionNames = options.Select(option => option.Name?.Trim() ?? string.Empty).ToArray();
+            if (optionNames.Where(value => value.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).Count()
+                != optionNames.Count(value => value.Length > 0))
+            {
+                AddError(field, "Choice names must be unique within an attribute group.");
+            }
+
+            for (var optionIndex = 0; optionIndex < options.Count; optionIndex++)
+            {
+                var option = options[optionIndex];
+                var optionField = $"{field}.Options[{optionIndex}]";
+                if (string.IsNullOrWhiteSpace(option.Name) || option.Name.Trim().Length > 150)
+                {
+                    AddError(optionField, "Choice name is required and must be 150 characters or fewer.");
+                }
+                if (option.PriceAdjustment < 0 || option.PriceAdjustment > 99999999999999.9999m
+                    || decimal.Round(option.PriceAdjustment, 4) != option.PriceAdjustment)
+                {
+                    AddError(optionField, "Price adjustment must be non-negative and support up to four decimal places.");
+                }
+                if (option.DisplayOrder < 0)
+                {
+                    AddError(optionField, "Choice order cannot be negative.");
+                }
+                if (option.Id is Guid optionId
+                    && (product is null || group.Id is not Guid parentGroupId
+                        || product.AttributeGroups.All(existingGroup => existingGroup.Id != parentGroupId
+                            || existingGroup.Options.All(existingOption => existingOption.Id != optionId))))
+                {
+                    AddError(optionField, "Choice does not belong to this attribute group.");
+                }
+            }
         }
 
         var duplicateIds = variants
@@ -232,6 +380,23 @@ public sealed class AdminCatalogService(StoreDbContext database)
                 variant.CurrencyCode,
                 variant.StockQuantity,
                 variant.IsActive))
+            .ToArray(),
+        product.AttributeGroups
+            .OrderBy(group => group.DisplayOrder)
+            .Select(group => new AdminProductAttributeGroupResponse(
+                group.Id,
+                group.Name,
+                group.IsRequired,
+                group.AllowMultiple,
+                group.DisplayOrder,
+                group.Options.OrderBy(option => option.DisplayOrder)
+                    .Select(option => new AdminProductAttributeOptionResponse(
+                        option.Id,
+                        option.Name,
+                        option.PriceAdjustment,
+                        option.IsActive,
+                        option.DisplayOrder))
+                    .ToArray()))
             .ToArray());
 
     private static object CreateAuditSnapshot(StoreProduct product) => new
@@ -251,6 +416,18 @@ public sealed class AdminCatalogService(StoreDbContext database)
                 variant.StockQuantity,
                 variant.IsActive
             })
+            .ToArray(),
+        AttributeGroups = product.AttributeGroups
+            .OrderBy(group => group.DisplayOrder)
+            .Select(group => new
+            {
+                group.Name,
+                group.IsRequired,
+                group.AllowMultiple,
+                Options = group.Options.OrderBy(option => option.DisplayOrder)
+                    .Select(option => new { option.Name, option.PriceAdjustment, option.IsActive })
+                    .ToArray()
+            })
             .ToArray()
     };
 }
@@ -260,7 +437,8 @@ public sealed record AdminProductRequest(
     string Slug,
     string Description,
     bool IsPublished,
-    IReadOnlyList<AdminProductVariantRequest> Variants);
+    IReadOnlyList<AdminProductVariantRequest> Variants,
+    IReadOnlyList<AdminProductAttributeGroupRequest>? AttributeGroups = null);
 
 public sealed record AdminProductVariantRequest(
     Guid? Id,
@@ -271,13 +449,29 @@ public sealed record AdminProductVariantRequest(
     int StockQuantity,
     bool IsActive);
 
+public sealed record AdminProductAttributeGroupRequest(
+    Guid? Id,
+    string Name,
+    bool IsRequired,
+    bool AllowMultiple,
+    int DisplayOrder,
+    IReadOnlyList<AdminProductAttributeOptionRequest>? Options);
+
+public sealed record AdminProductAttributeOptionRequest(
+    Guid? Id,
+    string Name,
+    decimal PriceAdjustment,
+    bool IsActive,
+    int DisplayOrder);
+
 public sealed record AdminProductResponse(
     Guid Id,
     string Name,
     string Slug,
     string Description,
     bool IsPublished,
-    IReadOnlyList<AdminProductVariantResponse> Variants);
+    IReadOnlyList<AdminProductVariantResponse> Variants,
+    IReadOnlyList<AdminProductAttributeGroupResponse> AttributeGroups);
 
 public sealed record AdminProductVariantResponse(
     Guid Id,
@@ -287,6 +481,21 @@ public sealed record AdminProductVariantResponse(
     string CurrencyCode,
     int StockQuantity,
     bool IsActive);
+
+public sealed record AdminProductAttributeGroupResponse(
+    Guid Id,
+    string Name,
+    bool IsRequired,
+    bool AllowMultiple,
+    int DisplayOrder,
+    IReadOnlyList<AdminProductAttributeOptionResponse> Options);
+
+public sealed record AdminProductAttributeOptionResponse(
+    Guid Id,
+    string Name,
+    decimal PriceAdjustment,
+    bool IsActive,
+    int DisplayOrder);
 
 public sealed record AdminCatalogSaveResult(
     AdminProductResponse? Product,

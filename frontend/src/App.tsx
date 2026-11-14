@@ -13,6 +13,8 @@ export default function App() {
 function Storefront() {
   const [product, setProduct] = useState<StorefrontProduct | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState("");
+  const [selectedAttributeOptions, setSelectedAttributeOptions] = useState<Record<string, string[]>>({});
+  const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -34,6 +36,24 @@ function Storefront() {
   }, []);
 
   const selectedVariant = product?.variants.find((variant) => variant.id === selectedVariantId);
+  const selectedOptions = product?.attributeGroups.flatMap((group) => {
+    const selected = new Set(selectedAttributeOptions[group.id] ?? []);
+    return group.options.filter((option) => selected.has(option.id));
+  }) ?? [];
+  const requiredAttributesSelected = product?.attributeGroups.every((group) =>
+    !group.isRequired || (selectedAttributeOptions[group.id]?.length ?? 0) > 0
+  ) ?? false;
+  const currentTotal = (selectedVariant?.price ?? 0) + selectedOptions.reduce((total, option) => total + option.priceAdjustment, 0);
+
+  function chooseAttributeOption(groupId: string, optionId: string, allowMultiple: boolean) {
+    setSelectedAttributeOptions((current) => {
+      const selected = current[groupId] ?? [];
+      const next = allowMultiple
+        ? selected.includes(optionId) ? selected.filter((id) => id !== optionId) : [...selected, optionId]
+        : [optionId];
+      return { ...current, [groupId]: next };
+    });
+  }
 
   return (
     <main className="page">
@@ -76,10 +96,38 @@ function Storefront() {
                 </label>
               ))}
             </div>
-            <button type="button" disabled={!selectedVariant?.isAvailable}>
+            {product.attributeGroups.map((group) => (
+              <fieldset className="store-attribute" key={group.id}>
+                <legend>{group.name}{group.isRequired ? " *" : " (optional)"}</legend>
+                <div className="attribute-options">
+                  {group.options.map((option) => {
+                    const checked = (selectedAttributeOptions[group.id] ?? []).includes(option.id);
+                    return (
+                      <label className="store-attribute-option" key={option.id}>
+                        <input
+                          type={group.allowMultiple ? "checkbox" : "radio"}
+                          name={`attribute-${group.id}`}
+                          required={group.isRequired && !group.allowMultiple}
+                          checked={checked}
+                          onChange={() => chooseAttributeOption(group.id, option.id, group.allowMultiple)}
+                        />
+                        <span>{option.name}</span>
+                        {option.priceAdjustment > 0 && <span className="store-variant-price">+{formatPrice(option.priceAdjustment, selectedVariant?.currencyCode ?? "USD")}</span>}
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            ))}
+            <label className="quantity-control">
+              Quantity
+              <input type="number" min="1" max="99" step="1" value={quantity} onChange={(event) => setQuantity(Math.max(1, Math.min(99, Number(event.target.value) || 1)))} />
+            </label>
+            <p className="store-total" aria-live="polite">Total: {formatPrice(currentTotal * quantity, selectedVariant?.currencyCode ?? "USD")}</p>
+            <button type="button" disabled={!selectedVariant?.isAvailable || !requiredAttributesSelected}>
               Cash on Delivery checkout coming next
             </button>
-            <p className="note">Orders are not available yet.</p>
+            <p className="note">{!requiredAttributesSelected ? "Choose an option for every required attribute." : "Orders are not available yet."}</p>
           </div>
         </section>
       ) : (

@@ -14,6 +14,11 @@ public sealed class StorefrontCatalogService(StoreDbContext database)
             .Include(candidate => candidate.Variants
                 .Where(variant => variant.IsActive)
                 .OrderBy(variant => variant.DisplayName))
+            .Include(candidate => candidate.AttributeGroups
+                .OrderBy(group => group.DisplayOrder))
+                .ThenInclude(group => group.Options
+                    .Where(option => option.IsActive)
+                    .OrderBy(option => option.DisplayOrder))
             .SingleOrDefaultAsync(cancellationToken);
 
         if (product is null)
@@ -35,6 +40,17 @@ public sealed class StorefrontCatalogService(StoreDbContext database)
             product.Name,
             product.Slug,
             product.Description,
-            variants);
+            variants,
+            product.AttributeGroups
+                .Select(group => new StorefrontAttributeGroupResponse(
+                    group.Id,
+                    group.Name,
+                    group.IsRequired,
+                    group.AllowMultiple,
+                    group.Options.Select(option => new StorefrontAttributeOptionResponse(
+                        option.Id,
+                        option.Name,
+                        option.PriceAdjustment)).ToArray()))
+                .ToArray());
     }
 }

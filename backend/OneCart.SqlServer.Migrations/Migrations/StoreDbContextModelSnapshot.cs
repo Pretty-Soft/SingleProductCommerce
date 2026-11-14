@@ -263,6 +263,75 @@ namespace OneCart.SqlServer.Migrations.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("OneCart.Api.Catalog.ProductAttributeGroup", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("AllowMultiple")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("product_attribute_groups", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_product_attribute_groups_order_non_negative", "[DisplayOrder] >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("OneCart.Api.Catalog.ProductAttributeOption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AttributeGroupId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<decimal>("PriceAdjustment")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AttributeGroupId");
+
+                    b.ToTable("product_attribute_options", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_product_attribute_options_adjustment_non_negative", "[PriceAdjustment] >= 0");
+
+                            t.HasCheckConstraint("ck_product_attribute_options_order_non_negative", "[DisplayOrder] >= 0");
+                        });
+                });
+
             modelBuilder.Entity("OneCart.Api.Catalog.ProductVariant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -408,6 +477,28 @@ namespace OneCart.SqlServer.Migrations.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("OneCart.Api.Catalog.ProductAttributeGroup", b =>
+                {
+                    b.HasOne("OneCart.Api.Catalog.StoreProduct", "Product")
+                        .WithMany("AttributeGroups")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("OneCart.Api.Catalog.ProductAttributeOption", b =>
+                {
+                    b.HasOne("OneCart.Api.Catalog.ProductAttributeGroup", "AttributeGroup")
+                        .WithMany("Options")
+                        .HasForeignKey("AttributeGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AttributeGroup");
+                });
+
             modelBuilder.Entity("OneCart.Api.Catalog.ProductVariant", b =>
                 {
                     b.HasOne("OneCart.Api.Catalog.StoreProduct", "Product")
@@ -419,8 +510,15 @@ namespace OneCart.SqlServer.Migrations.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("OneCart.Api.Catalog.ProductAttributeGroup", b =>
+                {
+                    b.Navigation("Options");
+                });
+
             modelBuilder.Entity("OneCart.Api.Catalog.StoreProduct", b =>
                 {
+                    b.Navigation("AttributeGroups");
+
                     b.Navigation("Variants");
                 });
 #pragma warning restore 612, 618

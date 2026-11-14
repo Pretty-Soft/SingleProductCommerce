@@ -11,6 +11,21 @@ export interface StorefrontProduct {
   slug: string;
   description: string;
   variants: StorefrontVariant[];
+  attributeGroups: StorefrontAttributeGroup[];
+}
+
+export interface StorefrontAttributeGroup {
+  id: string;
+  name: string;
+  isRequired: boolean;
+  allowMultiple: boolean;
+  options: StorefrontAttributeOption[];
+}
+
+export interface StorefrontAttributeOption {
+  id: string;
+  name: string;
+  priceAdjustment: number;
 }
 
 export interface StorefrontVariant {

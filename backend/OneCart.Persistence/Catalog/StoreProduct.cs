@@ -17,4 +17,6 @@ public sealed class StoreProduct
     public DateTimeOffset UpdatedAtUtc { get; set; }
 
     public ICollection<ProductVariant> Variants { get; } = new List<ProductVariant>();
+
+    public ICollection<ProductAttributeGroup> AttributeGroups { get; } = new List<ProductAttributeGroup>();
 }

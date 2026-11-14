@@ -44,6 +44,41 @@ public sealed class CatalogValidationTests
         Assert.Contains("Variants[0]", errors.Keys);
     }
 
+    [Fact]
+    public void Accepts_required_single_choice_and_optional_multi_choice_attributes()
+    {
+        var request = ValidPublishedProduct() with
+        {
+            AttributeGroups =
+            [
+                new AdminProductAttributeGroupRequest(null, "Memory", true, false, 0,
+                [new AdminProductAttributeOptionRequest(null, "16 GB", 0, true, 0)]),
+                new AdminProductAttributeGroupRequest(null, "Software", false, true, 1,
+                [new AdminProductAttributeOptionRequest(null, "Office", 49.99m, true, 0)])
+            ]
+        };
+
+        var errors = AdminCatalogService.ValidateProduct(request, null);
+
+        Assert.Empty(errors);
+    }
+
+    [Fact]
+    public void Rejects_required_attributes_without_active_choices_and_negative_adjustments()
+    {
+        var request = ValidPublishedProduct() with
+        {
+            AttributeGroups =
+            [new AdminProductAttributeGroupRequest(null, "Processor", true, false, 0,
+                [new AdminProductAttributeOptionRequest(null, "Unavailable", -1, false, 0)])]
+        };
+
+        var errors = AdminCatalogService.ValidateProduct(request, null);
+
+        Assert.Contains("AttributeGroups[0]", errors.Keys);
+        Assert.Contains("AttributeGroups[0].Options[0]", errors.Keys);
+    }
+
     private static AdminProductRequest ValidPublishedProduct() => new(
         "OneCart Sample",
         "onecart-sample",

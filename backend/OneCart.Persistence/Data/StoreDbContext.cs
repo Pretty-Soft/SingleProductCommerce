@@ -13,6 +13,10 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
 
     public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
 
+    public DbSet<ProductAttributeGroup> ProductAttributeGroups => Set<ProductAttributeGroup>();
+
+    public DbSet<ProductAttributeOption> ProductAttributeOptions => Set<ProductAttributeOption>();
+
     public DbSet<AdminAuditEvent> AdminAuditEvents => Set<AdminAuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -42,6 +46,10 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
             .WithOne(variant => variant.Product)
             .HasForeignKey(variant => variant.ProductId)
             .OnDelete(DeleteBehavior.Cascade);
+        products.HasMany(product => product.AttributeGroups)
+            .WithOne(group => group.Product)
+            .HasForeignKey(group => group.ProductId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         var variants = modelBuilder.Entity<ProductVariant>();
         variants.ToTable("product_variants", table =>
@@ -56,6 +64,30 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
         variants.Property(variant => variant.Price).HasPrecision(18, 4);
         variants.Property(variant => variant.CurrencyCode).HasMaxLength(3).IsRequired();
         variants.Property(variant => variant.StockQuantity).IsRequired();
+
+        var attributeGroups = modelBuilder.Entity<ProductAttributeGroup>();
+        attributeGroups.ToTable("product_attribute_groups", table =>
+        {
+            table.HasCheckConstraint("ck_product_attribute_groups_order_non_negative", isSqlServer ? "[DisplayOrder] >= 0" : "\"DisplayOrder\" >= 0");
+        });
+        attributeGroups.HasKey(group => group.Id);
+        attributeGroups.Property(group => group.Name).HasMaxLength(100).IsRequired();
+        attributeGroups.Property(group => group.DisplayOrder).IsRequired();
+        attributeGroups.HasMany(group => group.Options)
+            .WithOne(option => option.AttributeGroup)
+            .HasForeignKey(option => option.AttributeGroupId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        var attributeOptions = modelBuilder.Entity<ProductAttributeOption>();
+        attributeOptions.ToTable("product_attribute_options", table =>
+        {
+            table.HasCheckConstraint("ck_product_attribute_options_adjustment_non_negative", isSqlServer ? "[PriceAdjustment] >= 0" : "\"PriceAdjustment\" >= 0");
+            table.HasCheckConstraint("ck_product_attribute_options_order_non_negative", isSqlServer ? "[DisplayOrder] >= 0" : "\"DisplayOrder\" >= 0");
+        });
+        attributeOptions.HasKey(option => option.Id);
+        attributeOptions.Property(option => option.Name).HasMaxLength(150).IsRequired();
+        attributeOptions.Property(option => option.PriceAdjustment).HasPrecision(18, 4);
+        attributeOptions.Property(option => option.DisplayOrder).IsRequired();
 
         var auditEvents = modelBuilder.Entity<AdminAuditEvent>();
         auditEvents.ToTable("admin_audit_events");

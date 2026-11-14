@@ -18,6 +18,24 @@ interface EditableProduct {
   description: string;
   isPublished: boolean;
   variants: EditableVariant[];
+  attributeGroups: EditableAttributeGroup[];
+}
+
+interface EditableAttributeGroup {
+  id: string | null;
+  name: string;
+  isRequired: boolean;
+  allowMultiple: boolean;
+  displayOrder: number;
+  options: EditableAttributeOption[];
+}
+
+interface EditableAttributeOption {
+  id: string | null;
+  name: string;
+  priceAdjustment: number;
+  isActive: boolean;
+  displayOrder: number;
 }
 
 const emptyProduct = (): EditableProduct => ({
@@ -26,7 +44,8 @@ const emptyProduct = (): EditableProduct => ({
   slug: "",
   description: "",
   isPublished: false,
-  variants: [emptyVariant()]
+  variants: [emptyVariant()],
+  attributeGroups: []
 });
 
 function emptyVariant(): EditableVariant {
@@ -39,6 +58,21 @@ function emptyVariant(): EditableVariant {
     stockQuantity: 0,
     isActive: true
   };
+}
+
+function emptyAttributeGroup(displayOrder: number): EditableAttributeGroup {
+  return {
+    id: null,
+    name: "",
+    isRequired: true,
+    allowMultiple: false,
+    displayOrder,
+    options: [emptyAttributeOption(0)]
+  };
+}
+
+function emptyAttributeOption(displayOrder: number): EditableAttributeOption {
+  return { id: null, name: "", priceAdjustment: 0, isActive: true, displayOrder };
 }
 
 export default function AdminCatalogEditor() {
@@ -81,6 +115,26 @@ export default function AdminCatalogEditor() {
     }));
   }
 
+  function updateAttributeGroup(index: number, changes: Partial<EditableAttributeGroup>) {
+    setProduct((current) => ({
+      ...current,
+      attributeGroups: current.attributeGroups.map((group, itemIndex) => itemIndex === index
+        ? { ...group, ...changes }
+        : group)
+    }));
+  }
+
+  function updateAttributeOption(groupIndex: number, optionIndex: number, changes: Partial<EditableAttributeOption>) {
+    setProduct((current) => ({
+      ...current,
+      attributeGroups: current.attributeGroups.map((group, itemIndex) => itemIndex === groupIndex
+        ? { ...group, options: group.options.map((option, choiceIndex) => choiceIndex === optionIndex
+          ? { ...option, ...changes }
+          : option) }
+        : group)
+    }));
+  }
+
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -92,7 +146,7 @@ export default function AdminCatalogEditor() {
         body: JSON.stringify(product)
       });
       setProduct(saved);
-      setMessage("Product and variants saved.");
+      setMessage("Product, variants, and attributes saved.");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Product settings could not be saved.");
     } finally {
@@ -170,6 +224,64 @@ export default function AdminCatalogEditor() {
                   Remove
                 </button>
               </div>
+            </fieldset>
+          ))}
+
+          <div className="section-heading variant-heading">
+            <div>
+              <h3>Configurable attributes</h3>
+              <p className="admin-muted">Add required selections or optional add-ons. Choices can increase the selected variant price.</p>
+            </div>
+            <button className="button button-quiet" type="button" onClick={() => updateProduct("attributeGroups", [...product.attributeGroups, emptyAttributeGroup(product.attributeGroups.length)])} disabled={busy || product.attributeGroups.length >= 30}>
+              Add attribute
+            </button>
+          </div>
+
+          {product.attributeGroups.map((group, groupIndex) => (
+            <fieldset className="variant-card" key={group.id ?? `attribute-${groupIndex}`}>
+              <legend>Attribute {groupIndex + 1}</legend>
+              <div className="catalog-fields">
+                <label>
+                  Name
+                  <input maxLength={100} required value={group.name} onChange={(event) => updateAttributeGroup(groupIndex, { name: event.target.value })} placeholder="e.g. Processor" />
+                </label>
+                <label className="role-option">
+                  <input type="checkbox" checked={group.isRequired} onChange={(event) => updateAttributeGroup(groupIndex, { isRequired: event.target.checked })} />
+                  <span>Shopper must choose an option</span>
+                </label>
+                <label className="role-option">
+                  <input type="checkbox" checked={group.allowMultiple} onChange={(event) => updateAttributeGroup(groupIndex, { allowMultiple: event.target.checked })} />
+                  <span>Allow multiple choices (add-ons)</span>
+                </label>
+              </div>
+              <div className="section-heading variant-heading">
+                <h4>Choices</h4>
+                <button className="button button-quiet" type="button" onClick={() => updateAttributeGroup(groupIndex, { options: [...group.options, emptyAttributeOption(group.options.length)] })} disabled={busy || group.options.length >= 100}>
+                  Add choice
+                </button>
+              </div>
+              {group.options.map((option, optionIndex) => (
+                <div className="catalog-fields attribute-option" key={option.id ?? `choice-${groupIndex}-${optionIndex}`}>
+                  <label>
+                    Choice
+                    <input maxLength={150} required value={option.name} onChange={(event) => updateAttributeOption(groupIndex, optionIndex, { name: event.target.value })} placeholder="e.g. 16 GB RAM" />
+                  </label>
+                  <label>
+                    Added price
+                    <input type="number" min="0" step="0.0001" required value={option.priceAdjustment} onChange={(event) => updateAttributeOption(groupIndex, optionIndex, { priceAdjustment: Number(event.target.value) })} />
+                  </label>
+                  <label className="role-option">
+                    <input type="checkbox" checked={option.isActive} onChange={(event) => updateAttributeOption(groupIndex, optionIndex, { isActive: event.target.checked })} />
+                    <span>Available</span>
+                  </label>
+                  <button className="button button-quiet" type="button" onClick={() => updateAttributeGroup(groupIndex, { options: group.options.filter((_, itemIndex) => itemIndex !== optionIndex).map((item, order) => ({ ...item, displayOrder: order })) })} disabled={busy || group.options.length === 1}>
+                    Remove choice
+                  </button>
+                </div>
+              ))}
+              <button className="button button-quiet" type="button" onClick={() => updateProduct("attributeGroups", product.attributeGroups.filter((_, itemIndex) => itemIndex !== groupIndex).map((item, order) => ({ ...item, displayOrder: order })))} disabled={busy}>
+                Remove attribute
+              </button>
             </fieldset>
           ))}
 

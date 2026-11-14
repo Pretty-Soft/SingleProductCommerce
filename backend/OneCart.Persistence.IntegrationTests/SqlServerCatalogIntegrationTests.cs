@@ -42,7 +42,14 @@ public sealed class SqlServerCatalogIntegrationTests
                     19.95m,
                     "USD",
                     7,
-                    true)]);
+                    true)],
+                [new AdminProductAttributeGroupRequest(
+                    null,
+                    "Memory",
+                    true,
+                    false,
+                    0,
+                    [new AdminProductAttributeOptionRequest(null, "16 GB", 25m, true, 0)])]);
 
             var writeService = new AdminCatalogService(database);
             var saved = await writeService.SaveProductAsync(
@@ -62,6 +69,9 @@ public sealed class SqlServerCatalogIntegrationTests
             Assert.Single(published.Variants);
             Assert.Equal(19.95m, published.Variants[0].Price);
             Assert.True(published.Variants[0].IsAvailable);
+            Assert.Single(published.AttributeGroups);
+            Assert.Equal("Memory", published.AttributeGroups[0].Name);
+            Assert.Equal(25m, published.AttributeGroups[0].Options[0].PriceAdjustment);
             Assert.Single(await database.AdminAuditEvents.AsNoTracking().ToListAsync());
         }
         finally
