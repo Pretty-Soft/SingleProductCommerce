@@ -52,7 +52,7 @@ export async function adminRequest<T>(
   }
 
   const headers = new Headers(options.headers);
-  if (options.body && !headers.has("Content-Type")) {
+  if (options.body && !(options.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
   if (mutatesState && csrfToken) {
@@ -80,4 +80,12 @@ export async function adminRequest<T>(
     return undefined as T;
   }
   return (await response.json()) as T;
+}
+
+export async function loadAdminImagePreview(imageId: string): Promise<string> {
+  const response = await fetch(`${apiBase}/api/v1/admin/catalog/product/images/${imageId}`, {
+    credentials: "include"
+  });
+  if (!response.ok) throw new Error("Image preview could not be loaded.");
+  return URL.createObjectURL(await response.blob());
 }

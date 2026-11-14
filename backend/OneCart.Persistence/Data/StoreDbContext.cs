@@ -17,6 +17,10 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
 
     public DbSet<ProductAttributeOption> ProductAttributeOptions => Set<ProductAttributeOption>();
 
+    public DbSet<ProductImage> ProductImages => Set<ProductImage>();
+
+    public DbSet<ProductTrustItem> ProductTrustItems => Set<ProductTrustItem>();
+
     public DbSet<AdminAuditEvent> AdminAuditEvents => Set<AdminAuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -48,6 +52,9 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
         products.Property(product => product.Slug).HasMaxLength(180).IsRequired();
         products.HasIndex(product => product.Slug).IsUnique();
         products.Property(product => product.Description).HasMaxLength(8000).IsRequired();
+        products.Property(product => product.BrandName).HasMaxLength(120).HasDefaultValue("OneCart").IsRequired();
+        products.Property(product => product.StorefrontHeadline).HasMaxLength(200).IsRequired();
+        products.Property(product => product.StorefrontSubtitle).HasMaxLength(500).IsRequired();
         products.Property(product => product.FlashSaleLabel).HasMaxLength(100).IsRequired();
         products.Property(product => product.FlashSaleDiscountType).HasMaxLength(20).HasDefaultValue("percentage").IsRequired();
         products.Property(product => product.FlashSaleDiscountValue).HasPrecision(18, 4);
@@ -62,6 +69,14 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
         products.HasMany(product => product.AttributeGroups)
             .WithOne(group => group.Product)
             .HasForeignKey(group => group.ProductId)
+            .OnDelete(DeleteBehavior.Cascade);
+        products.HasMany(product => product.Images)
+            .WithOne(image => image.Product)
+            .HasForeignKey(image => image.ProductId)
+            .OnDelete(DeleteBehavior.Cascade);
+        products.HasMany(product => product.TrustItems)
+            .WithOne(item => item.Product)
+            .HasForeignKey(item => item.ProductId)
             .OnDelete(DeleteBehavior.Cascade);
 
         var variants = modelBuilder.Entity<ProductVariant>();
@@ -101,6 +116,33 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
         attributeOptions.Property(option => option.Name).HasMaxLength(150).IsRequired();
         attributeOptions.Property(option => option.PriceAdjustment).HasPrecision(18, 4);
         attributeOptions.Property(option => option.DisplayOrder).IsRequired();
+
+        var productImages = modelBuilder.Entity<ProductImage>();
+        productImages.ToTable("product_images", table =>
+        {
+            table.HasCheckConstraint("ck_product_images_display_order_non_negative", isSqlServer ? "[DisplayOrder] >= 0" : "\"DisplayOrder\" >= 0");
+        });
+        productImages.HasKey(image => image.Id);
+        productImages.HasIndex(image => image.StorageKey).IsUnique();
+        productImages.HasIndex(image => image.ProductId)
+            .IsUnique()
+            .HasFilter(isSqlServer ? "[MediaKind] = N'logo'" : "\"MediaKind\" = 'logo'");
+        productImages.Property(image => image.StorageKey).HasMaxLength(32).IsRequired();
+        productImages.Property(image => image.ContentType).HasMaxLength(40).IsRequired();
+        productImages.Property(image => image.MediaKind).HasMaxLength(20).IsRequired();
+        productImages.Property(image => image.AltText).HasMaxLength(200).IsRequired();
+        productImages.Property(image => image.DisplayOrder).IsRequired();
+        productImages.Property(image => image.CreatedAtUtc).IsRequired();
+
+        var trustItems = modelBuilder.Entity<ProductTrustItem>();
+        trustItems.ToTable("product_trust_items", table =>
+        {
+            table.HasCheckConstraint("ck_product_trust_items_display_order_non_negative", isSqlServer ? "[DisplayOrder] >= 0" : "\"DisplayOrder\" >= 0");
+        });
+        trustItems.HasKey(item => item.Id);
+        trustItems.Property(item => item.Title).HasMaxLength(80).IsRequired();
+        trustItems.Property(item => item.Description).HasMaxLength(300).IsRequired();
+        trustItems.Property(item => item.DisplayOrder).IsRequired();
 
         var auditEvents = modelBuilder.Entity<AdminAuditEvent>();
         auditEvents.ToTable("admin_audit_events");

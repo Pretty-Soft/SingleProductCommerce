@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import AdminApp from "./AdminApp";
-import { getPublishedProduct, StorefrontProduct } from "./storeApi";
+import { getMediaUrl, getPublishedProduct, StorefrontProduct } from "./storeApi";
 
 export default function App() {
   if (window.location.pathname.startsWith("/admin")) {
@@ -13,6 +13,7 @@ export default function App() {
 function Storefront() {
   const [product, setProduct] = useState<StorefrontProduct | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState("");
+  const [selectedImageId, setSelectedImageId] = useState("");
   const [selectedAttributeOptions, setSelectedAttributeOptions] = useState<Record<string, string[]>>({});
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -28,6 +29,7 @@ function Storefront() {
         if (!active) return;
         setProduct(loaded);
         setSelectedVariantId(loaded?.variants[0]?.id ?? "");
+        setSelectedImageId(loaded?.images[0]?.id ?? "");
         setProductReceivedAtMs(Date.now());
       })
       .catch(() => {
@@ -46,6 +48,7 @@ function Storefront() {
   }, [product?.flashSale.enabled, product?.flashSale.endsAtUtc]);
 
   const selectedVariant = product?.variants.find((variant) => variant.id === selectedVariantId);
+  const selectedImage = product?.images.find((image) => image.id === selectedImageId) ?? product?.images[0];
   const selectedOptions = product?.attributeGroups.flatMap((group) => {
     const selected = new Set(selectedAttributeOptions[group.id] ?? []);
     return group.options.filter((option) => selected.has(option.id));
@@ -102,8 +105,10 @@ function Storefront() {
     <main className="page">
       <header className="topbar">
         <a className="brand" href="/" aria-label="OneCart Commerce home">
-          <span className="brand-mark">O</span>
-          <span>OneCart</span>
+          {product?.brandLogoUrl
+            ? <img className="brand-logo" src={getMediaUrl(product.brandLogoUrl)} alt="" />
+            : <span className="brand-mark">{(product?.brandName ?? "OneCart").slice(0, 1).toUpperCase()}</span>}
+          <span>{product?.brandName ?? "OneCart"}</span>
         </a>
         <a className="status" href="/admin">Admin</a>
       </header>
@@ -113,12 +118,37 @@ function Storefront() {
       ) : error ? (
         <section className="hero" role="alert"><p className="eyebrow">OneCart Commerce</p><h1>Store temporarily unavailable</h1><p className="intro">{error}</p></section>
       ) : product ? (
-        <section className="store-product" aria-labelledby="hero-title">
+        <section className={`store-product${product.images.length > 0 ? " has-images" : ""}`} aria-labelledby="hero-title">
           <div className="product-copy">
-            <p className="eyebrow">One carefully chosen product</p>
-            <h1 id="hero-title">{product.name}</h1>
+            <p className="eyebrow">{product.brandName}</p>
+            <h1 id="hero-title">{product.storefrontHeadline || product.name}</h1>
+            {product.storefrontSubtitle && <p className="product-subtitle">{product.storefrontSubtitle}</p>}
+            {product.storefrontHeadline && <p className="product-name-note">{product.name}</p>}
             <p className="intro">{product.description}</p>
           </div>
+          {selectedImage && (
+            <div className="product-gallery" aria-label="Product images">
+              <figure className="product-image-stage">
+                <img src={getMediaUrl(selectedImage.url)} alt={selectedImage.altText} />
+              </figure>
+              {product.images.length > 1 && (
+                <div className="product-thumbnails" aria-label="Choose product image">
+                  {product.images.map((image) => (
+                    <button
+                      className={`product-thumbnail${selectedImage.id === image.id ? " selected" : ""}`}
+                      type="button"
+                      key={image.id}
+                      onClick={() => setSelectedImageId(image.id)}
+                      aria-label={`Show image: ${image.altText}`}
+                      aria-pressed={selectedImage.id === image.id}
+                    >
+                      <img src={getMediaUrl(image.url)} alt="" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <div className="purchase-panel">
             {flashSaleActive && (
               <div className="flash-sale-banner" aria-live="polite">
@@ -199,6 +229,16 @@ function Storefront() {
             )}
             {shareMessage && <p className="share-message" role="status">{shareMessage}</p>}
           </div>
+          {product.trustItems.length > 0 && (
+            <ul className="store-trust-items" aria-label="Store service details">
+              {product.trustItems.map((item) => (
+                <li key={item.title}>
+                  <span className="trust-mark" aria-hidden="true">✓</span>
+                  <span><strong>{item.title}</strong>{item.description && <small>{item.description}</small>}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       ) : (
         <section className="hero">

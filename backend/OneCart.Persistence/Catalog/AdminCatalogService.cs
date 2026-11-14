@@ -14,6 +14,8 @@ public sealed class AdminCatalogService(StoreDbContext database)
             .Include(candidate => candidate.Variants.OrderBy(variant => variant.DisplayName))
             .Include(candidate => candidate.AttributeGroups.OrderBy(group => group.DisplayOrder))
                 .ThenInclude(group => group.Options.OrderBy(option => option.DisplayOrder))
+            .Include(candidate => candidate.Images.OrderBy(image => image.MediaKind).ThenBy(image => image.DisplayOrder))
+            .Include(candidate => candidate.TrustItems.OrderBy(item => item.DisplayOrder))
             .SingleOrDefaultAsync(cancellationToken);
 
         return product is null ? null : ToResponse(product);
@@ -32,6 +34,8 @@ public sealed class AdminCatalogService(StoreDbContext database)
             .Include(candidate => candidate.Variants)
             .Include(candidate => candidate.AttributeGroups)
                 .ThenInclude(group => group.Options)
+            .Include(candidate => candidate.Images)
+            .Include(candidate => candidate.TrustItems)
             .SingleOrDefaultAsync(cancellationToken);
         var errors = ValidateProduct(request, product);
         if (errors.Count > 0)
@@ -50,6 +54,9 @@ public sealed class AdminCatalogService(StoreDbContext database)
         product.Name = request.Name.Trim();
         product.Slug = request.Slug.Trim();
         product.Description = request.Description.Trim();
+        product.BrandName = (request.BrandName ?? "OneCart").Trim();
+        product.StorefrontHeadline = request.StorefrontHeadline?.Trim() ?? string.Empty;
+        product.StorefrontSubtitle = request.StorefrontSubtitle?.Trim() ?? string.Empty;
         product.IsPublished = request.IsPublished;
         var flashSale = request.FlashSale ?? AdminFlashSaleRequest.Disabled;
         product.FlashSaleEnabled = flashSale.Enabled;
@@ -154,6 +161,33 @@ public sealed class AdminCatalogService(StoreDbContext database)
             product.AttributeGroups.Remove(group);
         }
 
+        var existingTrustItems = product.TrustItems.ToDictionary(item => item.Id);
+        var retainedTrustItemIds = new HashSet<Guid>();
+        foreach (var requestedItem in request.TrustItems ?? [])
+        {
+            ProductTrustItem item;
+            if (requestedItem.Id is Guid itemId)
+            {
+                item = existingTrustItems[itemId];
+                retainedTrustItemIds.Add(itemId);
+            }
+            else
+            {
+                item = new ProductTrustItem { Id = Guid.NewGuid(), Product = product };
+                product.TrustItems.Add(item);
+            }
+
+            item.Title = requestedItem.Title.Trim();
+            item.Description = requestedItem.Description?.Trim() ?? string.Empty;
+            item.IsActive = requestedItem.IsActive;
+            item.DisplayOrder = requestedItem.DisplayOrder;
+        }
+        foreach (var item in existingTrustItems.Values.Where(item => !retainedTrustItemIds.Contains(item.Id)))
+        {
+            database.ProductTrustItems.Remove(item);
+            product.TrustItems.Remove(item);
+        }
+
         if (database.Entry(product).State == EntityState.Detached)
         {
             database.Products.Add(product);
@@ -210,6 +244,53 @@ public sealed class AdminCatalogService(StoreDbContext database)
         if (description.Length > 8000)
         {
             AddError(nameof(request.Description), "Description must be 8,000 characters or fewer.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.BrandName) || request.BrandName.Trim().Length > 120)
+        {
+            AddError(nameof(request.BrandName), "Brand name is required and must be 120 characters or fewer.");
+        }
+        if ((request.StorefrontHeadline?.Trim().Length ?? 0) > 200)
+        {
+            AddError(nameof(request.StorefrontHeadline), "Storefront headline must be 200 characters or fewer.");
+        }
+        if ((request.StorefrontSubtitle?.Trim().Length ?? 0) > 500)
+        {
+            AddError(nameof(request.StorefrontSubtitle), "Storefront subtitle must be 500 characters or fewer.");
+        }
+
+        var trustItems = request.TrustItems?.Where(item => item is not null).ToList() ?? [];
+        if (request.TrustItems?.Any(item => item is null) == true)
+        {
+            AddError(nameof(request.TrustItems), "Trust items cannot contain empty entries.");
+        }
+        if (trustItems.Count > 8)
+        {
+            AddError(nameof(request.TrustItems), "Add no more than 8 trust or service details.");
+        }
+        if (trustItems.Where(item => item.Id.HasValue).Select(item => item.Id).Distinct().Count() != trustItems.Count(item => item.Id.HasValue))
+        {
+            AddError(nameof(request.TrustItems), "A trust item can only appear once.");
+        }
+        for (var index = 0; index < trustItems.Count; index++)
+        {
+            var item = trustItems[index];
+            if (string.IsNullOrWhiteSpace(item.Title) || item.Title.Trim().Length > 80)
+            {
+                AddError($"TrustItems[{index}]", "Trust item title is required and must be 80 characters or fewer.");
+            }
+            if ((item.Description?.Trim().Length ?? 0) > 300)
+            {
+                AddError($"TrustItems[{index}]", "Trust item description must be 300 characters or fewer.");
+            }
+            if (item.DisplayOrder < 0)
+            {
+                AddError($"TrustItems[{index}]", "Trust item order cannot be negative.");
+            }
+            if (item.Id is Guid trustItemId && (product is null || product.TrustItems.All(existing => existing.Id != trustItemId)))
+            {
+                AddError($"TrustItems[{index}]", "Trust item does not belong to this product.");
+            }
         }
 
         if (variants.Count is 0 or > 100)
@@ -428,6 +509,9 @@ public sealed class AdminCatalogService(StoreDbContext database)
         product.Name,
         product.Slug,
         product.Description,
+        product.BrandName,
+        product.StorefrontHeadline,
+        product.StorefrontSubtitle,
         product.IsPublished,
         product.Variants
             .OrderBy(variant => variant.DisplayName)
@@ -467,13 +551,20 @@ public sealed class AdminCatalogService(StoreDbContext database)
         product.SocialSharingEnabled,
         product.WhatsAppEnabled,
         product.WhatsAppPhoneNumber,
-        product.WhatsAppPrefillMessage);
+        product.WhatsAppPrefillMessage,
+        product.Images.OrderBy(image => image.MediaKind).ThenBy(image => image.DisplayOrder)
+            .Select(image => new ProductImageResponse(image.Id, "/api/v1/store/product/images/" + image.Id, image.MediaKind, image.AltText, image.DisplayOrder)).ToArray(),
+        product.TrustItems.OrderBy(item => item.DisplayOrder).Select(item => new AdminProductTrustItemResponse(
+            item.Id, item.Title, item.Description, item.IsActive, item.DisplayOrder)).ToArray());
 
     private static object CreateAuditSnapshot(StoreProduct product) => new
     {
         product.Name,
         product.Slug,
         product.Description,
+        product.BrandName,
+        product.StorefrontHeadline,
+        product.StorefrontSubtitle,
         product.IsPublished,
         FlashSale = new
         {
@@ -488,6 +579,8 @@ public sealed class AdminCatalogService(StoreDbContext database)
         product.WhatsAppEnabled,
         product.WhatsAppPhoneNumber,
         product.WhatsAppPrefillMessage,
+        TrustItems = product.TrustItems.OrderBy(item => item.DisplayOrder)
+            .Select(item => new { item.Title, item.Description, item.IsActive, item.DisplayOrder }).ToArray(),
         Variants = product.Variants
             .OrderBy(variant => variant.Sku)
             .Select(variant => new
@@ -526,7 +619,11 @@ public sealed record AdminProductRequest(
     bool SocialSharingEnabled = false,
     bool WhatsAppEnabled = false,
     string? WhatsAppPhoneNumber = null,
-    string? WhatsAppPrefillMessage = null);
+    string? WhatsAppPrefillMessage = null,
+    string? BrandName = "OneCart",
+    string? StorefrontHeadline = null,
+    string? StorefrontSubtitle = null,
+    IReadOnlyList<AdminProductTrustItemRequest>? TrustItems = null);
 
 public sealed record AdminFlashSaleRequest(
     bool Enabled,
@@ -568,6 +665,9 @@ public sealed record AdminProductResponse(
     string Name,
     string Slug,
     string Description,
+    string BrandName,
+    string StorefrontHeadline,
+    string StorefrontSubtitle,
     bool IsPublished,
     IReadOnlyList<AdminProductVariantResponse> Variants,
     IReadOnlyList<AdminProductAttributeGroupResponse> AttributeGroups,
@@ -575,7 +675,13 @@ public sealed record AdminProductResponse(
     bool SocialSharingEnabled,
     bool WhatsAppEnabled,
     string WhatsAppPhoneNumber,
-    string WhatsAppPrefillMessage);
+    string WhatsAppPrefillMessage,
+    IReadOnlyList<ProductImageResponse> Images,
+    IReadOnlyList<AdminProductTrustItemResponse> TrustItems);
+
+public sealed record AdminProductTrustItemRequest(Guid? Id, string Title, string Description, bool IsActive, int DisplayOrder);
+
+public sealed record AdminProductTrustItemResponse(Guid Id, string Title, string Description, bool IsActive, int DisplayOrder);
 
 public sealed record AdminProductVariantResponse(
     Guid Id,

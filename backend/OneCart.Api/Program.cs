@@ -19,6 +19,16 @@ builder.Services.AddDbContext<StoreDbContext>(options =>
         storeConnectionString));
 builder.Services.AddScoped<StorefrontCatalogService>();
 builder.Services.AddScoped<AdminCatalogService>();
+builder.Services.AddScoped<ProductMediaService>();
+builder.Services.AddSingleton<IProductImageStorage>(services =>
+{
+    var environment = services.GetRequiredService<IWebHostEnvironment>();
+    var configuredPath = builder.Configuration["ProductMedia:RootPath"] ?? Path.Combine("App_Data", "product-images");
+    var rootPath = Path.IsPathRooted(configuredPath)
+        ? configuredPath
+        : Path.Combine(environment.ContentRootPath, configuredPath);
+    return new LocalProductImageStorage(Path.GetFullPath(rootPath));
+});
 builder.Services.AddIdentity<AdminUser, IdentityRole<Guid>>(options =>
     {
         options.User.RequireUniqueEmail = true;
@@ -143,6 +153,16 @@ app.MapGet("/api/v1/store/product", async (
 {
     var product = await catalog.GetPublishedProductAsync(cancellationToken);
     return product is null ? Results.NotFound() : Results.Ok(product);
+});
+app.MapGet("/api/v1/store/product/images/{imageId:guid}", async (
+    Guid imageId,
+    ProductMediaService media,
+    CancellationToken cancellationToken) =>
+{
+    var image = await media.OpenPublishedImageAsync(imageId, cancellationToken);
+    return image is null
+        ? Results.NotFound()
+        : Results.File(image.Content, image.ContentType, enableRangeProcessing: false);
 });
 app.MapAdminEndpoints();
 

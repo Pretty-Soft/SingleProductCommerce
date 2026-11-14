@@ -18,6 +18,7 @@ public sealed class SqlServerCatalogIntegrationTests
             ?? throw new InvalidOperationException("SQL Server integration connection string is required.");
 
         var databaseName = $"OneCart_Integration_{Guid.NewGuid():N}";
+        var mediaRoot = Path.Combine(Path.GetTempPath(), "onecart-media-test-" + Guid.NewGuid().ToString("N"));
         var connection = new SqlConnectionStringBuilder(configuredConnection)
         {
             InitialCatalog = databaseName
@@ -62,7 +63,11 @@ public sealed class SqlServerCatalogIntegrationTests
                 SocialSharingEnabled = true,
                 WhatsAppEnabled = true,
                 WhatsAppPhoneNumber = "+880 1712-345678",
-                WhatsAppPrefillMessage = "I have a question"
+                WhatsAppPrefillMessage = "I have a question",
+                BrandName = "Integration Brand",
+                StorefrontHeadline = "Made for daily use",
+                StorefrontSubtitle = "Thoughtful essentials",
+                TrustItems = [new AdminProductTrustItemRequest(null, "Fast delivery", "Ships within two days", true, 0)]
             };
 
             var writeService = new AdminCatalogService(database);
@@ -91,7 +96,32 @@ public sealed class SqlServerCatalogIntegrationTests
             Assert.Equal(17.955m, published.Variants[0].SalePrice);
             Assert.True(published.SocialSharingEnabled);
             Assert.Contains("https://wa.me/8801712345678?text=", published.WhatsAppContactUrl);
-            Assert.Single(await database.AdminAuditEvents.AsNoTracking().ToListAsync());
+            Assert.Equal("Integration Brand", published.BrandName);
+            Assert.Equal("Made for daily use", published.StorefrontHeadline);
+            Assert.Single(published.TrustItems);
+
+            var mediaService = new ProductMediaService(database, new LocalProductImageStorage(mediaRoot));
+            byte[] pngSignature = [137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0];
+            var invalid = await mediaService.UploadAsync(new MemoryStream([1, 2, 3]), 3, "product", "Invalid image", Guid.NewGuid(), "media@onecart.local", CancellationToken.None);
+            Assert.NotNull(invalid.Error);
+
+            var uploaded = await mediaService.UploadAsync(new MemoryStream(pngSignature), pngSignature.Length, "product", "Product front", Guid.NewGuid(), "media@onecart.local", CancellationToken.None);
+            Assert.Null(uploaded.Error);
+            var image = Assert.IsType<ProductImageResponse>(uploaded.Image);
+            Assert.Single((await readService.GetPublishedProductAsync(CancellationToken.None))!.Images);
+
+            var publicImage = await mediaService.OpenPublishedImageAsync(image.Id, CancellationToken.None);
+            Assert.NotNull(publicImage);
+            await using var content = publicImage!.Content;
+            await using var copy = new MemoryStream();
+            await content.CopyToAsync(copy);
+            Assert.Equal(pngSignature, copy.ToArray());
+
+            var update = await mediaService.UpdateAsync(image.Id, "Updated product front", 3, Guid.NewGuid(), "media@onecart.local", CancellationToken.None);
+            Assert.Equal("Updated product front", update.Image?.AltText);
+            Assert.True(await mediaService.DeleteAsync(image.Id, Guid.NewGuid(), "media@onecart.local", CancellationToken.None));
+            Assert.Empty((await readService.GetPublishedProductAsync(CancellationToken.None))!.Images);
+            Assert.Equal(4, await database.AdminAuditEvents.AsNoTracking().CountAsync());
         }
         finally
         {
@@ -102,6 +132,11 @@ public sealed class SqlServerCatalogIntegrationTests
             catch
             {
                 // Preserve the test failure if SQL Server did not create the disposable database.
+            }
+
+            if (Directory.Exists(mediaRoot) && Path.GetFullPath(mediaRoot).StartsWith(Path.GetFullPath(Path.GetTempPath()), StringComparison.OrdinalIgnoreCase))
+            {
+                Directory.Delete(mediaRoot, recursive: true);
             }
         }
     }

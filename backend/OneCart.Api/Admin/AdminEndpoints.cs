@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Mvc;
 using OneCart.Api.Catalog;
 using OneCart.Api.Data;
 
@@ -64,6 +65,27 @@ public static class AdminEndpoints
             .AddEndpointFilter(RequireChangedPasswordAsync);
 
         group.MapPut("/catalog/product", SaveAdminProductAsync)
+            .RequireAuthorization(policy => policy.RequireRole(AdminRoles.SystemAdmin))
+            .AddEndpointFilter(ValidateAntiforgeryAsync)
+            .AddEndpointFilter(RequireChangedPasswordAsync);
+
+        group.MapPost("/catalog/product/images", UploadProductImageAsync)
+            .RequireAuthorization(policy => policy.RequireRole(AdminRoles.SystemAdmin))
+            .WithMetadata(new RequestSizeLimitAttribute(ProductMediaService.MaximumImageBytes + 128 * 1024))
+            .WithMetadata(new RequestFormLimitsAttribute { MultipartBodyLengthLimit = ProductMediaService.MaximumImageBytes + 128 * 1024 })
+            .AddEndpointFilter(ValidateAntiforgeryAsync)
+            .AddEndpointFilter(RequireChangedPasswordAsync);
+
+        group.MapGet("/catalog/product/images/{imageId:guid}", OpenAdminProductImageAsync)
+            .RequireAuthorization(policy => policy.RequireRole(AdminRoles.SystemAdmin))
+            .AddEndpointFilter(RequireChangedPasswordAsync);
+
+        group.MapPut("/catalog/product/images/{imageId:guid}", UpdateProductImageAsync)
+            .RequireAuthorization(policy => policy.RequireRole(AdminRoles.SystemAdmin))
+            .AddEndpointFilter(ValidateAntiforgeryAsync)
+            .AddEndpointFilter(RequireChangedPasswordAsync);
+
+        group.MapDelete("/catalog/product/images/{imageId:guid}", DeleteProductImageAsync)
             .RequireAuthorization(policy => policy.RequireRole(AdminRoles.SystemAdmin))
             .AddEndpointFilter(ValidateAntiforgeryAsync)
             .AddEndpointFilter(RequireChangedPasswordAsync);
@@ -223,6 +245,97 @@ public static class AdminEndpoints
         return result.Errors is not null
             ? Results.ValidationProblem(result.Errors)
             : Results.Ok(result.Product);
+    }
+
+    private static async Task<IResult> UploadProductImageAsync(
+        HttpContext context,
+        ProductMediaService media,
+        UserManager<AdminUser> userManager)
+    {
+        if (context.Request.ContentLength is > ProductMediaService.MaximumImageBytes + 128 * 1024)
+        {
+            return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+        }
+
+        IFormCollection form;
+        try
+        {
+            form = await context.Request.ReadFormAsync(context.RequestAborted);
+        }
+        catch (InvalidDataException)
+        {
+            return Results.BadRequest(new { error = "Upload a valid multipart form." });
+        }
+
+        var file = form.Files.GetFile("file");
+        if (file is null)
+        {
+            return Results.BadRequest(new { error = "Choose an image to upload." });
+        }
+        if (!Guid.TryParse(userManager.GetUserId(context.User), out var actorId))
+        {
+            return Results.Unauthorized();
+        }
+
+        await using var stream = file.OpenReadStream();
+        var result = await media.UploadAsync(
+            stream,
+            file.Length,
+            form["mediaKind"].ToString(),
+            form["altText"].ToString(),
+            actorId,
+            userManager.GetUserName(context.User) ?? string.Empty,
+            context.RequestAborted);
+
+        if (result.Error is not null) return Results.BadRequest(new { error = result.Error });
+        return result.Image is null
+            ? Results.BadRequest(new { error = "Create a product draft before uploading media." })
+            : Results.Created(result.Image.Url, result.Image);
+    }
+
+    private static async Task<IResult> OpenAdminProductImageAsync(
+        Guid imageId,
+        ProductMediaService media,
+        CancellationToken cancellationToken)
+    {
+        var image = await media.OpenAdminImageAsync(imageId, cancellationToken);
+        return image is null
+            ? Results.NotFound()
+            : Results.File(image.Content, image.ContentType, enableRangeProcessing: false);
+    }
+
+    private static async Task<IResult> UpdateProductImageAsync(
+        Guid imageId,
+        AdminProductImageUpdateRequest request,
+        ProductMediaService media,
+        UserManager<AdminUser> userManager,
+        HttpContext context)
+    {
+        if (!Guid.TryParse(userManager.GetUserId(context.User), out var actorId)) return Results.Unauthorized();
+        var result = await media.UpdateAsync(
+            imageId,
+            request.AltText,
+            request.DisplayOrder,
+            actorId,
+            userManager.GetUserName(context.User) ?? string.Empty,
+            context.RequestAborted);
+        if (result.IsNotFound) return Results.NotFound();
+        return result.Error is not null ? Results.BadRequest(new { error = result.Error }) : Results.Ok(result.Image);
+    }
+
+    private static async Task<IResult> DeleteProductImageAsync(
+        Guid imageId,
+        ProductMediaService media,
+        UserManager<AdminUser> userManager,
+        HttpContext context)
+    {
+        if (!Guid.TryParse(userManager.GetUserId(context.User), out var actorId)) return Results.Unauthorized();
+        var deleted = await media.DeleteAsync(
+            imageId,
+            actorId,
+            userManager.GetUserName(context.User) ?? string.Empty,
+            context.RequestAborted);
+        return deleted ? Results.NoContent() : Results.NotFound();
     }
 
     private static async Task<IResult> CreateUserAsync(
@@ -428,6 +541,7 @@ public static class AdminEndpoints
     public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
     public sealed record CreateAdminUserRequest(string Email, string TemporaryPassword, string[] RoleNames);
     public sealed record UpdateAdminUserRolesRequest(string[] RoleNames);
+    public sealed record AdminProductImageUpdateRequest(string AltText, int DisplayOrder);
     public sealed record AdminRoleResponse(Guid Id, string Name);
     public sealed record AdminAuditResponse(
         Guid Id,

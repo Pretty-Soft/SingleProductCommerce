@@ -10,6 +10,12 @@ public sealed class StoreProduct
 
     public string Description { get; set; } = string.Empty;
 
+    public string BrandName { get; set; } = "OneCart";
+
+    public string StorefrontHeadline { get; set; } = string.Empty;
+
+    public string StorefrontSubtitle { get; set; } = string.Empty;
+
     public bool FlashSaleEnabled { get; set; }
 
     public string FlashSaleLabel { get; set; } = string.Empty;
@@ -39,4 +45,8 @@ public sealed class StoreProduct
     public ICollection<ProductVariant> Variants { get; } = new List<ProductVariant>();
 
     public ICollection<ProductAttributeGroup> AttributeGroups { get; } = new List<ProductAttributeGroup>();
+
+    public ICollection<ProductImage> Images { get; } = new List<ProductImage>();
+
+    public ICollection<ProductTrustItem> TrustItems { get; } = new List<ProductTrustItem>();
 }

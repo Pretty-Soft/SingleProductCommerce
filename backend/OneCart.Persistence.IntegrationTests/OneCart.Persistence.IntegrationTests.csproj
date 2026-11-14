@@ -15,6 +15,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\OneCart.Api\OneCart.Api.csproj" />
     <ProjectReference Include="..\OneCart.Persistence\OneCart.Persistence.csproj" />
     <ProjectReference Include="..\OneCart.SqlServer.Migrations\OneCart.SqlServer.Migrations.csproj" />
   </ItemGroup>

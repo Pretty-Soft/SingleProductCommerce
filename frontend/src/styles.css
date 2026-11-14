@@ -72,6 +72,13 @@ button:enabled {
   width: 36px;
 }
 
+.brand-logo {
+  height: 40px;
+  max-width: 120px;
+  object-fit: contain;
+  width: auto;
+}
+
 .status,
 .note {
   color: #667085;
@@ -93,11 +100,137 @@ button:enabled {
   padding: 72px 0;
 }
 
+.store-product.has-images {
+  align-items: start;
+  grid-template-areas:
+    "copy gallery"
+    "purchase gallery"
+    "trust trust";
+  grid-template-columns: minmax(0, 0.85fr) minmax(320px, 1fr);
+  row-gap: 28px;
+}
+
+.product-copy { grid-area: copy; }
+.product-gallery { grid-area: gallery; }
+.purchase-panel { grid-area: purchase; }
+.store-trust-items { grid-area: trust; }
+
 .product-copy h1 {
   font-size: clamp(2.7rem, 7vw, 5.5rem);
   letter-spacing: -0.065em;
   line-height: 0.98;
   margin: 18px 0;
+}
+
+.product-subtitle {
+  color: #566176;
+  font-size: clamp(1.15rem, 2.2vw, 1.55rem);
+  font-weight: 650;
+  line-height: 1.4;
+  margin: -4px 0 18px;
+}
+
+.product-name-note {
+  color: #8991a2;
+  font-size: 0.9rem;
+  font-weight: 650;
+  margin: 0 0 12px;
+}
+
+.product-gallery {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.product-image-stage {
+  align-items: center;
+  aspect-ratio: 1 / 1;
+  background: radial-gradient(circle at 50% 42%, #ffffff 0, #faf8f5 65%, #f0ece6 100%);
+  border: 1px solid #ece8e2;
+  border-radius: 24px;
+  display: flex;
+  justify-content: center;
+  margin: 0;
+  overflow: hidden;
+  padding: 22px;
+}
+
+.product-image-stage img {
+  height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+  width: 100%;
+}
+
+.product-thumbnails {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.product-thumbnail {
+  background: #fff;
+  border: 1px solid #dce1eb;
+  border-radius: 10px;
+  height: 64px;
+  opacity: 0.72;
+  overflow: hidden;
+  padding: 4px;
+  width: 64px;
+}
+
+.product-thumbnail.selected {
+  border-color: #536da9;
+  opacity: 1;
+}
+
+.product-thumbnail img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.store-trust-items {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 8px 0 0;
+}
+
+.store-trust-items li {
+  align-items: flex-start;
+  background: #fff;
+  border: 1px solid #e7e9ed;
+  border-radius: 13px;
+  display: flex;
+  gap: 10px;
+  padding: 15px;
+}
+
+.store-trust-items li > span:last-child {
+  display: grid;
+  gap: 4px;
+}
+
+.store-trust-items small {
+  color: #667085;
+  line-height: 1.45;
+}
+
+.trust-mark {
+  align-items: center;
+  background: #edf7ef;
+  border-radius: 50%;
+  color: #176c45;
+  display: inline-flex;
+  flex: 0 0 24px;
+  font-size: 0.78rem;
+  height: 24px;
+  justify-content: center;
+  width: 24px;
 }
 
 .purchase-panel {
@@ -363,6 +496,11 @@ footer {
     grid-template-columns: minmax(0, 1fr);
     padding: 56px 0;
   }
+
+  .store-product.has-images {
+    grid-template-areas: "copy" "gallery" "purchase" "trust";
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .admin-page {
@@ -471,6 +609,47 @@ footer {
 
 .catalog-form {
   margin-top: 24px;
+}
+
+.image-upload-form {
+  align-items: end;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.image-upload-form .admin-muted {
+  grid-column: 1 / -1;
+}
+
+.admin-media-list {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-media-row {
+  align-items: center;
+  border: 1px solid #e1e6ef;
+  border-radius: 12px;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 112px minmax(0, 1fr);
+  padding: 14px;
+}
+
+.admin-media-row > img,
+.admin-media-preview {
+  aspect-ratio: 1 / 1;
+  background: #f5f3ef;
+  border-radius: 9px;
+  height: 112px;
+  object-fit: contain;
+  padding: 4px;
+  width: 112px;
+}
+
+.admin-media-row .variant-actions {
+  grid-column: 2;
 }
 
 .catalog-settings {
@@ -776,5 +955,19 @@ footer {
 
   .catalog-fields {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .image-upload-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-media-row {
+    grid-template-columns: 88px minmax(0, 1fr);
+  }
+
+  .admin-media-row > img,
+  .admin-media-preview {
+    height: 88px;
+    width: 88px;
   }
 }

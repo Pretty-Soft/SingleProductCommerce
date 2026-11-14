@@ -332,6 +332,91 @@ namespace OneCart.SqlServer.Migrations.Migrations
                         });
                 });
 
+            modelBuilder.Entity("OneCart.Api.Catalog.ProductImage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AltText")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("MediaKind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId")
+                        .IsUnique()
+                        .HasFilter("[MediaKind] = N'logo'");
+
+                    b.HasIndex("StorageKey")
+                        .IsUnique();
+
+                    b.ToTable("product_images", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_product_images_display_order_non_negative", "[DisplayOrder] >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("OneCart.Api.Catalog.ProductTrustItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("product_trust_items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_product_trust_items_display_order_non_negative", "[DisplayOrder] >= 0");
+                        });
+                });
+
             modelBuilder.Entity("OneCart.Api.Catalog.ProductVariant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -387,6 +472,13 @@ namespace OneCart.SqlServer.Migrations.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("BrandName")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)")
+                        .HasDefaultValue("OneCart");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -397,9 +489,10 @@ namespace OneCart.SqlServer.Migrations.Migrations
 
                     b.Property<string>("FlashSaleDiscountType")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasMaxLength(20)
-                        .HasDefaultValue("percentage")
-                        .HasColumnType("nvarchar(20)");
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("percentage");
 
                     b.Property<decimal>("FlashSaleDiscountValue")
                         .HasPrecision(18, 4)
@@ -434,6 +527,16 @@ namespace OneCart.SqlServer.Migrations.Migrations
 
                     b.Property<bool>("SocialSharingEnabled")
                         .HasColumnType("bit");
+
+                    b.Property<string>("StorefrontHeadline")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("StorefrontSubtitle")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("datetimeoffset");
@@ -543,6 +646,28 @@ namespace OneCart.SqlServer.Migrations.Migrations
                     b.Navigation("AttributeGroup");
                 });
 
+            modelBuilder.Entity("OneCart.Api.Catalog.ProductImage", b =>
+                {
+                    b.HasOne("OneCart.Api.Catalog.StoreProduct", "Product")
+                        .WithMany("Images")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("OneCart.Api.Catalog.ProductTrustItem", b =>
+                {
+                    b.HasOne("OneCart.Api.Catalog.StoreProduct", "Product")
+                        .WithMany("TrustItems")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("OneCart.Api.Catalog.ProductVariant", b =>
                 {
                     b.HasOne("OneCart.Api.Catalog.StoreProduct", "Product")
@@ -562,6 +687,10 @@ namespace OneCart.SqlServer.Migrations.Migrations
             modelBuilder.Entity("OneCart.Api.Catalog.StoreProduct", b =>
                 {
                     b.Navigation("AttributeGroups");
+
+                    b.Navigation("Images");
+
+                    b.Navigation("TrustItems");
 
                     b.Navigation("Variants");
                 });

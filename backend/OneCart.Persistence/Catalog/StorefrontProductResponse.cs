@@ -5,11 +5,17 @@ public sealed record StorefrontProductResponse(
     string Name,
     string Slug,
     string Description,
+    string BrandName,
+    string StorefrontHeadline,
+    string StorefrontSubtitle,
     IReadOnlyList<StorefrontVariantResponse> Variants,
     IReadOnlyList<StorefrontAttributeGroupResponse> AttributeGroups,
     StorefrontFlashSaleResponse FlashSale,
     bool SocialSharingEnabled,
-    string? WhatsAppContactUrl);
+    string? WhatsAppContactUrl,
+    IReadOnlyList<ProductImageResponse> Images,
+    string? BrandLogoUrl,
+    IReadOnlyList<StorefrontTrustItemResponse> TrustItems);
 
 public sealed record StorefrontVariantResponse(
     Guid Id,
@@ -39,3 +45,5 @@ public sealed record StorefrontFlashSaleResponse(
     DateTimeOffset? StartsAtUtc,
     DateTimeOffset? EndsAtUtc,
     DateTimeOffset ServerTimeUtc);
+
+public sealed record StorefrontTrustItemResponse(string Title, string Description);

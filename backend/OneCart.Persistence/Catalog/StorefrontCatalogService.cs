@@ -19,6 +19,10 @@ public sealed class StorefrontCatalogService(StoreDbContext database)
                 .ThenInclude(group => group.Options
                     .Where(option => option.IsActive)
                     .OrderBy(option => option.DisplayOrder))
+            .Include(candidate => candidate.Images.OrderBy(image => image.DisplayOrder))
+            .Include(candidate => candidate.TrustItems
+                .Where(item => item.IsActive)
+                .OrderBy(item => item.DisplayOrder))
             .SingleOrDefaultAsync(cancellationToken);
 
         if (product is null)
@@ -52,6 +56,9 @@ public sealed class StorefrontCatalogService(StoreDbContext database)
             product.Name,
             product.Slug,
             product.Description,
+            product.BrandName,
+            product.StorefrontHeadline,
+            product.StorefrontSubtitle,
             variants,
             product.AttributeGroups
                 .Select(group => new StorefrontAttributeGroupResponse(
@@ -73,7 +80,17 @@ public sealed class StorefrontCatalogService(StoreDbContext database)
                 product.FlashSaleEndsAtUtc,
                 serverTimeUtc),
             product.SocialSharingEnabled,
-            whatsAppUrl);
+            whatsAppUrl,
+            product.Images.Where(image => image.MediaKind == "product")
+                .OrderBy(image => image.DisplayOrder)
+                .Select(image => new ProductImageResponse(image.Id, "/api/v1/store/product/images/" + image.Id, image.MediaKind, image.AltText, image.DisplayOrder))
+                .ToArray(),
+            product.Images.Where(image => image.MediaKind == "logo")
+                .Select(image => "/api/v1/store/product/images/" + image.Id)
+                .SingleOrDefault(),
+            product.TrustItems.OrderBy(item => item.DisplayOrder)
+                .Select(item => new StorefrontTrustItemResponse(item.Title, item.Description))
+                .ToArray());
     }
 
     private static decimal CalculateSalePrice(decimal price, string discountType, decimal discountValue)

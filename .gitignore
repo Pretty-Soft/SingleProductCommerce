@@ -17,6 +17,7 @@ dist/
 !.env.example
 appsettings.Local.json
 secrets.json
+**/App_Data/
 
 # OS/editor
 .DS_Store
