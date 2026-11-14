@@ -1,16 +1,24 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using OneCart.Api.Admin;
 using OneCart.Api.Catalog;
 
 namespace OneCart.Api.Data;
 
-public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : DbContext(options)
+public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
+    : IdentityDbContext<AdminUser, IdentityRole<Guid>, Guid>(options)
 {
     public DbSet<StoreProduct> Products => Set<StoreProduct>();
 
     public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
 
+    public DbSet<AdminAuditEvent> AdminAuditEvents => Set<AdminAuditEvent>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        base.OnModelCreating(modelBuilder);
+
         var products = modelBuilder.Entity<StoreProduct>();
         products.ToTable("store_products", table =>
         {
@@ -44,5 +52,15 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options) : D
         variants.Property(variant => variant.Price).HasPrecision(18, 4);
         variants.Property(variant => variant.CurrencyCode).HasMaxLength(3).IsRequired();
         variants.Property(variant => variant.StockQuantity).IsRequired();
+
+        var auditEvents = modelBuilder.Entity<AdminAuditEvent>();
+        auditEvents.ToTable("admin_audit_events");
+        auditEvents.HasKey(auditEvent => auditEvent.Id);
+        auditEvents.Property(auditEvent => auditEvent.ActorEmail).HasMaxLength(256).IsRequired();
+        auditEvents.Property(auditEvent => auditEvent.Action).HasMaxLength(100).IsRequired();
+        auditEvents.Property(auditEvent => auditEvent.TargetEmail).HasMaxLength(256).IsRequired();
+        auditEvents.Property(auditEvent => auditEvent.Details).HasMaxLength(4000).IsRequired();
+        auditEvents.Property(auditEvent => auditEvent.CreatedAtUtc).IsRequired();
+        auditEvents.HasIndex(auditEvent => auditEvent.CreatedAtUtc);
     }
 }

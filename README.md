@@ -26,6 +26,12 @@ dotnet tool restore
 dotnet ef database update --project backend/OneCart.Api
 ```
 
+Create the requested first System Admin account. The bootstrap command applies pending migrations, seeds the built-in roles, and prompts for the password without displaying or storing it in the repository:
+
+```powershell
+dotnet run --project backend/OneCart.Api -- --bootstrap-system-admin zs.islam93@gmail.com
+```
+
 Create and trust the local ASP.NET Core development certificate once:
 
 ```powershell
@@ -48,7 +54,7 @@ npm install
 npm run dev
 ```
 
-The API health check is available at `/health`. The public catalog read endpoint is `GET /api/v1/store/product`; it returns `404` until an administrator workflow publishes a product. Admin product editing and checkout are not implemented yet. The current frontend is only a starter shell.
+The API health check is available at `/health`. The public catalog read endpoint is `GET /api/v1/store/product`; it returns `404` until an administrator workflow publishes a product. Open `/admin` in the frontend to sign in and manage users as a System Admin. New accounts receive a temporary password and must change it at first sign-in. The frontend uses secure cookie authentication and anti-forgery tokens; production deployments must configure `Cors:AllowedOrigins` for the exact frontend origin.
 
 ## Project direction
 

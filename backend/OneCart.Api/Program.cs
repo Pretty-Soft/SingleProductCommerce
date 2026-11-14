@@ -1,6 +1,9 @@
 using System.Net;
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using OneCart.Api.Admin;
 using OneCart.Api.Catalog;
 using OneCart.Api.Data;
 
@@ -12,6 +15,65 @@ var storeConnectionString = builder.Configuration.GetConnectionString("Store")
 builder.Services.AddDbContext<StoreDbContext>(options =>
     options.UseNpgsql(storeConnectionString));
 builder.Services.AddScoped<StorefrontCatalogService>();
+builder.Services.AddIdentity<AdminUser, IdentityRole<Guid>>(options =>
+    {
+        options.User.RequireUniqueEmail = true;
+        options.Password.RequiredLength = 12;
+        options.Password.RequireDigit = true;
+        options.Password.RequireLowercase = true;
+        options.Password.RequireUppercase = true;
+        options.Password.RequireNonAlphanumeric = true;
+        options.Lockout.AllowedForNewUsers = true;
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+    })
+    .AddEntityFrameworkStores<StoreDbContext>()
+    .AddDefaultTokenProviders();
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.Cookie.Name = "__Host-OneCart.Admin";
+    options.Cookie.Path = "/";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.None;
+    options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+    options.SlidingExpiration = true;
+});
+builder.Services.Configure<SecurityStampValidatorOptions>(options =>
+{
+    options.ValidationInterval = TimeSpan.Zero;
+});
+builder.Services.AddAuthorization();
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-CSRF-TOKEN";
+    options.Cookie.Name = "__Host-OneCart.AntiForgery";
+    options.Cookie.Path = "/";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.None;
+});
+
+var allowedAdminOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? [];
+if (builder.Environment.IsDevelopment())
+{
+    allowedAdminOrigins = allowedAdminOrigins
+        .Concat(["http://localhost:5173", "http://127.0.0.1:5173"])
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+}
+
+builder.Services.AddCors(options => options.AddPolicy("AdminUi", policy =>
+{
+    if (allowedAdminOrigins.Length > 0)
+    {
+        policy.WithOrigins(allowedAdminOrigins);
+    }
+
+    policy.AllowAnyHeader().AllowAnyMethod().AllowCredentials();
+}));
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
@@ -59,6 +121,10 @@ app.Use(async (context, next) =>
     await next();
 });
 
+app.UseCors("AdminUi");
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.MapGet("/health", () => Results.Ok(new
 {
     status = "ok",
@@ -72,5 +138,12 @@ app.MapGet("/api/v1/store/product", async (
     var product = await catalog.GetPublishedProductAsync(cancellationToken);
     return product is null ? Results.NotFound() : Results.Ok(product);
 });
+app.MapAdminEndpoints();
+
+if (args.Length == 2 && args[0] == "--bootstrap-system-admin")
+{
+    Environment.ExitCode = await AdminBootstrapper.CreateFirstSystemAdminAsync(app.Services, args[1]);
+    return;
+}
 
 app.Run();

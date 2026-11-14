@@ -28,6 +28,10 @@ Treat first installation and upgrades as explicit workflows. The installer must 
 
 The API accepts requests only when ASP.NET Core sees an HTTPS scheme. The local launch profile binds to HTTPS at `https://localhost:7241`. Production deployments must use a valid TLS certificate. If TLS terminates at a reverse proxy, set `ForwardedHeaders:KnownProxies` to the proxy's IP address so the API can safely recognize the forwarded HTTPS scheme. Forwarded headers from untrusted clients must not be accepted.
 
+## Administrator authentication
+
+Administrator accounts use ASP.NET Core Identity with PostgreSQL persistence and secure cookies. Mutating browser API calls require an anti-forgery request token. Credentialed CORS accepts only configured frontend origins (development permits the local Vite origins). Public registration is not mapped. The first System Admin is created by the one-time local bootstrap command, which prompts for a password; later account creation and role assignment require SystemAdmin authorization. New accounts must change their temporary password on first sign-in.
+
 ## Current implementation boundary
 
-The API exposes health and read-only published catalog endpoints. Product administration, checkout/orders, authentication, and installer workflows are not implemented yet. The frontend remains a shell.
+The API exposes health and read-only published catalog endpoints plus SystemAdmin-only user and role assignment APIs. The frontend includes admin sign-in and user management. Product administration, checkout/orders, audit history, and installer workflows are not implemented yet.

@@ -11,6 +11,8 @@ This repository builds OneCart Commerce, a maintainable commercial single-produc
 - Keep database-specific behavior behind persistence adapters. Do not claim a database provider is supported until migrations, transactions, installation, and integration coverage exist for it.
 - COD is the only confirmed payment method. Do not add online payment providers without an approved requirement.
 - Require HTTPS for all API traffic and use an HTTPS API base URL. Trust forwarded protocol headers only from explicitly configured reverse proxies.
+- Use ASP.NET Core Identity for administrator accounts. Only the SystemAdmin role may create accounts or assign roles; never add public registration.
+- Protect cookie-authenticated state-changing API requests with anti-forgery validation and allow only configured frontend origins through credentialed CORS.
 - Treat security, input validation, authorization, auditability, accessibility, localization, and responsive behavior as product requirements.
 - Never commit secrets, production credentials, personal customer data, or generated environment files.
 - Avoid placeholder implementations in user-facing or security-critical flows. If a requirement is not ready, document it and keep the behavior explicit.

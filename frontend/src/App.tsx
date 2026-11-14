@@ -1,4 +1,10 @@
+import AdminApp from "./AdminApp";
+
 export default function App() {
+  if (window.location.pathname.startsWith("/admin")) {
+    return <AdminApp />;
+  }
+
   return (
     <main className="page">
       <header className="topbar">

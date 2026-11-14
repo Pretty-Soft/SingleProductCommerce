@@ -33,6 +33,9 @@ The project should be developed with human review and release quality in mind. C
 
 - Provide an administrator area for managing orders, customers, inventory, product content, store settings, and sales information.
 - Include authentication and role-based authorization appropriate to the actions available.
+- Use built-in email/password administrator accounts. Only a System Admin may create administrator accounts and assign roles; public registration is disabled.
+- Require new admin users to change the temporary password at first sign-in.
+- Create the first System Admin through a one-time local bootstrap command that prompts for the password, rather than shipping a default credential.
 - Maintain audit records for important administrative changes.
 
 ### Languages, currency, and theme
@@ -100,6 +103,7 @@ These are recommendations for a maintainable first release, not finalized produc
 - Variant option structure (for example size/color), quantity limits, and inventory decrement/reservation rules.
 - Customer checkout fields, address format, guest checkout, order confirmation, and cancellation policy.
 - Admin roles, account recovery, and optional administrator MFA.
+- Detailed permission mapping for the initial `SystemAdmin`, `CatalogManager`, `OrderManager`, and `StoreManager` roles; current role names are built-in starting defaults.
 - Which additional database providers, beyond the confirmed first-release PostgreSQL provider, are required for release.
 - Whether “hybrid” means multiple providers used together, relational plus document storage, or another deployment pattern.
 - Supported languages and translation ownership.
@@ -115,6 +119,7 @@ These are recommendations for a maintainable first release, not finalized produc
 - Repository contains an ASP.NET Core 10 API project and a React/TypeScript frontend shell.
 - The catalog model is one product with selectable variants, persisted in PostgreSQL for the first release.
 - The public API can read the single published product and its active variants over HTTPS.
+- Only System Admin accounts can create users and assign roles through the admin panel.
 - Product scope and confirmed technology direction are documented here.
 - Unresolved requirements remain visible and are not invented by implementation.
 - Starter documentation explains how to run the two applications locally.
