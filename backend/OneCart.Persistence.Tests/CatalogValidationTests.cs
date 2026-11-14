@@ -79,6 +79,45 @@ public sealed class CatalogValidationTests
         Assert.Contains("AttributeGroups[0].Options[0]", errors.Keys);
     }
 
+    [Fact]
+    public void Accepts_a_scheduled_flash_sale_and_valid_whats_app_number()
+    {
+        var request = ValidPublishedProduct() with
+        {
+            FlashSale = new AdminFlashSaleRequest(
+                true,
+                "Weekend sale",
+                "percentage",
+                15,
+                DateTimeOffset.UtcNow.AddHours(1),
+                DateTimeOffset.UtcNow.AddHours(2)),
+            WhatsAppEnabled = true,
+            WhatsAppPhoneNumber = "+880 1712-345678",
+            WhatsAppPrefillMessage = "Question about the product"
+        };
+
+        var errors = AdminCatalogService.ValidateProduct(request, null);
+
+        Assert.Empty(errors);
+    }
+
+    [Fact]
+    public void Rejects_invalid_flash_sale_window_and_whats_app_number()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var request = ValidPublishedProduct() with
+        {
+            FlashSale = new AdminFlashSaleRequest(true, "Sale", "fixedAmount", 10m, now, now),
+            WhatsAppEnabled = true,
+            WhatsAppPhoneNumber = "not-a-phone"
+        };
+
+        var errors = AdminCatalogService.ValidateProduct(request, null);
+
+        Assert.Contains(nameof(AdminProductRequest.FlashSale), errors.Keys);
+        Assert.Contains(nameof(AdminProductRequest.WhatsAppPhoneNumber), errors.Keys);
+    }
+
     private static AdminProductRequest ValidPublishedProduct() => new(
         "OneCart Sample",
         "onecart-sample",

@@ -31,7 +31,7 @@ The project should be developed with human review and release quality in mind. C
 - Show the regular (old) price and sale (new) price together when a discount is active, with a clear discount indicator.
 - Support administrator-configured flash sales with a start/end schedule and a visible countdown while the sale is active. The sale price and countdown must stop when the configured sale window ends.
 - Discount and flash-sale settings must be manageable from the admin module, with an enable/disable control and a clear preview of the resulting customer-facing price.
-- Provide social sharing for the product page, with administrator-configured enabled channels and a share action that uses the canonical product URL.
+- Provide an administrator-controlled product sharing action that uses the canonical product URL and the browser's native share sheet or a copy-link fallback.
 - Provide a WhatsApp contact action for customer questions. Administrators must configure whether it is enabled, the store contact number, and the prefilled message; the storefront must not expose a contact action with a missing or invalid number.
 - Reference for the configurable product and product page experience: [nopCommerce “Build your own computer” demo](https://demo.nopcommerce.com/build-your-own-computer), which presents required Processor, RAM, HDD, and OS selections, optional Software add-ons, price adjustments, quantity, and cart/wishlist/compare/email-a-friend actions.
 
@@ -118,11 +118,11 @@ These are recommendations for a maintainable first release, not finalized produc
 - Whether attribute combinations need compatibility rules, combination-specific SKUs/stock, or only independent price adjustments.
 - Whether product-page wishlist, compare, email-a-friend, and reviews are included in the first release, and their account, privacy, moderation, and notification rules.
 - How attribute price adjustments interact with variants, discounts, taxes, currency conversion, and order-price snapshots.
-- Discount configuration rules: fixed amount versus percentage, whether promotions apply to all variants or selected ones, sale-price validation, rounding, and currency behavior.
+- Discount configuration rules: whether to retain both percentage and fixed-amount modes, whether promotions apply to all variants or selected ones, sale-price validation, currency-specific rounding, and how a fixed amount applies when variants use different currencies.
 - Flash-sale schedule input timezone, boundary behavior, and whether administrators can schedule multiple or overlapping promotions.
 - Product media upload format, size limits, storage, processing, and replacement/retention rules.
 - Storefront branding/theme controls, configurable trust/service details, and which content blocks may be hidden or reordered.
-- Social sharing channels to enable and WhatsApp contact display location, phone-number format/validation, and default message content.
+- Additional social networks beyond the native share sheet/copy-link action, and WhatsApp contact display location, phone-number format/validation, and default message content.
 - Customer checkout fields, address format, guest checkout, order confirmation, and cancellation policy.
 - Admin roles, account recovery, and optional administrator MFA.
 - Detailed permission mapping for the initial `SystemAdmin`, `CatalogManager`, `OrderManager`, and `StoreManager` roles; current role names are built-in starting defaults.
@@ -144,8 +144,9 @@ These are recommendations for a maintainable first release, not finalized produc
 - The public API can read the single published product and its active variants over HTTPS.
 - The System Admin panel can edit product content, variants, required/optional attribute groups, and option-level price adjustments; catalog edits create before/after audit records. Other role permissions remain open.
 - The storefront displays a published product and selectable variants/attributes, and updates the displayed total for option price adjustments. COD order submission remains pending the checkout policy decisions.
-- Storefront branding/presentation settings and scheduled discounts/flash sales are confirmed requirements but are not implemented yet.
-- Product social sharing and WhatsApp contact actions are confirmed requirements but are not implemented yet.
+- The System Admin panel can configure percentage/fixed flash-sale discounts and schedules, sharing, and WhatsApp contact details. The storefront shows regular/sale prices only during the sale window, with a countdown while active, and provides share and WhatsApp contact actions.
+- Product image upload, broader branding/layout controls, and configurable trust/service content remain confirmed requirements not implemented yet.
+- The sale schedule is entered in the administrator's local time and stored in UTC. Percentage discounts currently round the displayed sale price to four decimal places and apply to the selected variant's base price; attribute add-on prices are then added at their configured amounts. Confirmation of currency-specific rounding and attribute-discount interaction remains open.
 - Only System Admin accounts can create users and assign roles through the admin panel.
 - Product scope and confirmed technology direction are documented here.
 - Unresolved requirements remain visible and are not invented by implementation.

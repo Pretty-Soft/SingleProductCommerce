@@ -12,6 +12,19 @@ export interface StorefrontProduct {
   description: string;
   variants: StorefrontVariant[];
   attributeGroups: StorefrontAttributeGroup[];
+  flashSale: StorefrontFlashSale;
+  socialSharingEnabled: boolean;
+  whatsAppContactUrl: string | null;
+}
+
+export interface StorefrontFlashSale {
+  enabled: boolean;
+  label: string;
+  discountType: "percentage" | "fixedAmount";
+  discountValue: number;
+  startsAtUtc: string | null;
+  endsAtUtc: string | null;
+  serverTimeUtc: string;
 }
 
 export interface StorefrontAttributeGroup {
@@ -32,6 +45,7 @@ export interface StorefrontVariant {
   id: string;
   displayName: string;
   price: number;
+  salePrice: number | null;
   currencyCode: string;
   isAvailable: boolean;
 }

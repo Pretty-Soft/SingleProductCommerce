@@ -50,6 +50,20 @@ public sealed class SqlServerCatalogIntegrationTests
                     false,
                     0,
                     [new AdminProductAttributeOptionRequest(null, "16 GB", 25m, true, 0)])]);
+            request = request with
+            {
+                FlashSale = new AdminFlashSaleRequest(
+                    true,
+                    "Integration sale",
+                    "percentage",
+                    10m,
+                    DateTimeOffset.UtcNow.AddMinutes(-1),
+                    DateTimeOffset.UtcNow.AddHours(1)),
+                SocialSharingEnabled = true,
+                WhatsAppEnabled = true,
+                WhatsAppPhoneNumber = "+880 1712-345678",
+                WhatsAppPrefillMessage = "I have a question"
+            };
 
             var writeService = new AdminCatalogService(database);
             var saved = await writeService.SaveProductAsync(
@@ -72,6 +86,11 @@ public sealed class SqlServerCatalogIntegrationTests
             Assert.Single(published.AttributeGroups);
             Assert.Equal("Memory", published.AttributeGroups[0].Name);
             Assert.Equal(25m, published.AttributeGroups[0].Options[0].PriceAdjustment);
+            Assert.True(published.FlashSale.Enabled);
+            Assert.Equal("Integration sale", published.FlashSale.Label);
+            Assert.Equal(17.955m, published.Variants[0].SalePrice);
+            Assert.True(published.SocialSharingEnabled);
+            Assert.Contains("https://wa.me/8801712345678?text=", published.WhatsAppContactUrl);
             Assert.Single(await database.AdminAuditEvents.AsNoTracking().ToListAsync());
         }
         finally

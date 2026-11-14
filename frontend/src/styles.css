@@ -33,6 +33,11 @@ button {
   opacity: 0.72;
 }
 
+button:enabled {
+  cursor: pointer;
+  opacity: 1;
+}
+
 .page {
   margin: 0 auto;
   max-width: 1120px;
@@ -157,6 +162,91 @@ button {
 
 .purchase-panel button:disabled {
   cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.flash-sale-banner {
+  align-items: center;
+  background: #fff1f3;
+  border: 1px solid #f7ccd4;
+  border-radius: 12px;
+  color: #84243c;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  justify-content: space-between;
+  padding: 12px 14px;
+}
+
+.flash-sale-label {
+  font-weight: 750;
+}
+
+.flash-sale-timer {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.price-stack {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.price-stack del {
+  color: #8991a2;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.price-stack strong {
+  color: #b12c4a;
+  font-size: 1rem;
+}
+
+.discount-note {
+  color: #a12643;
+  font-weight: 700;
+  margin: -8px 0 0;
+}
+
+.product-contact-actions {
+  border-top: 1px solid #e9edf3;
+  display: grid;
+  gap: 10px;
+  padding-top: 16px;
+}
+
+.button-secondary,
+.button-whatsapp {
+  align-items: center;
+  border: 1px solid #dce1eb;
+  border-radius: 10px;
+  display: inline-flex;
+  font: inherit;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 14px;
+  text-align: center;
+}
+
+.button-secondary {
+  background: #fff;
+  color: #243c78;
+}
+
+.button-whatsapp {
+  background: #e9f8ef;
+  border-color: #c7ead4;
+  color: #176c45;
+}
+
+.share-message {
+  color: #4560a5;
+  font-size: 0.85rem;
+  margin: -8px 0 0;
 }
 
 .store-attribute {
@@ -381,6 +471,35 @@ footer {
 
 .catalog-form {
   margin-top: 24px;
+}
+
+.catalog-settings {
+  border-top: 1px solid #e8ebf1;
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+  padding-top: 20px;
+}
+
+.catalog-settings h3,
+.catalog-settings p {
+  margin: 0;
+}
+
+.admin-card select {
+  background: white;
+  border: 1px solid #d3d8e2;
+  border-radius: 9px;
+  color: #172033;
+  font: inherit;
+  min-height: 44px;
+  padding: 9px 11px;
+  width: 100%;
+}
+
+.admin-card select:focus-visible {
+  outline: 3px solid #9bb4ff;
+  outline-offset: 2px;
 }
 
 .catalog-fields {

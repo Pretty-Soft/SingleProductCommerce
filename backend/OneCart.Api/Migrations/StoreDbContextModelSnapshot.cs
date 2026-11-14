@@ -393,6 +393,30 @@ namespace OneCart.Api.Migrations
                         .HasMaxLength(8000)
                         .HasColumnType("character varying(8000)");
 
+                    b.Property<string>("FlashSaleDiscountType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasDefaultValue("percentage")
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal>("FlashSaleDiscountValue")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<bool>("FlashSaleEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset?>("FlashSaleEndsAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FlashSaleLabel")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset?>("FlashSaleStartsAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsPublished")
                         .HasColumnType("boolean");
 
@@ -406,8 +430,24 @@ namespace OneCart.Api.Migrations
                         .HasMaxLength(180)
                         .HasColumnType("character varying(180)");
 
+                    b.Property<bool>("SocialSharingEnabled")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("WhatsAppEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("WhatsAppPhoneNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("WhatsAppPrefillMessage")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.HasKey("Id");
 
@@ -420,6 +460,10 @@ namespace OneCart.Api.Migrations
 
                     b.ToTable("store_products", null, t =>
                         {
+                            t.HasCheckConstraint("ck_store_products_flash_sale_value_non_negative", "\"FlashSaleDiscountValue\" >= 0");
+
+                            t.HasCheckConstraint("ck_store_products_flash_sale_window", "\"FlashSaleEnabled\" = FALSE OR (\"FlashSaleStartsAtUtc\" IS NOT NULL AND \"FlashSaleEndsAtUtc\" IS NOT NULL AND \"FlashSaleEndsAtUtc\" > \"FlashSaleStartsAtUtc\")");
+
                             t.HasCheckConstraint("ck_store_products_name_not_empty", "length(\"Name\") > 0");
                         });
                 });

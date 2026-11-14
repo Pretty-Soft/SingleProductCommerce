@@ -31,6 +31,14 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
             table.HasCheckConstraint(
                 "ck_store_products_name_not_empty",
                 isSqlServer ? "LEN([Name]) > 0" : "length(\"Name\") > 0");
+            table.HasCheckConstraint(
+                "ck_store_products_flash_sale_value_non_negative",
+                isSqlServer ? "[FlashSaleDiscountValue] >= 0" : "\"FlashSaleDiscountValue\" >= 0");
+            table.HasCheckConstraint(
+                "ck_store_products_flash_sale_window",
+                isSqlServer
+                    ? "[FlashSaleEnabled] = 0 OR ([FlashSaleStartsAtUtc] IS NOT NULL AND [FlashSaleEndsAtUtc] IS NOT NULL AND [FlashSaleEndsAtUtc] > [FlashSaleStartsAtUtc])"
+                    : "\"FlashSaleEnabled\" = FALSE OR (\"FlashSaleStartsAtUtc\" IS NOT NULL AND \"FlashSaleEndsAtUtc\" IS NOT NULL AND \"FlashSaleEndsAtUtc\" > \"FlashSaleStartsAtUtc\")");
         });
         products.HasIndex(product => product.IsPublished)
             .IsUnique()
@@ -40,6 +48,11 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
         products.Property(product => product.Slug).HasMaxLength(180).IsRequired();
         products.HasIndex(product => product.Slug).IsUnique();
         products.Property(product => product.Description).HasMaxLength(8000).IsRequired();
+        products.Property(product => product.FlashSaleLabel).HasMaxLength(100).IsRequired();
+        products.Property(product => product.FlashSaleDiscountType).HasMaxLength(20).HasDefaultValue("percentage").IsRequired();
+        products.Property(product => product.FlashSaleDiscountValue).HasPrecision(18, 4);
+        products.Property(product => product.WhatsAppPhoneNumber).HasMaxLength(20).IsRequired();
+        products.Property(product => product.WhatsAppPrefillMessage).HasMaxLength(500).IsRequired();
         products.Property(product => product.CreatedAtUtc).IsRequired();
         products.Property(product => product.UpdatedAtUtc).IsRequired();
         products.HasMany(product => product.Variants)

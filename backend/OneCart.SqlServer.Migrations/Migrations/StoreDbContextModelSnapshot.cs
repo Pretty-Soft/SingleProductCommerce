@@ -395,6 +395,30 @@ namespace OneCart.SqlServer.Migrations.Migrations
                         .HasMaxLength(8000)
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("FlashSaleDiscountType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasDefaultValue("percentage")
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<decimal>("FlashSaleDiscountValue")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<bool>("FlashSaleEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset?>("FlashSaleEndsAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("FlashSaleLabel")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset?>("FlashSaleStartsAtUtc")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<bool>("IsPublished")
                         .HasColumnType("bit");
 
@@ -408,8 +432,24 @@ namespace OneCart.SqlServer.Migrations.Migrations
                         .HasMaxLength(180)
                         .HasColumnType("nvarchar(180)");
 
+                    b.Property<bool>("SocialSharingEnabled")
+                        .HasColumnType("bit");
+
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("WhatsAppEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("WhatsAppPhoneNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("WhatsAppPrefillMessage")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.HasKey("Id");
 
@@ -422,6 +462,10 @@ namespace OneCart.SqlServer.Migrations.Migrations
 
                     b.ToTable("store_products", null, t =>
                         {
+                            t.HasCheckConstraint("ck_store_products_flash_sale_value_non_negative", "[FlashSaleDiscountValue] >= 0");
+
+                            t.HasCheckConstraint("ck_store_products_flash_sale_window", "[FlashSaleEnabled] = 0 OR ([FlashSaleStartsAtUtc] IS NOT NULL AND [FlashSaleEndsAtUtc] IS NOT NULL AND [FlashSaleEndsAtUtc] > [FlashSaleStartsAtUtc])");
+
                             t.HasCheckConstraint("ck_store_products_name_not_empty", "LEN([Name]) > 0");
                         });
                 });

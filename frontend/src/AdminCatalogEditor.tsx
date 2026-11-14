@@ -19,6 +19,20 @@ interface EditableProduct {
   isPublished: boolean;
   variants: EditableVariant[];
   attributeGroups: EditableAttributeGroup[];
+  flashSale: EditableFlashSale;
+  socialSharingEnabled: boolean;
+  whatsAppEnabled: boolean;
+  whatsAppPhoneNumber: string;
+  whatsAppPrefillMessage: string;
+}
+
+interface EditableFlashSale {
+  enabled: boolean;
+  label: string;
+  discountType: "percentage" | "fixedAmount";
+  discountValue: number;
+  startsAtUtc: string | null;
+  endsAtUtc: string | null;
 }
 
 interface EditableAttributeGroup {
@@ -45,7 +59,12 @@ const emptyProduct = (): EditableProduct => ({
   description: "",
   isPublished: false,
   variants: [emptyVariant()],
-  attributeGroups: []
+  attributeGroups: [],
+  flashSale: { enabled: false, label: "", discountType: "percentage", discountValue: 0, startsAtUtc: null, endsAtUtc: null },
+  socialSharingEnabled: true,
+  whatsAppEnabled: false,
+  whatsAppPhoneNumber: "",
+  whatsAppPrefillMessage: "Hello, I have a question about this product."
 });
 
 function emptyVariant(): EditableVariant {
@@ -152,6 +171,20 @@ export default function AdminCatalogEditor() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function updateFlashSale(changes: Partial<EditableFlashSale>) {
+    setProduct((current) => ({ ...current, flashSale: { ...current.flashSale, ...changes } }));
+  }
+
+  function updateFlashSaleDate(key: "startsAtUtc" | "endsAtUtc", localValue: string) {
+    updateFlashSale({ [key]: localValue ? new Date(localValue).toISOString() : null });
+  }
+
+  function toLocalDateTime(value: string | null): string {
+    if (!value) return "";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "" : new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
   }
 
   return (
@@ -284,6 +317,66 @@ export default function AdminCatalogEditor() {
               </button>
             </fieldset>
           ))}
+
+          <section className="catalog-settings">
+            <h3>Flash sale</h3>
+            <p className="admin-muted">Set a scheduled discount. The storefront shows the regular and sale prices only during the configured window.</p>
+            <label className="role-option">
+              <input type="checkbox" checked={product.flashSale.enabled} onChange={(event) => updateFlashSale({ enabled: event.target.checked })} />
+              <span>Enable flash sale</span>
+            </label>
+            {product.flashSale.enabled && (
+              <div className="catalog-fields">
+                <label>
+                  Sale label
+                  <input maxLength={100} required value={product.flashSale.label} onChange={(event) => updateFlashSale({ label: event.target.value })} placeholder="e.g. Weekend flash sale" />
+                </label>
+                <label>
+                  Discount type
+                  <select value={product.flashSale.discountType} onChange={(event) => updateFlashSale({ discountType: event.target.value as EditableFlashSale["discountType"] })}>
+                    <option value="percentage">Percentage</option>
+                    <option value="fixedAmount">Fixed amount</option>
+                  </select>
+                </label>
+                <label>
+                  {product.flashSale.discountType === "percentage" ? "Discount percentage" : "Discount amount"}
+                  <input type="number" min="0.0001" max={product.flashSale.discountType === "percentage" ? 100 : undefined} step={product.flashSale.discountType === "percentage" ? 0.01 : 0.0001} required value={product.flashSale.discountValue} onChange={(event) => updateFlashSale({ discountValue: Number(event.target.value) })} />
+                </label>
+                <label>
+                  Starts (your local time)
+                  <input type="datetime-local" required value={toLocalDateTime(product.flashSale.startsAtUtc)} onChange={(event) => updateFlashSaleDate("startsAtUtc", event.target.value)} />
+                </label>
+                <label>
+                  Ends (your local time)
+                  <input type="datetime-local" required value={toLocalDateTime(product.flashSale.endsAtUtc)} onChange={(event) => updateFlashSaleDate("endsAtUtc", event.target.value)} />
+                </label>
+              </div>
+            )}
+          </section>
+
+          <section className="catalog-settings">
+            <h3>Storefront contact and sharing</h3>
+            <label className="role-option">
+              <input type="checkbox" checked={product.socialSharingEnabled} onChange={(event) => updateProduct("socialSharingEnabled", event.target.checked)} />
+              <span>Show product share action</span>
+            </label>
+            <label className="role-option">
+              <input type="checkbox" checked={product.whatsAppEnabled} onChange={(event) => updateProduct("whatsAppEnabled", event.target.checked)} />
+              <span>Show WhatsApp contact action</span>
+            </label>
+            {product.whatsAppEnabled && (
+              <div className="catalog-fields">
+                <label>
+                  WhatsApp number with country code
+                  <input type="tel" maxLength={20} required pattern="\+?[0-9\s()\-]{7,20}" value={product.whatsAppPhoneNumber} onChange={(event) => updateProduct("whatsAppPhoneNumber", event.target.value)} placeholder="e.g. +880 1XXXXXXXXX" />
+                </label>
+                <label>
+                  Prefilled message
+                  <textarea maxLength={500} rows={3} value={product.whatsAppPrefillMessage} onChange={(event) => updateProduct("whatsAppPrefillMessage", event.target.value)} />
+                </label>
+              </div>
+            )}
+          </section>
 
           <label className="role-option publish-toggle">
             <input type="checkbox" checked={product.isPublished} onChange={(event) => updateProduct("isPublished", event.target.checked)} />

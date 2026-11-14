@@ -26,14 +26,26 @@ public sealed class StorefrontCatalogService(StoreDbContext database)
             return null;
         }
 
+        var serverTimeUtc = DateTimeOffset.UtcNow;
+        var hasValidSaleWindow = product.FlashSaleStartsAtUtc is not null
+            && product.FlashSaleEndsAtUtc is not null
+            && product.FlashSaleEndsAtUtc > product.FlashSaleStartsAtUtc;
+        var saleConfigured = product.FlashSaleEnabled && hasValidSaleWindow;
+
         var variants = product.Variants
             .Select(variant => new StorefrontVariantResponse(
                 variant.Id,
                 variant.DisplayName,
                 variant.Price,
+                saleConfigured ? CalculateSalePrice(variant.Price, product.FlashSaleDiscountType, product.FlashSaleDiscountValue) : null,
                 variant.CurrencyCode,
                 variant.StockQuantity > 0))
             .ToArray();
+
+        var phoneDigits = new string(product.WhatsAppPhoneNumber.Where(char.IsDigit).ToArray());
+        var whatsAppUrl = product.WhatsAppEnabled && phoneDigits.Length is >= 7 and <= 15
+            ? $"https://wa.me/{phoneDigits}?text={Uri.EscapeDataString(product.WhatsAppPrefillMessage)}"
+            : null;
 
         return new StorefrontProductResponse(
             product.Id,
@@ -51,6 +63,28 @@ public sealed class StorefrontCatalogService(StoreDbContext database)
                         option.Id,
                         option.Name,
                         option.PriceAdjustment)).ToArray()))
-                .ToArray());
+                .ToArray(),
+            new StorefrontFlashSaleResponse(
+                saleConfigured,
+                product.FlashSaleLabel,
+                product.FlashSaleDiscountType,
+                product.FlashSaleDiscountValue,
+                product.FlashSaleStartsAtUtc,
+                product.FlashSaleEndsAtUtc,
+                serverTimeUtc),
+            product.SocialSharingEnabled,
+            whatsAppUrl);
+    }
+
+    private static decimal CalculateSalePrice(decimal price, string discountType, decimal discountValue)
+    {
+        var discount = discountType switch
+        {
+            "percentage" => price * discountValue / 100m,
+            "fixedAmount" => discountValue,
+            _ => 0m
+        };
+
+        return decimal.Round(Math.Max(0m, price - discount), 4, MidpointRounding.AwayFromZero);
     }
 }

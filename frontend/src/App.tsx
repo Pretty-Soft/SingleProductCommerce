@@ -17,6 +17,9 @@ function Storefront() {
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [clientTimeMs, setClientTimeMs] = useState(Date.now());
+  const [productReceivedAtMs, setProductReceivedAtMs] = useState<number | null>(null);
+  const [shareMessage, setShareMessage] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -25,6 +28,7 @@ function Storefront() {
         if (!active) return;
         setProduct(loaded);
         setSelectedVariantId(loaded?.variants[0]?.id ?? "");
+        setProductReceivedAtMs(Date.now());
       })
       .catch(() => {
         if (active) setError("The secure store API could not be reached. Please try again later.");
@@ -35,6 +39,12 @@ function Storefront() {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    if (!product?.flashSale.enabled || !product.flashSale.endsAtUtc) return;
+    const interval = window.setInterval(() => setClientTimeMs(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, [product?.flashSale.enabled, product?.flashSale.endsAtUtc]);
+
   const selectedVariant = product?.variants.find((variant) => variant.id === selectedVariantId);
   const selectedOptions = product?.attributeGroups.flatMap((group) => {
     const selected = new Set(selectedAttributeOptions[group.id] ?? []);
@@ -43,7 +53,21 @@ function Storefront() {
   const requiredAttributesSelected = product?.attributeGroups.every((group) =>
     !group.isRequired || (selectedAttributeOptions[group.id]?.length ?? 0) > 0
   ) ?? false;
-  const currentTotal = (selectedVariant?.price ?? 0) + selectedOptions.reduce((total, option) => total + option.priceAdjustment, 0);
+  const estimatedServerNow = product && productReceivedAtMs !== null
+    ? Date.parse(product.flashSale.serverTimeUtc) + Math.max(0, clientTimeMs - productReceivedAtMs)
+    : clientTimeMs;
+  const flashSaleStartMs = product?.flashSale.startsAtUtc ? Date.parse(product.flashSale.startsAtUtc) : Number.NaN;
+  const flashSaleEndMs = product?.flashSale.endsAtUtc ? Date.parse(product.flashSale.endsAtUtc) : Number.NaN;
+  const flashSaleActive = Boolean(product?.flashSale.enabled)
+    && Number.isFinite(flashSaleStartMs)
+    && Number.isFinite(flashSaleEndMs)
+    && estimatedServerNow >= flashSaleStartMs
+    && estimatedServerNow < flashSaleEndMs;
+  const saleRemainingSeconds = flashSaleActive ? Math.max(0, Math.floor((flashSaleEndMs - estimatedServerNow) / 1000)) : 0;
+  const selectedBasePrice = flashSaleActive && selectedVariant?.salePrice != null
+    ? selectedVariant.salePrice
+    : selectedVariant?.price ?? 0;
+  const currentTotal = selectedBasePrice + selectedOptions.reduce((total, option) => total + option.priceAdjustment, 0);
 
   function chooseAttributeOption(groupId: string, optionId: string, allowMultiple: boolean) {
     setSelectedAttributeOptions((current) => {
@@ -53,6 +77,25 @@ function Storefront() {
         : [optionId];
       return { ...current, [groupId]: next };
     });
+  }
+
+  async function shareProduct() {
+    if (!product) return;
+    const url = window.location.href;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: product.name, text: product.description, url });
+        setShareMessage("Product link shared.");
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+        setShareMessage("Product link copied.");
+      } else {
+        window.prompt("Copy this product link", url);
+      }
+    } catch (reason) {
+      if (reason instanceof Error && reason.name === "AbortError") return;
+      setShareMessage("Could not share the product link.");
+    }
   }
 
   return (
@@ -72,12 +115,18 @@ function Storefront() {
       ) : product ? (
         <section className="store-product" aria-labelledby="hero-title">
           <div className="product-copy">
-            <p className="eyebrow">Featured product</p>
+            <p className="eyebrow">One carefully chosen product</p>
             <h1 id="hero-title">{product.name}</h1>
             <p className="intro">{product.description}</p>
           </div>
           <div className="purchase-panel">
-            <p className="eyebrow">Choose an option</p>
+            {flashSaleActive && (
+              <div className="flash-sale-banner" aria-live="polite">
+                <span className="flash-sale-label">{product.flashSale.label || "Flash sale"}</span>
+                <span className="flash-sale-timer">Ends in {formatCountdown(saleRemainingSeconds)}</span>
+              </div>
+            )}
+            <p className="eyebrow">Choose your product</p>
             <div className="variant-options" role="radiogroup" aria-label="Product variants">
               {product.variants.map((variant) => (
                 <label className={`store-variant${selectedVariantId === variant.id ? " selected" : ""}`} key={variant.id}>
@@ -89,7 +138,14 @@ function Storefront() {
                     onChange={() => setSelectedVariantId(variant.id)}
                   />
                   <span className="store-variant-name">{variant.displayName}</span>
-                  <span className="store-variant-price">{formatPrice(variant.price, variant.currencyCode)}</span>
+                  <span className="store-variant-price">
+                    {flashSaleActive && variant.salePrice != null ? (
+                      <span className="price-stack">
+                        <del>{formatPrice(variant.price, variant.currencyCode)}</del>
+                        <strong>{formatPrice(variant.salePrice, variant.currencyCode)}</strong>
+                      </span>
+                    ) : formatPrice(variant.price, variant.currencyCode)}
+                  </span>
                   <span className={variant.isAvailable ? "availability" : "availability unavailable"}>
                     {variant.isAvailable ? "In stock" : "Out of stock"}
                   </span>
@@ -121,13 +177,27 @@ function Storefront() {
             ))}
             <label className="quantity-control">
               Quantity
-              <input type="number" min="1" max="99" step="1" value={quantity} onChange={(event) => setQuantity(Math.max(1, Math.min(99, Number(event.target.value) || 1)))} />
+              <input type="number" min="1" step="1" value={quantity} onChange={(event) => setQuantity(Math.max(1, Math.trunc(Number(event.target.value) || 1)))} />
             </label>
             <p className="store-total" aria-live="polite">Total: {formatPrice(currentTotal * quantity, selectedVariant?.currencyCode ?? "USD")}</p>
+            {flashSaleActive && selectedVariant?.salePrice != null && (
+              <p className="discount-note">
+                Save {product.flashSale.discountType === "percentage"
+                  ? `${product.flashSale.discountValue}%`
+                  : formatPrice(selectedVariant.price - selectedVariant.salePrice, selectedVariant.currencyCode)} during this sale
+              </p>
+            )}
             <button type="button" disabled={!selectedVariant?.isAvailable || !requiredAttributesSelected}>
               Cash on Delivery checkout coming next
             </button>
             <p className="note">{!requiredAttributesSelected ? "Choose an option for every required attribute." : "Orders are not available yet."}</p>
+            {(product.socialSharingEnabled || product.whatsAppContactUrl) && (
+              <div className="product-contact-actions">
+                {product.socialSharingEnabled && <button className="button-secondary" type="button" onClick={() => void shareProduct()}>Share product</button>}
+                {product.whatsAppContactUrl && <a className="button-whatsapp" href={product.whatsAppContactUrl} target="_blank" rel="noopener noreferrer">Chat with us on WhatsApp</a>}
+              </div>
+            )}
+            {shareMessage && <p className="share-message" role="status">{shareMessage}</p>}
           </div>
         </section>
       ) : (
@@ -150,4 +220,13 @@ function formatPrice(amount: number, currencyCode: string): string {
   } catch {
     return `${currencyCode} ${amount.toFixed(2)}`;
   }
+}
+
+function formatCountdown(seconds: number): string {
+  const days = Math.floor(seconds / 86_400);
+  const hours = Math.floor((seconds % 86_400) / 3_600);
+  const minutes = Math.floor((seconds % 3_600) / 60);
+  const remainingSeconds = seconds % 60;
+  const time = [hours, minutes, remainingSeconds].map((value) => String(value).padStart(2, "0")).join(":");
+  return days > 0 ? `${days}d ${time}` : time;
 }

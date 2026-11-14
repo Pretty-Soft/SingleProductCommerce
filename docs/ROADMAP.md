@@ -27,7 +27,7 @@ Build a working path through product setup, public product display, COD checkout
 
 Acceptance: an administrator can configure the approved product shape; a customer can submit a valid COD order over HTTPS; the order is persisted with a stable status and can be reviewed by an authorized administrator.
 
-The catalog persistence, public read endpoint, protected product editor, variant management, configurable required/optional product attributes, option price adjustments, and public product display are implemented. Next, add admin-managed storefront presentation, scheduled discount/flash-sale pricing, social sharing, and WhatsApp contact. The endpoint returns `404` until a published product with an active variant exists. The editor is temporarily restricted to System Admin while detailed role permissions remain open. Checkout remains gated on the open customer/address and order policy decisions.
+The catalog persistence, public read endpoint, protected product editor, variant management, configurable required/optional product attributes, scheduled percentage/fixed flash-sale discounts, live sale countdown, social sharing, WhatsApp contact, and public product display are implemented. Next, add configurable branding, product media, and trust/service content. The endpoint returns `404` until a published product with an active variant exists. The editor is temporarily restricted to System Admin while detailed role permissions remain open. Checkout remains gated on the open customer/address and order policy decisions.
 
 ## Stage 3 — Store administration and security (user management in progress)
 

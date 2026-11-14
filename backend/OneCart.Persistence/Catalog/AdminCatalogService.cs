@@ -51,6 +51,17 @@ public sealed class AdminCatalogService(StoreDbContext database)
         product.Slug = request.Slug.Trim();
         product.Description = request.Description.Trim();
         product.IsPublished = request.IsPublished;
+        var flashSale = request.FlashSale ?? AdminFlashSaleRequest.Disabled;
+        product.FlashSaleEnabled = flashSale.Enabled;
+        product.FlashSaleLabel = flashSale.Label?.Trim() ?? string.Empty;
+        product.FlashSaleDiscountType = flashSale.DiscountType?.Trim() ?? "percentage";
+        product.FlashSaleDiscountValue = flashSale.DiscountValue;
+        product.FlashSaleStartsAtUtc = flashSale.StartsAtUtc?.ToUniversalTime();
+        product.FlashSaleEndsAtUtc = flashSale.EndsAtUtc?.ToUniversalTime();
+        product.SocialSharingEnabled = request.SocialSharingEnabled;
+        product.WhatsAppEnabled = request.WhatsAppEnabled;
+        product.WhatsAppPhoneNumber = request.WhatsAppPhoneNumber?.Trim() ?? string.Empty;
+        product.WhatsAppPrefillMessage = request.WhatsAppPrefillMessage?.Trim() ?? string.Empty;
         product.UpdatedAtUtc = DateTimeOffset.UtcNow;
 
         var existingVariants = product.Variants.ToDictionary(variant => variant.Id);
@@ -214,6 +225,54 @@ public sealed class AdminCatalogService(StoreDbContext database)
         if (request.IsPublished && variants.All(variant => !variant.IsActive))
         {
             AddError(nameof(request.Variants), "A published product needs at least one active variant.");
+        }
+
+        var flashSale = request.FlashSale ?? AdminFlashSaleRequest.Disabled;
+        if (flashSale.Enabled)
+        {
+            if (string.IsNullOrWhiteSpace(flashSale.Label) || flashSale.Label.Trim().Length > 100)
+            {
+                AddError(nameof(request.FlashSale), "A flash sale needs a label up to 100 characters.");
+            }
+            if (flashSale.DiscountType is not ("percentage" or "fixedAmount"))
+            {
+                AddError(nameof(request.FlashSale), "Choose a percentage or fixed amount discount.");
+            }
+            if (flashSale.DiscountType == "percentage"
+                && (flashSale.DiscountValue <= 0 || flashSale.DiscountValue > 100 || decimal.Round(flashSale.DiscountValue, 2) != flashSale.DiscountValue))
+            {
+                AddError(nameof(request.FlashSale), "Percentage discount must be greater than 0 and no more than 100.");
+            }
+            if (flashSale.DiscountType == "fixedAmount"
+                && (flashSale.DiscountValue <= 0 || flashSale.DiscountValue > 99999999999999.9999m || decimal.Round(flashSale.DiscountValue, 4) != flashSale.DiscountValue))
+            {
+                AddError(nameof(request.FlashSale), "Fixed discount must be greater than 0 and support up to four decimal places.");
+            }
+            if (flashSale.StartsAtUtc is null || flashSale.EndsAtUtc is null || flashSale.EndsAtUtc <= flashSale.StartsAtUtc)
+            {
+                AddError(nameof(request.FlashSale), "Set a valid sale start and end time; the end must be later than the start.");
+            }
+            if (flashSale.DiscountType == "fixedAmount"
+                && variants.Where(variant => variant.IsActive).Any(variant => variant.Price <= flashSale.DiscountValue))
+            {
+                AddError(nameof(request.FlashSale), "The fixed discount must be less than every active variant price.");
+            }
+        }
+
+        if (request.WhatsAppPhoneNumber is { Length: > 20 })
+        {
+            AddError(nameof(request.WhatsAppPhoneNumber), "WhatsApp phone number must be 20 characters or fewer.");
+        }
+        var waNumber = request.WhatsAppPhoneNumber?.Trim() ?? string.Empty;
+        var waDigits = new string(waNumber.Where(char.IsDigit).ToArray());
+        var allowedPhoneCharacters = System.Text.RegularExpressions.Regex.IsMatch(waNumber, @"^\+?[0-9\s()\-]*$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        if (request.WhatsAppEnabled && (!allowedPhoneCharacters || waDigits.Length is < 7 or > 15))
+        {
+            AddError(nameof(request.WhatsAppPhoneNumber), "Enter a valid WhatsApp number with 7 to 15 digits, including country code.");
+        }
+        if ((request.WhatsAppPrefillMessage?.Length ?? 0) > 500)
+        {
+            AddError(nameof(request.WhatsAppPrefillMessage), "WhatsApp message must be 500 characters or fewer.");
         }
 
         var groups = request.AttributeGroups?.Where(group => group is not null).ToList() ?? [];
@@ -397,7 +456,18 @@ public sealed class AdminCatalogService(StoreDbContext database)
                         option.IsActive,
                         option.DisplayOrder))
                     .ToArray()))
-            .ToArray());
+            .ToArray(),
+        new AdminFlashSaleRequest(
+            product.FlashSaleEnabled,
+            product.FlashSaleLabel,
+            product.FlashSaleDiscountType,
+            product.FlashSaleDiscountValue,
+            product.FlashSaleStartsAtUtc,
+            product.FlashSaleEndsAtUtc),
+        product.SocialSharingEnabled,
+        product.WhatsAppEnabled,
+        product.WhatsAppPhoneNumber,
+        product.WhatsAppPrefillMessage);
 
     private static object CreateAuditSnapshot(StoreProduct product) => new
     {
@@ -405,6 +475,19 @@ public sealed class AdminCatalogService(StoreDbContext database)
         product.Slug,
         product.Description,
         product.IsPublished,
+        FlashSale = new
+        {
+            product.FlashSaleEnabled,
+            product.FlashSaleLabel,
+            product.FlashSaleDiscountType,
+            product.FlashSaleDiscountValue,
+            product.FlashSaleStartsAtUtc,
+            product.FlashSaleEndsAtUtc
+        },
+        product.SocialSharingEnabled,
+        product.WhatsAppEnabled,
+        product.WhatsAppPhoneNumber,
+        product.WhatsAppPrefillMessage,
         Variants = product.Variants
             .OrderBy(variant => variant.Sku)
             .Select(variant => new
@@ -438,7 +521,23 @@ public sealed record AdminProductRequest(
     string Description,
     bool IsPublished,
     IReadOnlyList<AdminProductVariantRequest> Variants,
-    IReadOnlyList<AdminProductAttributeGroupRequest>? AttributeGroups = null);
+    IReadOnlyList<AdminProductAttributeGroupRequest>? AttributeGroups = null,
+    AdminFlashSaleRequest? FlashSale = null,
+    bool SocialSharingEnabled = false,
+    bool WhatsAppEnabled = false,
+    string? WhatsAppPhoneNumber = null,
+    string? WhatsAppPrefillMessage = null);
+
+public sealed record AdminFlashSaleRequest(
+    bool Enabled,
+    string? Label,
+    string? DiscountType,
+    decimal DiscountValue,
+    DateTimeOffset? StartsAtUtc,
+    DateTimeOffset? EndsAtUtc)
+{
+    public static AdminFlashSaleRequest Disabled { get; } = new(false, "", "percentage", 0, null, null);
+}
 
 public sealed record AdminProductVariantRequest(
     Guid? Id,
@@ -471,7 +570,12 @@ public sealed record AdminProductResponse(
     string Description,
     bool IsPublished,
     IReadOnlyList<AdminProductVariantResponse> Variants,
-    IReadOnlyList<AdminProductAttributeGroupResponse> AttributeGroups);
+    IReadOnlyList<AdminProductAttributeGroupResponse> AttributeGroups,
+    AdminFlashSaleRequest FlashSale,
+    bool SocialSharingEnabled,
+    bool WhatsAppEnabled,
+    string WhatsAppPhoneNumber,
+    string WhatsAppPrefillMessage);
 
 public sealed record AdminProductVariantResponse(
     Guid Id,
