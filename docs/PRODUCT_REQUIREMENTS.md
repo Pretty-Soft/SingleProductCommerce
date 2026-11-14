@@ -21,6 +21,12 @@ The project should be developed with human review and release quality in mind. C
 - Present product information and a clear purchase path on desktop and mobile.
 - Keep product content and store settings manageable without editing application source.
 - The catalog is one product with selectable variants. Each variant can have its own SKU, display name/options, price, active state, and stock quantity.
+- A product may have multiple configurable attributes in addition to its variant selection. The product page must present each attribute with its available choices, including required selections and optional add-ons.
+- Attribute choices may add a price adjustment. The page must show the current total price and update it when the shopper changes selections.
+- The product detail page must show the product title, images, SKU, availability/shipping information when configured, description, price, quantity control, and a clear add-to-cart action.
+- Product page actions should include wishlist, compare, and email/share-with-a-friend controls, subject to the policy decisions below.
+- Product reviews and ratings should be displayable on the product page, with review submission governed by the store's configured review policy.
+- Reference for the configurable product and product page experience: [nopCommerce “Build your own computer” demo](https://demo.nopcommerce.com/build-your-own-computer), which presents required Processor, RAM, HDD, and OS selections, optional Software add-ons, price adjustments, quantity, and cart/wishlist/compare/email-a-friend actions.
 
 ### Orders and payments
 
@@ -101,6 +107,10 @@ These are recommendations for a maintainable first release, not finalized produc
 ## 6. Open decisions to resolve before corresponding implementation
 
 - Variant option structure (for example size/color), quantity limits, and inventory decrement/reservation rules.
+- Product attribute types and presentation controls (for example dropdown, radio, checkbox), whether multiple choices may be selected per attribute, and how required/optional rules are configured.
+- Whether attribute combinations need compatibility rules, combination-specific SKUs/stock, or only independent price adjustments.
+- Whether product-page wishlist, compare, email-a-friend, and reviews are included in the first release, and their account, privacy, moderation, and notification rules.
+- How attribute price adjustments interact with variants, discounts, taxes, currency conversion, and order-price snapshots.
 - Customer checkout fields, address format, guest checkout, order confirmation, and cancellation policy.
 - Admin roles, account recovery, and optional administrator MFA.
 - Detailed permission mapping for the initial `SystemAdmin`, `CatalogManager`, `OrderManager`, and `StoreManager` roles; current role names are built-in starting defaults.

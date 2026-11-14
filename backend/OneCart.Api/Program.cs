@@ -42,6 +42,8 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.Cookie.SameSite = SameSiteMode.None;
     options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
     options.SlidingExpiration = true;
+    options.Events.OnRedirectToLogin = ApiCookieEvents.RedirectToUnauthorized;
+    options.Events.OnRedirectToAccessDenied = ApiCookieEvents.RedirectToForbidden;
 });
 builder.Services.Configure<SecurityStampValidatorOptions>(options =>
 {

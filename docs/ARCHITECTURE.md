@@ -16,7 +16,7 @@ The frontend should communicate through explicit JSON API contracts. Keep public
 
 ## Persistence
 
-PostgreSQL is the confirmed first-release provider and the default when `Database:Provider` is omitted. SQL Server has a separate experimental migration assembly and can be selected for local development, but it is not a supported release provider until installation, transaction behavior, backup/restore guidance, and automated integration coverage are verified. MySQL, MongoDB, and hybrid configurations remain broader product goals, not current support claims. Keep provider-specific behavior behind the persistence boundary and do not add superficial provider switches.
+PostgreSQL is the confirmed first-release provider and the default when `Database:Provider` is omitted. SQL Server has a separate experimental migration assembly and can be selected for local development. A local integration test covers migration plus catalog write/read behavior, but SQL Server is not a supported release provider until installation, deployment, transaction/concurrency behavior, backup/restore guidance, and broader integration coverage are verified. MySQL, MongoDB, and hybrid configurations remain broader product goals, not current support claims. Keep provider-specific behavior behind the persistence boundary and do not add superficial provider switches.
 
 The initial catalog uses Entity Framework Core migrations. `StoreProduct` represents the single storefront product; `ProductVariant` stores the selectable SKU, display name, price/currency code, active state, and stock quantity. The public catalog query returns only the published product and active variants, and exposes availability without exposing exact stock counts.
 

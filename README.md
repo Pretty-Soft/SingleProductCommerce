@@ -51,6 +51,15 @@ Run the focused persistence and validation tests with:
 
 ```powershell
 dotnet test backend/OneCart.Persistence.Tests/OneCart.Persistence.Tests.csproj
+dotnet test backend/OneCart.Api.Tests/OneCart.Api.Tests.csproj
+```
+
+The SQL Server integration test creates and drops a uniquely named disposable database. Run it only with a local/test SQL Server login that has database create/drop permission:
+
+```powershell
+$env:ONECART_SQLSERVER_TEST_CONNECTION = "Server=localhost\SQLEXPRESS;Trusted_Connection=True;Encrypt=True;TrustServerCertificate=True"
+dotnet test backend/OneCart.Persistence.IntegrationTests/OneCart.Persistence.IntegrationTests.csproj
+Remove-Item Env:\ONECART_SQLSERVER_TEST_CONNECTION
 ```
 
 The API listens at `https://localhost:7241`. Plain HTTP API requests are rejected. The production API base URL must also use `https://` with a certificate trusted by clients. When TLS terminates at a reverse proxy, configure only that proxy's IP under `ForwardedHeaders:KnownProxies`; do not trust forwarded headers from arbitrary clients.
@@ -67,7 +76,7 @@ The API health check is available at `/health`. The public catalog read endpoint
 
 ## Experimental SQL Server development path
 
-SQL Server is an experimental local development option and is not yet a supported release provider. Installation, transaction behavior, backup/restore, and integration coverage still need verification. PostgreSQL remains the default when `Database:Provider` is unset.
+SQL Server is an experimental local development option and is not yet a supported release provider. A focused local integration test covers migration and catalog round-trip behavior; installation, broader transaction behavior, backup/restore, and deployment coverage still need verification. PostgreSQL remains the default when `Database:Provider` is unset.
 
 For a local SQL Server instance, configure the provider and connection string in local user secrets. This example uses Windows authentication and trusts the local server certificate; hosted environments need a valid database certificate and a least-privilege login:
 
