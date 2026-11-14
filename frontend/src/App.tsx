@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AdminApp from "./AdminApp";
 import { getMediaUrl, getPublishedProduct, StorefrontProduct } from "./storeApi";
+import { addCartSelection, CartLine, changeCartSelectionQuantity, removeCartSelection } from "./cart";
 
 export default function App() {
   if (window.location.pathname.startsWith("/admin")) {
@@ -21,6 +22,9 @@ function Storefront() {
   const [clientTimeMs, setClientTimeMs] = useState(Date.now());
   const [productReceivedAtMs, setProductReceivedAtMs] = useState<number | null>(null);
   const [shareMessage, setShareMessage] = useState("");
+  const [cartItems, setCartItems] = useState<CartLine[]>([]);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [cartMessage, setCartMessage] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -71,6 +75,18 @@ function Storefront() {
     ? selectedVariant.salePrice
     : selectedVariant?.price ?? 0;
   const currentTotal = selectedBasePrice + selectedOptions.reduce((total, option) => total + option.priceAdjustment, 0);
+  const cartItemCount = cartItems.reduce((total, item) => total + item.quantity, 0);
+  const cartSubtotals = cartItems.reduce<Record<string, number>>((totals, item) => {
+    const variant = product?.variants.find((candidate) => candidate.id === item.variantId);
+    if (!product || !variant) return totals;
+    const unitPrice = (flashSaleActive && variant.salePrice != null ? variant.salePrice : variant.price)
+      + product.attributeGroups
+        .flatMap((group) => group.options)
+        .filter((option) => item.optionIds.includes(option.id))
+        .reduce((sum, option) => sum + option.priceAdjustment, 0);
+    totals[variant.currencyCode] = (totals[variant.currencyCode] ?? 0) + unitPrice * item.quantity;
+    return totals;
+  }, {});
 
   function chooseAttributeOption(groupId: string, optionId: string, allowMultiple: boolean) {
     setSelectedAttributeOptions((current) => {
@@ -80,6 +96,22 @@ function Storefront() {
         : [optionId];
       return { ...current, [groupId]: next };
     });
+  }
+
+  function addToCart() {
+    if (!selectedVariant || !selectedVariant.isAvailable || !requiredAttributesSelected) return;
+    const optionIds = selectedOptions.map((option) => option.id).sort();
+    setCartItems((current) => addCartSelection(current, selectedVariant.id, optionIds, quantity));
+    setCartMessage(`${quantity} ${quantity === 1 ? "item" : "items"} added to your cart.`);
+    setCartOpen(true);
+  }
+
+  function changeCartQuantity(key: string, change: number) {
+    setCartItems((current) => changeCartSelectionQuantity(current, key, change));
+  }
+
+  function removeCartItem(key: string) {
+    setCartItems((current) => removeCartSelection(current, key));
   }
 
   async function shareProduct() {
@@ -110,7 +142,10 @@ function Storefront() {
             : <span className="brand-mark">{(product?.brandName ?? "OneCart").slice(0, 1).toUpperCase()}</span>}
           <span>{product?.brandName ?? "OneCart"}</span>
         </a>
-        <a className="status" href="/admin">Admin</a>
+        <div className="store-header-actions">
+          {product && <button className="cart-toggle" type="button" onClick={() => setCartOpen((open) => !open)} aria-expanded={cartOpen}>Cart <span>{cartItemCount}</span></button>}
+          <a className="status" href="/admin">Admin</a>
+        </div>
       </header>
 
       {loading ? (
@@ -217,10 +252,10 @@ function Storefront() {
                   : formatPrice(selectedVariant.price - selectedVariant.salePrice, selectedVariant.currencyCode)} during this sale
               </p>
             )}
-            <button type="button" disabled={!selectedVariant?.isAvailable || !requiredAttributesSelected}>
-              Cash on Delivery checkout coming next
+            <button type="button" disabled={!selectedVariant?.isAvailable || !requiredAttributesSelected} onClick={addToCart}>
+              Add to cart
             </button>
-            <p className="note">{!requiredAttributesSelected ? "Choose an option for every required attribute." : "Orders are not available yet."}</p>
+            <p className="note">{!requiredAttributesSelected ? "Choose an option for every required attribute." : !selectedVariant?.isAvailable ? "This option is currently out of stock." : "Cash on Delivery checkout will be available after store setup is complete."}</p>
             {(product.socialSharingEnabled || product.whatsAppContactUrl) && (
               <div className="product-contact-actions">
                 {product.socialSharingEnabled && <button className="button-secondary" type="button" onClick={() => void shareProduct()}>Share product</button>}
@@ -246,6 +281,48 @@ function Storefront() {
           <h1>Your product story starts here.</h1>
           <p className="intro">This store is ready for its first product. A System Admin can configure and publish it from the admin panel.</p>
           <a className="button store-admin-link" href="/admin">Open admin</a>
+        </section>
+      )}
+
+      {product && cartOpen && (
+        <section className="cart-panel" aria-labelledby="cart-title">
+          <div className="cart-heading">
+            <div><p className="eyebrow">Your selections</p><h2 id="cart-title">Shopping cart ({cartItemCount})</h2></div>
+            <button className="button-secondary" type="button" onClick={() => setCartOpen(false)}>Close cart</button>
+          </div>
+          {cartItems.length === 0 ? <p className="note">Your cart is empty. Choose your product options and add them here.</p> : (
+            <>
+              <ul className="cart-list">
+                {cartItems.map((item) => {
+                  const variant = product.variants.find((candidate) => candidate.id === item.variantId);
+                  if (!variant) return null;
+                  const chosenOptions = product.attributeGroups.flatMap((group) => group.options.filter((option) => item.optionIds.includes(option.id)));
+                  const unitPrice = (flashSaleActive && variant.salePrice != null ? variant.salePrice : variant.price)
+                    + chosenOptions.reduce((sum, option) => sum + option.priceAdjustment, 0);
+                  return (
+                    <li className="cart-item" key={item.key}>
+                      <div className="cart-item-copy">
+                        <strong>{product.name} · {variant.displayName}</strong>
+                        {chosenOptions.length > 0 && <small>{chosenOptions.map((option) => option.name).join(", ")}</small>}
+                        <span>{formatPrice(unitPrice, variant.currencyCode)} each</span>
+                      </div>
+                      <div className="cart-item-actions" aria-label={`Quantity for ${variant.displayName}`}>
+                        <button type="button" aria-label="Decrease quantity" onClick={() => changeCartQuantity(item.key, -1)}>−</button>
+                        <span>{item.quantity}</span>
+                        <button type="button" aria-label="Increase quantity" onClick={() => changeCartQuantity(item.key, 1)}>+</button>
+                        <button className="remove-cart-item" type="button" onClick={() => removeCartItem(item.key)}>Remove</button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="cart-summary">
+                <div><strong>Estimated subtotal</strong>{Object.entries(cartSubtotals).map(([currency, amount]) => <strong key={currency}>{formatPrice(amount, currency)}</strong>)}</div>
+                <p>Prices and availability are confirmed when COD checkout is enabled.</p>
+              </div>
+            </>
+          )}
+          {cartMessage && <p className="share-message" role="status">{cartMessage}</p>}
         </section>
       )}
 

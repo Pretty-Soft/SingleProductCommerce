@@ -13,9 +13,9 @@ This roadmap sequences work using confirmed product requirements. It contains no
 
 Confirmed: the catalog is one product with selectable variants, and PostgreSQL is the first-release database provider.
 
-Still confirm these before implementing checkout fields and order behavior:
+Still confirm these before implementing order submission and inventory behavior:
 
-- Checkout customer/address fields, guest checkout, order confirmation, and cancellation behavior.
+- Address structure/validation, order confirmation, and cancellation behavior. Guest checkout with customer name, phone, and delivery address is confirmed.
 - Variant option dimensions (such as size/color), quantity limits, and inventory decrement/reservation rules.
 - Initial store language and base/display currency rules.
 
@@ -27,7 +27,7 @@ Build a working path through product setup, public product display, COD checkout
 
 Acceptance: an administrator can configure the approved product shape; a customer can submit a valid COD order over HTTPS; the order is persisted with a stable status and can be reviewed by an authorized administrator.
 
-The catalog persistence, public read endpoint, protected product editor, variant management, configurable required/optional product attributes, scheduled percentage/fixed flash-sale discounts, live sale countdown, social sharing, WhatsApp contact, configurable branding, product image/logo uploads, and trust/service content are implemented. The endpoint returns `404` until a published product with an active variant exists. The editor is temporarily restricted to System Admin while detailed role permissions remain open. Checkout remains gated on the open customer/address and order policy decisions.
+The catalog persistence, public read endpoint, protected product editor, variant management, configurable required/optional product attributes, scheduled percentage/fixed flash-sale discounts, live sale countdown, social sharing, WhatsApp contact, configurable branding, product image/logo uploads, trust/service content, and session-only shopping cart are implemented. The endpoint returns `404` until a published product with an active variant exists. The editor is temporarily restricted to System Admin while detailed role permissions remain open. COD order creation is gated on the remaining address, confirmation/cancellation, quantity, and inventory policy decisions.
 
 ## Stage 3 — Store administration and security (user management in progress)
 
