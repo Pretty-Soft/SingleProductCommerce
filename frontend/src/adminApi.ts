@@ -20,6 +20,15 @@ export interface AdminRole {
   name: string;
 }
 
+export interface AdminAuditEvent {
+  id: string;
+  actorEmail: string;
+  action: string;
+  target: string;
+  details: string;
+  createdAtUtc: string;
+}
+
 export async function refreshCsrfToken(): Promise<void> {
   const response = await fetch(`${apiBase}/api/v1/admin/csrf`, {
     credentials: "include"

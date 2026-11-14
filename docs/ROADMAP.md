@@ -31,7 +31,7 @@ The catalog persistence, public read endpoint, protected product editor, variant
 
 ## Stage 3 — Store administration and security (user management in progress)
 
-Use built-in email/password accounts with secure cookies, anti-forgery protection, and lockout. Bootstrap the first System Admin from a local command; only System Admins can create accounts and assign the initial roles. User management and audit records for account changes are implemented. Product edits are also audited. Then add store settings, order and customer views, and inventory controls. Define account recovery and MFA behavior before implementing those flows.
+Use built-in email/password accounts with secure cookies, anti-forgery protection, and lockout. Bootstrap the first System Admin from a local command; only System Admins can create accounts and assign the initial roles. User management, recent audit history, and audit records for account and product changes are implemented. Then add store settings, order and customer views, and inventory controls. Define account recovery and MFA behavior before implementing those flows.
 
 Acceptance: protected operations enforce authorization server-side, validate inputs, and produce audit records where required.
 

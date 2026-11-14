@@ -63,7 +63,7 @@ npm install
 npm run dev
 ```
 
-The API health check is available at `/health`. The public catalog read endpoint is `GET /api/v1/store/product`; it returns `404` until a published product has an active variant. Open `/admin` in the frontend to sign in, manage users, and edit the product catalog as a System Admin. Product and variant changes are audited. Catalog editing is limited to System Admin until detailed role permissions are decided. New accounts receive a temporary password and must change it at first sign-in. The frontend uses secure cookie authentication and anti-forgery tokens; production deployments must configure `Cors:AllowedOrigins` for the exact frontend origin.
+The API health check is available at `/health`. The public catalog read endpoint is `GET /api/v1/store/product`; it returns `404` until a published product has an active variant. Open `/admin` in the frontend to sign in, manage users, edit the product catalog, and review recent audit history as a System Admin. Product and variant changes are audited. Catalog editing is limited to System Admin until detailed role permissions are decided. New accounts receive a temporary password and must change it at first sign-in. The frontend uses secure cookie authentication and anti-forgery tokens; production deployments must configure `Cors:AllowedOrigins` for the exact frontend origin.
 
 ## Experimental SQL Server development path
 

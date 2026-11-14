@@ -456,6 +456,63 @@ footer {
   margin-top: 20px;
 }
 
+.audit-list {
+  border-top: 1px solid #e8ebf1;
+  margin-top: 20px;
+}
+
+.audit-row {
+  border-bottom: 1px solid #e8ebf1;
+  padding: 18px 0;
+}
+
+.audit-summary {
+  display: grid;
+  gap: 8px;
+}
+
+.audit-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  justify-content: space-between;
+}
+
+.audit-heading time,
+.audit-summary p,
+.audit-summary details {
+  color: #667085;
+  font-size: 0.84rem;
+}
+
+.audit-summary p {
+  margin: 0;
+}
+
+.audit-summary p span {
+  color: #344054;
+  font-weight: 700;
+}
+
+.audit-summary summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.audit-summary pre {
+  background: #f7f8fb;
+  border-radius: 10px;
+  color: #344054;
+  font: 0.78rem/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+  margin: 10px 0 0;
+  max-height: 280px;
+  overflow: auto;
+  padding: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .user-row {
   align-items: flex-start;
   border-bottom: 1px solid #e8ebf1;

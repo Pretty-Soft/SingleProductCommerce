@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import AdminCatalogEditor from "./AdminCatalogEditor";
-import { adminRequest, AdminRole, AdminUser, refreshCsrfToken } from "./adminApi";
+import { adminRequest, AdminAuditEvent, AdminRole, AdminUser, refreshCsrfToken } from "./adminApi";
 
 type RoleChanges = Record<string, string[]>;
 
@@ -8,6 +8,7 @@ export default function AdminApp() {
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
   const [roles, setRoles] = useState<AdminRole[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [auditEvents, setAuditEvents] = useState<AdminAuditEvent[]>([]);
   const [roleChanges, setRoleChanges] = useState<RoleChanges>({});
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,12 +20,14 @@ export default function AdminApp() {
   const [busy, setBusy] = useState(false);
 
   async function loadAdminData() {
-    const [loadedRoles, loadedUsers] = await Promise.all([
+    const [loadedRoles, loadedUsers, loadedAuditEvents] = await Promise.all([
       adminRequest<AdminRole[]>("/api/v1/admin/roles"),
-      adminRequest<AdminUser[]>("/api/v1/admin/users")
+      adminRequest<AdminUser[]>("/api/v1/admin/users"),
+      adminRequest<AdminAuditEvent[]>("/api/v1/admin/audit")
     ]);
     setRoles(loadedRoles);
     setUsers(loadedUsers);
+    setAuditEvents(loadedAuditEvents);
     setRoleChanges(Object.fromEntries(loadedUsers.map((user) => [user.id, user.roles])));
   }
 
@@ -147,6 +150,7 @@ export default function AdminApp() {
       setCurrentUser(null);
       setUsers([]);
       setRoles([]);
+      setAuditEvents([]);
       await refreshCsrfToken();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Sign-out failed.");
@@ -306,6 +310,35 @@ export default function AdminApp() {
                 {users.length === 0 && <p className="admin-muted">No accounts yet.</p>}
               </div>
             </section>
+
+            <section className="admin-card">
+              <div className="section-heading">
+                <div>
+                  <h2>Audit history</h2>
+                  <p className="admin-muted">Recent account, role, and catalog changes performed by administrators.</p>
+                </div>
+                <span className="user-count">Latest {auditEvents.length}</span>
+              </div>
+              <div className="audit-list">
+                {auditEvents.map((event) => (
+                  <article className="audit-row" key={event.id}>
+                    <div className="audit-summary">
+                      <div className="audit-heading">
+                        <strong>{formatAuditAction(event.action)}</strong>
+                        <time dateTime={event.createdAtUtc}>{formatAuditDate(event.createdAtUtc)}</time>
+                      </div>
+                      <p><span>Actor</span> {event.actorEmail}</p>
+                      <p><span>Target</span> {event.target}</p>
+                      <details>
+                        <summary>View recorded details</summary>
+                        <pre>{formatAuditDetails(event.details)}</pre>
+                      </details>
+                    </div>
+                  </article>
+                ))}
+                {auditEvents.length === 0 && <p className="admin-muted">No administrative changes recorded yet.</p>}
+              </div>
+            </section>
           </>
         )}
 
@@ -315,4 +348,21 @@ export default function AdminApp() {
       <footer className="admin-footer">OneCart Commerce · Secure administrator access</footer>
     </main>
   );
+}
+
+function formatAuditAction(action: string): string {
+  return action.replace(/[._]/g, " ");
+}
+
+function formatAuditDate(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function formatAuditDetails(value: string): string {
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return value;
+  }
 }
