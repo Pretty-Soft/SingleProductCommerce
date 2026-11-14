@@ -47,6 +47,8 @@ The project should be developed with human review and release quality in mind. C
 - Provide a guided web installer so a store owner can configure the application without editing source code.
 - Target portable deployment across IIS, Linux, Docker, and compatible .NET hosting.
 - Support configurable persistence rather than baking one database vendor into domain behavior.
+- Require SSL/TLS for all public API traffic. The canonical API base URL must use HTTPS, and production certificates must be valid and trusted by clients.
+- Plain HTTP requests to the API must not reach application endpoints. If a trusted reverse proxy terminates TLS, the app may rely on forwarded protocol information only from explicitly configured proxy addresses.
 - Installation, upgrades, backups, and recovery must be documented.
 - **Open decision:** Exact installer behavior, supported deployment topology, and minimum server requirements.
 
@@ -103,6 +105,7 @@ These are recommendations for a maintainable first release, not finalized produc
 - Store base currency, display currency, conversion source, rounding, and historical order-price rules.
 - Theme customization boundaries and whether custom CSS is allowed.
 - Installer and upgrade strategy for IIS, Linux, and Docker.
+- Certificate provisioning, renewal, and trusted reverse-proxy addresses for supported hosting environments.
 - License activation behavior, offline installations, and local resale obligations.
 - Marketplace and direct-sale packaging, support, and update commitments.
 

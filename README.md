@@ -16,11 +16,19 @@ OneCart Commerce is a commercial, single-product commerce platform. This reposit
 
 ## Run locally
 
-Backend:
+Create and trust the local ASP.NET Core development certificate once:
+
+```powershell
+dotnet dev-certs https --trust
+```
+
+Backend (HTTPS only):
 
 ```powershell
 dotnet run --project backend/OneCart.Api
 ```
+
+The API listens at `https://localhost:7241`. Plain HTTP API requests are rejected. The production API base URL must also use `https://` with a certificate trusted by clients. When TLS terminates at a reverse proxy, configure only that proxy's IP under `ForwardedHeaders:KnownProxies`; do not trust forwarded headers from arbitrary clients.
 
 Frontend:
 

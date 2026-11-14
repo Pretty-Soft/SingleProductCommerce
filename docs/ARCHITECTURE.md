@@ -22,6 +22,10 @@ Select a first-release default only after the owner confirms operational needs. 
 
 Treat first installation and upgrades as explicit workflows. The installer must validate prerequisites and configuration, protect secrets, prevent repeated setup from weakening security, and support supported hosting targets. Exact installer and topology decisions remain open in the requirements document.
 
+## HTTPS requirement
+
+The API accepts requests only when ASP.NET Core sees an HTTPS scheme. The local launch profile binds to HTTPS at `https://localhost:7241`. Production deployments must use a valid TLS certificate. If TLS terminates at a reverse proxy, set `ForwardedHeaders:KnownProxies` to the proxy's IP address so the API can safely recognize the forwarded HTTPS scheme. Forwarded headers from untrusted clients must not be accepted.
+
 ## Current implementation boundary
 
 The starter API exposes a health endpoint only. The starter frontend is a shell. Neither contains commerce, authentication, persistence, or installer functionality yet.
