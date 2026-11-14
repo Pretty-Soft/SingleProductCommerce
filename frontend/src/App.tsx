@@ -285,10 +285,14 @@ function Storefront() {
                 </div>
               </fieldset>
             ))}
-            <label className="quantity-control">
-              Quantity
-              <input type="number" min="1" step="1" value={quantity} onChange={(event) => setQuantity(Math.max(1, Math.trunc(Number(event.target.value) || 1)))} />
-            </label>
+            <div className="quantity-control">
+              <label htmlFor="store-quantity">Quantity</label>
+              <div className="quantity-stepper">
+                <button type="button" aria-label="Decrease quantity" disabled={quantity <= 1} onClick={() => setQuantity((value) => Math.max(1, value - 1))}>−</button>
+                <input id="store-quantity" type="number" inputMode="numeric" min="1" step="1" value={quantity} onChange={(event) => setQuantity(Math.max(1, Math.trunc(Number(event.target.value) || 1)))} />
+                <button type="button" aria-label="Increase quantity" onClick={() => setQuantity((value) => value + 1)}>+</button>
+              </div>
+            </div>
             <p className="store-total" aria-live="polite">Total: {formatPrice(currentTotal * quantity, selectedVariant?.currencyCode ?? "USD")}</p>
             {flashSaleActive && selectedVariant?.salePrice != null && (
               <p className="discount-note">

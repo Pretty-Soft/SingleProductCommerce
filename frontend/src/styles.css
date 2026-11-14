@@ -599,8 +599,7 @@ button:enabled {
   padding: 8px;
 }
 
-.store-attribute-option input,
-.quantity-control input {
+.store-attribute-option input {
   accent-color: #243c78;
   min-height: 18px;
   width: 18px;
@@ -619,12 +618,64 @@ button:enabled {
   justify-content: space-between;
 }
 
-.quantity-control input {
-  border: 1px solid #dce1eb;
-  border-radius: 8px;
-  font: inherit;
+.quantity-control > label {
+  color: #344054;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.quantity-stepper {
+  align-items: stretch;
+  border: 1px solid #d5dde7;
+  border-radius: 10px;
+  display: inline-grid;
+  grid-template-columns: 40px 64px 40px;
+  min-height: 44px;
+  overflow: hidden;
+}
+
+.quantity-stepper button {
+  background: #f2f5f8;
+  border-radius: 0;
+  color: #243c78;
+  cursor: pointer;
+  font-size: 1.15rem;
+  font-weight: 600;
   min-height: 42px;
-  padding: 6px 10px;
+  opacity: 1;
+  padding: 0;
+}
+
+.quantity-stepper button:hover:enabled {
+  background: #e7edf4;
+}
+
+.quantity-stepper button:disabled {
+  color: #a8b1bf;
+  cursor: not-allowed;
+}
+
+.quantity-stepper input {
+  appearance: textfield;
+  background: #fff;
+  border: 0;
+  border-left: 1px solid #d5dde7;
+  border-radius: 0;
+  border-right: 1px solid #d5dde7;
+  color: #172033;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  min-height: 42px;
+  padding: 6px 4px;
+  text-align: center;
+  width: 64px;
+}
+
+.quantity-stepper input::-webkit-inner-spin-button,
+.quantity-stepper input::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
 }
 
 .store-admin-link {
