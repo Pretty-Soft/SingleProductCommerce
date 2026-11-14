@@ -52,6 +52,7 @@ The project should be developed with human review and release quality in mind. C
 ### Administration
 
 - Provide an administrator area for managing orders, customers, inventory, product content, store settings, and sales information.
+- Organize the administrator workspace with a persistent left navigation on desktop and a mobile menu on smaller screens, grouped around the implemented Overview, Catalog, Orders, Accounts/Roles, and Audit sections.
 - Include authentication and role-based authorization appropriate to the actions available.
 - Use built-in email/password administrator accounts. Only a System Admin may create administrator accounts and assign roles; public registration is disabled.
 - Require new admin users to change the temporary password at first sign-in.

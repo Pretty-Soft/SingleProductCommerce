@@ -19,6 +19,8 @@ export default function AdminApp() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [activeSection, setActiveSection] = useState("overview");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   async function loadAdminData() {
     const [loadedRoles, loadedUsers, loadedAuditEvents] = await Promise.all([
@@ -161,14 +163,63 @@ export default function AdminApp() {
   }
 
   const isSystemAdmin = currentUser?.roles.includes("SystemAdmin") ?? false;
+  const hasWorkspace = Boolean(currentUser && !currentUser.mustChangePassword && isSystemAdmin);
+
+  function navigateSection(sectionId: string) {
+    setActiveSection(sectionId);
+    setSidebarOpen(false);
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   return (
-    <main className="admin-page">
-      <header className="admin-header">
-        <a className="brand" href="/" aria-label="OneCart storefront">
-          <span className="brand-mark">O</span>
-          <span>OneCart Admin</span>
-        </a>
+    <main className={`admin-page${hasWorkspace ? " admin-workspace" : ""}`}>
+      {hasWorkspace && (
+        <>
+          <aside className={`admin-sidebar${sidebarOpen ? " is-open" : ""}`} aria-label="Administration menu">
+            <a className="admin-sidebar-brand" href="/" aria-label="OneCart storefront">
+              <span className="admin-sidebar-mark">O</span>
+              <span><strong>OneCart</strong><small>Commerce Admin</small></span>
+            </a>
+            <nav className="admin-sidebar-nav" aria-label="Admin sections">
+              <p className="admin-nav-label">STORE WORKSPACE</p>
+              {adminMenuItems.map((item) => (
+                <button
+                  className={`admin-nav-item${activeSection === item.id ? " active" : ""}`}
+                  type="button"
+                  key={item.id}
+                  aria-current={activeSection === item.id ? "page" : undefined}
+                  onClick={() => navigateSection(item.id)}
+                >
+                  <AdminMenuIcon name={item.id} />
+                  <span>{item.label}</span>
+                  {activeSection === item.id && <span className="admin-nav-active-dot" aria-hidden="true" />}
+                </button>
+              ))}
+            </nav>
+            <div className="admin-sidebar-footer"><span aria-hidden="true">●</span> Secure admin workspace</div>
+          </aside>
+          {sidebarOpen && <button className="admin-sidebar-backdrop" type="button" aria-label="Close admin menu" onClick={() => setSidebarOpen(false)} />}
+        </>
+      )}
+
+      <div className={hasWorkspace ? "admin-workspace-main" : "admin-auth-main"}>
+      <header className={`admin-header${hasWorkspace ? " admin-workspace-header" : ""}`}>
+        {hasWorkspace ? (
+          <>
+            <button className="admin-menu-toggle" type="button" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen((open) => !open)}>
+              <span aria-hidden="true">☰</span> Menu
+            </button>
+            <div className="admin-page-heading">
+              <p>ONECART ADMIN</p>
+              <strong>{adminMenuItems.find((item) => item.id === activeSection)?.label ?? "Overview"}</strong>
+            </div>
+          </>
+        ) : (
+          <a className="brand" href="/" aria-label="OneCart storefront">
+            <span className="brand-mark">O</span>
+            <span>OneCart Admin</span>
+          </a>
+        )}
         {currentUser && (
           <div className="admin-account">
             <span>{currentUser.email}</span>
@@ -218,15 +269,26 @@ export default function AdminApp() {
           </section>
         ) : (
           <>
-            <div className="admin-title-row">
+            <div className="admin-title-row" id="overview">
               <div>
-                <p className="eyebrow">System administration</p>
-                <h1>Users and roles</h1>
-                <p className="admin-muted">Only a System Admin can create accounts or change role assignments.</p>
+                <p className="eyebrow">STORE WORKSPACE</p>
+                <h1>Overview</h1>
+                <p className="admin-muted">Manage your product, customer orders, and administrator access.</p>
               </div>
               <span className="admin-badge">System Admin</span>
             </div>
 
+            <div className="admin-overview-links" aria-label="Workspace shortcuts">
+              {adminMenuItems.filter((item) => item.id !== "overview").map((item) => (
+                <button className="admin-overview-link" type="button" key={item.id} onClick={() => navigateSection(item.id)}>
+                  <AdminMenuIcon name={item.id} />
+                  <span><strong>{item.label}</strong><small>{item.description}</small></span>
+                  <span aria-hidden="true">→</span>
+                </button>
+              ))}
+            </div>
+
+            <div id="accounts" className="admin-nav-target">
             <section className="admin-card">
               <div className="section-heading">
                 <div>
@@ -265,10 +327,6 @@ export default function AdminApp() {
                 </button>
               </form>
             </section>
-
-            <AdminCatalogEditor />
-
-            <AdminOrders />
 
             <section className="admin-card">
               <div className="section-heading">
@@ -314,7 +372,13 @@ export default function AdminApp() {
               </div>
             </section>
 
-            <section className="admin-card">
+            </div>
+
+            <div id="catalog" className="admin-nav-target"><AdminCatalogEditor /></div>
+
+            <div id="orders" className="admin-nav-target"><AdminOrders /></div>
+
+            <section className="admin-card admin-nav-target" id="audit">
               <div className="section-heading">
                 <div>
                   <h2>Audit history</h2>
@@ -349,7 +413,28 @@ export default function AdminApp() {
         {error && <p className="admin-error" role="alert">{error}</p>}
       </section>
       <footer className="admin-footer">OneCart Commerce · Secure administrator access</footer>
+      </div>
     </main>
+  );
+}
+
+const adminMenuItems = [
+  { id: "overview", label: "Overview", description: "Store workspace summary" },
+  { id: "catalog", label: "Catalog", description: "Product, pricing, and storefront" },
+  { id: "orders", label: "Orders", description: "Review and update customer orders" },
+  { id: "accounts", label: "Accounts & roles", description: "Manage administrator access" },
+  { id: "audit", label: "Audit history", description: "Review administrator activity" }
+];
+
+function AdminMenuIcon({ name }: { name: string }) {
+  return (
+    <svg className="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {name === "overview" ? <><path d="m3 10 9-7 9 7" /><path d="M5 9v12h14V9" /><path d="M9 21v-7h6v7" /></>
+        : name === "catalog" ? <><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" /></>
+          : name === "orders" ? <><path d="M6 3h9l4 4v14H6z" /><path d="M14 3v5h5M9 12h7M9 16h7" /></>
+            : name === "accounts" ? <><circle cx="9" cy="8" r="3" /><path d="M3.5 20v-1.5a5.5 5.5 0 0 1 11 0V20zM16 5.5a3 3 0 0 1 0 5.8M18 15a4.5 4.5 0 0 1 2.5 4v1" /></>
+              : <><path d="M4 5h16M4 12h16M4 19h16" /><circle cx="7" cy="5" r="1" /><circle cx="7" cy="12" r="1" /><circle cx="7" cy="19" r="1" /></>}
+    </svg>
   );
 }
 
