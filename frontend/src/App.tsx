@@ -210,6 +210,9 @@ function Storefront() {
             )}
           </span>
         </a>
+        <nav className="store-primary-nav" aria-label={text.storeNavigation}>
+          <a className="active" href="#product">{text.shop}</a>
+        </nav>
         <div className="store-header-actions">
           <label className="store-language-picker"><span className="visually-hidden">Language</span><select value={language} onChange={event => setLanguage(event.target.value as StoreLanguage)} aria-label="Language">{storeLanguages.map(item => <option key={item.code} value={item.code}>{item.label}</option>)}</select></label>
           {product && <button className="cart-toggle" type="button" onClick={() => setCartOpen((open) => !open)} aria-expanded={cartOpen}>{text.cart} <span>{cartItemCount}</span></button>}
@@ -222,7 +225,7 @@ function Storefront() {
       ) : error ? (
         <section className="hero" role="alert"><h1>{text.unavailable}</h1><p className="intro">{error}</p></section>
       ) : product ? (
-        <section className={`store-product${product.images.length > 0 ? " has-images" : ""}`} aria-labelledby="hero-title">
+        <section id="product" className={`store-product${product.images.length > 0 ? " has-images" : ""}`} aria-labelledby="hero-title">
           <div className="product-copy">
             <h1 id="hero-title">{product.name}</h1>
             {product.storefrontSubtitle && <p className="product-subtitle">{product.storefrontSubtitle}</p>}
@@ -341,7 +344,7 @@ function Storefront() {
             {shareMessage && <p className="share-message" role="status">{shareMessage}</p>}
           </div>
           {product.trustItems.length > 0 && (
-            <ul className="store-trust-items" aria-label={text.storeDetails}>
+            <ul id="store-details" className="store-trust-items" aria-label={text.storeDetails}>
               {product.trustItems.map((item) => (
                 <li key={item.title}>
                   <span className="trust-mark" aria-hidden="true">✓</span>
@@ -421,7 +424,20 @@ function Storefront() {
         </section>
       )}
 
-      <footer>OneCart Commerce · ASP.NET Core + React</footer>
+      <footer className="store-footer">
+        <a className="footer-brand" href="/" aria-label={`${product?.brandName ?? "Pretty Shop"} home`}>
+          {product?.brandLogoUrl
+            ? <img src={getMediaUrl(product.brandLogoUrl)} alt="" />
+            : <span className="footer-brand-mark">{(product?.brandName ?? "Pretty Shop").slice(0, 1).toUpperCase()}</span>}
+          <span><strong>{product?.brandName ?? "Pretty Shop"}</strong><small>{product?.storefrontHeadline ?? "Your trust, Your Love"}</small></span>
+        </a>
+        <nav className="store-footer-links" aria-label={text.storeNavigation}>
+          <a href="#product">{text.shop}</a>
+          {product?.whatsAppContactUrl && <a className="footer-whatsapp" href={product.whatsAppContactUrl} target="_blank" rel="noopener noreferrer">{text.whatsapp}</a>}
+          <a className="footer-admin" href="/admin">{text.admin}</a>
+        </nav>
+        <p className="store-copyright">© {new Date().getFullYear()} {product?.brandName ?? "Pretty Shop"}</p>
+      </footer>
     </main>
   );
 }
