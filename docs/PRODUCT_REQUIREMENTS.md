@@ -66,7 +66,7 @@ The project should be developed with human review and release quality in mind. C
 
 ### Languages, currency, and theme
 
-- Support English (`en`), Bangla (`bn`), and Spanish (`es`) storefront languages. English is the default and fallback; system interface labels ship in all three languages, and administrators maintain translated product and storefront content.
+- Support English (`en`), Bangla (`bn`), and Spanish (`es`) storefront languages. English is the default and fallback; storefront interface labels ship in all three languages, and administrators maintain translated product and storefront content.
 - The administrator selects one active currency for the whole store. A cart line retains both its numeric unit price and currency from when it was added. COD orders cannot mix currencies and currency conversion is not performed.
 - After initial product/currency setup, changing the store currency is locked until the owner defines the price-conversion rule. Existing order currency and totals remain historical snapshots.
 - Provide a dynamic theme system for colors, typography, layouts, and live preview.
@@ -127,7 +127,7 @@ These are recommendations for a maintainable first release, not finalized produc
 
 ## 6. Open decisions to resolve before corresponding implementation
 
-- Variant option structure (for example size/color), quantity limits, and inventory decrement/reservation rules.
+- Variant option structure (for example size/color).
 - Product attribute types and presentation controls (for example dropdown, radio, checkbox), whether multiple choices may be selected per attribute, and how required/optional rules are configured.
 - Whether attribute combinations need compatibility rules, combination-specific SKUs/stock, or only independent price adjustments.
 - Whether product-page wishlist, compare, email-a-friend, and reviews are included in the first release, and their account, privacy, moderation, and notification rules.
@@ -142,7 +142,6 @@ These are recommendations for a maintainable first release, not finalized produc
 - Authenticator-app recovery-code policy and MFA reset procedure.
 - Which additional database providers, beyond the confirmed first-release PostgreSQL provider, are required for release.
 - Whether “hybrid” means multiple providers used together, relational plus document storage, or another deployment pattern.
-- Translation ownership and workflow for English, Bangla, and Spanish (who supplies the translated text, and how administrators review and publish it).
 - How the owner-provided conversion rule will translate existing product prices when the admin changes the one active store currency. Historical order totals and their currencies remain unchanged.
 - Theme customization boundaries and whether custom CSS is allowed.
 - Installer and upgrade strategy for IIS, Linux, and Docker.

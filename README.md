@@ -12,6 +12,7 @@ OneCart Commerce is a commercial, single-product commerce platform. The current 
 - `docs/PRODUCT_REQUIREMENTS.md`: requirements recovered from the product planning conversation, with open decisions marked clearly.
 - `docs/ARCHITECTURE.md`: current architecture and implementation boundaries.
 - `docs/ROADMAP.md`: proposed implementation sequence and decision gates.
+- `docs/OPERATIONS_POSTGRES.md`: PostgreSQL backup and restore procedures, including locally stored product images and Data Protection keys.
 - `AGENTS.md`: project-specific instructions for future Codex work.
 
 ## Prerequisites

@@ -45,6 +45,8 @@ Acceptance: storefront UI and configured content can be presented in the three s
 
 Design the guided installer and upgrade path, then document deployment, TLS certificate provisioning and renewal, trusted proxy configuration, backups, restores, and minimum server requirements for the approved IIS, Linux, and Docker targets.
 
+The current PostgreSQL backup/restore runbook is documented in `docs/OPERATIONS_POSTGRES.md`. It covers logical database dumps and the local product-media and Data Protection directories. It does not claim point-in-time recovery or a supported hosted deployment topology.
+
 Acceptance: a clean installation and a supported upgrade can be completed from documented steps without editing application source; public API traffic requires trusted HTTPS.
 
 ## Stage 6 — Additional persistence providers
