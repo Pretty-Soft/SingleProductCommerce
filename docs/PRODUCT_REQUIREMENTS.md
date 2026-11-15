@@ -46,7 +46,7 @@ The project should be developed with human review and release quality in mind. C
 - Customers do not sign in or have customer profiles. Contact details belong to each guest order and are not merged across orders.
 - Save a new order in Pending status and show its order number after placement. Administrators may update or cancel an order.
 - Decrease inventory atomically when an order is placed, restore it if an administrator cancels the order, and do not impose an additional per-order quantity cap.
-- Retain the signed unit-price and currency quote captured when each cart line is added. Checkout must not accept client-edited prices, must preserve order-line price/product snapshots, and must reject mixed-currency carts/orders.
+- Retain the signed unit-price and currency quote captured when each cart line is added. Later store changes do not rewrite existing cart lines; each shopping period stays in one currency, and mixed-currency carts/orders are rejected. Checkout must not accept client-edited prices and must preserve order-line price/product snapshots.
 - Capture and manage customer orders through the admin experience.
 - Track order status and provide the administrator with order and sales visibility.
 - Do not assume online payment gateways are in scope.

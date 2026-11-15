@@ -5,8 +5,7 @@
       "launchBrowser": true,
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "Database__Provider": "SqlServer",
-        "ConnectionStrings__Store": "Server=localhost;Database=OneCartCommerce;Integrated Security=True;Encrypt=True;TrustServerCertificate=True"
+        "Database__Provider": "SqlServer"
       },
       "nativeDebugging": true
     },
@@ -14,8 +13,7 @@
       "commandName": "Project",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "Database__Provider": "SqlServer",
-        "ConnectionStrings__Store": "Server=localhost;Database=OneCartCommerce;Integrated Security=True;Encrypt=True;TrustServerCertificate=True"
+        "Database__Provider": "SqlServer"
       },
       "dotnetRunMessages": true,
       "applicationUrl": "https://localhost:7241"
