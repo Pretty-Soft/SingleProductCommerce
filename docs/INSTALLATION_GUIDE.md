@@ -9,7 +9,7 @@ This is the current manual installation path for local development. A guided web
 - PostgreSQL, configured for local connections
 - Git, if cloning the repository
 
-PostgreSQL is the default and first-release provider. SQL Server has an experimental local path and is not a supported release provider.
+PostgreSQL is the default and first-release provider. SQL Server has an experimental local path and is not a supported release provider. The Visual Studio Development launch profiles use local SQL Server (`localhost`, database `OneCartCommerce`) with Windows Authentication; edit those local launch-profile values if your instance differs. The normal provider default in code remains PostgreSQL.
 
 ## Configure PostgreSQL
 
