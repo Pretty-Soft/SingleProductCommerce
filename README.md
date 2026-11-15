@@ -11,6 +11,10 @@ OneCart Commerce is a commercial, single-product commerce platform. The current 
 - The storefront supports English, Bangla, and Spanish. Its selector is remembered per browser; System Admins, Catalog Managers, and Store Managers can edit localized catalog/storefront fields within their existing role scopes.
 - `docs/PRODUCT_REQUIREMENTS.md`: requirements recovered from the product planning conversation, with open decisions marked clearly.
 - `docs/ARCHITECTURE.md`: current architecture and implementation boundaries.
+- `docs/ADMINISTRATOR_GUIDE.md`: admin roles and workflows.
+- `docs/API_CONTRACTS.md`: versioned public and admin API route summary.
+- `docs/INSTALLATION_GUIDE.md`: current manual local setup and production-readiness boundary.
+- `docs/CUSTOMIZATION_GUIDE.md`: admin-configurable content and safe source changes.
 - `docs/ROADMAP.md`: proposed implementation sequence and decision gates.
 - `docs/OPERATIONS_POSTGRES.md`: PostgreSQL backup and restore procedures, including locally stored product images and Data Protection keys.
 - `AGENTS.md`: project-specific instructions for future Codex work.

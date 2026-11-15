@@ -35,17 +35,17 @@ Built-in email/password accounts, secure cookies, anti-forgery protection, locko
 
 Acceptance: protected operations enforce authorization server-side, validate inputs, and produce audit records where required.
 
-## Stage 4 — Localization and presentation settings (localization content slice complete)
+## Stage 4 — Localization and presentation settings (localization and theme controls complete)
 
 The storefront language selector supports English, Bangla, and Spanish, remembers the visitor's selection, and loads localized product/storefront text from the API. English is the default and per-field fallback. Administrators can edit translations for product names/descriptions, variants, attribute groups/options, store branding, sale labels, WhatsApp copy, and trust/service details. UI-language strings ship with the application. Currency conversion/configuration and theme editing/preview remain future work and retain their open decisions.
 
-Acceptance: storefront UI and configured content can be presented in the three supported languages. Currency conversion and theme acceptance remain pending.
+Acceptance: storefront UI and configured content can be presented in the three supported languages. Storefront color pickers and constrained font-size controls have a live preview and persistent settings; arbitrary CSS entry is intentionally unsupported. Currency conversion remains pending.
 
 ## Stage 5 — Installation and supported hosting
 
 Design the guided installer and upgrade path, then document deployment, TLS certificate provisioning and renewal, trusted proxy configuration, backups, restores, and minimum server requirements for the approved IIS, Linux, and Docker targets.
 
-The current PostgreSQL backup/restore runbook is documented in `docs/OPERATIONS_POSTGRES.md`. It covers logical database dumps and the local product-media and Data Protection directories. It does not claim point-in-time recovery or a supported hosted deployment topology.
+The manual local-development setup is documented in `docs/INSTALLATION_GUIDE.md`; it is not a guided installer or production deployment guide. PostgreSQL logical backup/restore is documented in `docs/OPERATIONS_POSTGRES.md`, including local product media and Data Protection keys. Point-in-time recovery and a supported hosted deployment topology remain unimplemented.
 
 Acceptance: a clean installation and a supported upgrade can be completed from documented steps without editing application source; public API traffic requires trusted HTTPS.
 
@@ -57,6 +57,6 @@ Acceptance: the published support matrix matches verified provider capabilities.
 
 ## Stage 7 — Commercial release readiness
 
-Automated CI now runs the API workflow tests, persistence tests, storefront tests, and production frontend build for pushes and pull requests. Complete end-to-end, security, installation, upgrade, and deployment verification. Prepare administrator, installation, customization, and API documentation; packaging; licensing behavior if approved; support/update policy; and target-market review. SQL Server integration tests remain opt-in until CI has a disposable SQL Server service configured.
+Automated CI now runs the API workflow tests, persistence tests, storefront tests, and production frontend build for pushes and pull requests. Administrator operations, current API routes, manual local installation, and customization are documented in `docs/ADMINISTRATOR_GUIDE.md`, `docs/API_CONTRACTS.md`, `docs/INSTALLATION_GUIDE.md`, and `docs/CUSTOMIZATION_GUIDE.md`. Complete end-to-end, security, production installation, upgrade, and deployment verification; packaging; licensing behavior if approved; support/update policy; and target-market review. SQL Server integration tests remain opt-in until CI has a disposable SQL Server service configured.
 
 Acceptance: release artifacts can be installed and operated using the supplied documentation, with no placeholder user-facing or security-critical flows.

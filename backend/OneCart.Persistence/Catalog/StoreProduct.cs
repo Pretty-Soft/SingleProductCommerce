@@ -20,6 +20,24 @@ public sealed class StoreProduct
 
     public string StorefrontSubtitle { get; set; } = string.Empty;
 
+    public string ThemePrimaryColor { get; set; } = "#242020";
+
+    public string ThemeAccentColor { get; set; } = "#c17b88";
+
+    public string ThemeTextColor { get; set; } = "#282326";
+
+    public string ThemeMutedTextColor { get; set; } = "#777078";
+
+    public string ThemeBackgroundColor { get; set; } = "#fbf8f8";
+
+    public string ThemeSurfaceColor { get; set; } = "#ffffff";
+
+    public string ThemeBorderColor { get; set; } = "#eee5e8";
+
+    public int ThemeProductTitleFontSizePx { get; set; } = 15;
+
+    public int ThemeDetailsFontSizePx { get; set; } = 13;
+
     public string CurrencyCode { get; set; } = "";
 
     public bool FlashSaleEnabled { get; set; }

@@ -102,7 +102,10 @@ public sealed class StorefrontCatalogService(StoreDbContext database)
                 .Select(item => new StorefrontTrustItemResponse(
                     Store($"trust.{item.Id}.title", item.Title),
                     Store($"trust.{item.Id}.description", item.Description)))
-                .ToArray());
+                .ToArray(),
+            new StorefrontThemeResponse(product.ThemePrimaryColor, product.ThemeAccentColor, product.ThemeTextColor,
+                product.ThemeMutedTextColor, product.ThemeBackgroundColor, product.ThemeSurfaceColor, product.ThemeBorderColor,
+                product.ThemeProductTitleFontSizePx, product.ThemeDetailsFontSizePx));
     }
 
     public static decimal CalculateSalePrice(decimal price, string discountType, decimal discountValue)

@@ -69,8 +69,8 @@ The project should be developed with human review and release quality in mind. C
 - Support English (`en`), Bangla (`bn`), and Spanish (`es`) storefront languages. English is the default and fallback; storefront interface labels ship in all three languages, and administrators maintain translated product and storefront content.
 - The administrator selects one active currency for the whole store. A cart line retains both its numeric unit price and currency from when it was added. COD orders cannot mix currencies and currency conversion is not performed.
 - After initial product/currency setup, changing the store currency is locked until the owner defines the price-conversion rule. Existing order currency and totals remain historical snapshots.
-- Provide a dynamic theme system for colors, typography, layouts, and live preview.
-- **Open decision:** Currency catalog and rounding rules; the owner-provided conversion rule for changing existing product prices when the store currency changes; theme customization boundaries.
+- Provide administrator UI controls for storefront colors and constrained typography sizes, with a live preview. Product titles are limited to 14–16 px and details to 12–14 px. Admins cannot enter custom CSS or arbitrary style rules; layout remains application-controlled.
+- **Open decision:** Currency catalog and rounding rules; the owner-provided conversion rule for changing existing product prices when the store currency changes.
 
 ### Installation and hosting
 
@@ -143,7 +143,6 @@ These are recommendations for a maintainable first release, not finalized produc
 - Which additional database providers, beyond the confirmed first-release PostgreSQL provider, are required for release.
 - Whether “hybrid” means multiple providers used together, relational plus document storage, or another deployment pattern.
 - How the owner-provided conversion rule will translate existing product prices when the admin changes the one active store currency. Historical order totals and their currencies remain unchanged.
-- Theme customization boundaries and whether custom CSS is allowed.
 - Installer and upgrade strategy for IIS, Linux, and Docker.
 - Certificate provisioning, renewal, and trusted reverse-proxy addresses for supported hosting environments.
 - License activation behavior, offline installations, and local resale obligations.

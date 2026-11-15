@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { CSSProperties, FormEvent, useEffect, useState } from "react";
 import AdminApp from "./AdminApp";
 import { getMediaUrl, getPublishedProduct, placeStoreOrder, quoteCartSelection, StorefrontProduct, StoreOrderConfirmation } from "./storeApi";
 import { addCartSelection, CartLine, changeCartSelectionQuantity, removeCartSelection } from "./cart";
@@ -187,7 +187,17 @@ function Storefront() {
   }
 
   return (
-    <main className="page">
+    <main className="page" style={product ? {
+      "--theme-primary": product.theme.primaryColor,
+      "--theme-accent": product.theme.accentColor,
+      "--theme-text": product.theme.textColor,
+      "--theme-muted": product.theme.mutedTextColor,
+      "--theme-background": product.theme.backgroundColor,
+      "--theme-surface": product.theme.surfaceColor,
+      "--theme-border": product.theme.borderColor,
+      "--theme-title-size": `${product.theme.productTitleFontSizePx}px`,
+      "--theme-details-size": `${product.theme.detailsFontSizePx}px`
+    } as CSSProperties : undefined}>
       <header className="topbar">
         <a className="brand" href="/" aria-label={`${product?.brandName ?? "Pretty Shop"} home`}>
           {product?.brandLogoUrl

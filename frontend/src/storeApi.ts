@@ -22,6 +22,19 @@ export interface StorefrontProduct {
   images: StorefrontProductImage[];
   brandLogoUrl: string | null;
   trustItems: StorefrontTrustItem[];
+  theme: StorefrontTheme;
+}
+
+export interface StorefrontTheme {
+  primaryColor: string;
+  accentColor: string;
+  textColor: string;
+  mutedTextColor: string;
+  backgroundColor: string;
+  surfaceColor: string;
+  borderColor: string;
+  productTitleFontSizePx: number;
+  detailsFontSizePx: number;
 }
 
 export interface CartPriceQuote {

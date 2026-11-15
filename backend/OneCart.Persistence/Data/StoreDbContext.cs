@@ -64,6 +64,15 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
         products.Property(product => product.BrandName).HasMaxLength(120).HasDefaultValue("OneCart").IsRequired();
         products.Property(product => product.StorefrontHeadline).HasMaxLength(200).IsRequired();
         products.Property(product => product.StorefrontSubtitle).HasMaxLength(500).IsRequired();
+        products.Property(product => product.ThemePrimaryColor).HasMaxLength(7).HasDefaultValue("#242020").IsRequired();
+        products.Property(product => product.ThemeAccentColor).HasMaxLength(7).HasDefaultValue("#c17b88").IsRequired();
+        products.Property(product => product.ThemeTextColor).HasMaxLength(7).HasDefaultValue("#282326").IsRequired();
+        products.Property(product => product.ThemeMutedTextColor).HasMaxLength(7).HasDefaultValue("#777078").IsRequired();
+        products.Property(product => product.ThemeBackgroundColor).HasMaxLength(7).HasDefaultValue("#fbf8f8").IsRequired();
+        products.Property(product => product.ThemeSurfaceColor).HasMaxLength(7).HasDefaultValue("#ffffff").IsRequired();
+        products.Property(product => product.ThemeBorderColor).HasMaxLength(7).HasDefaultValue("#eee5e8").IsRequired();
+        products.Property(product => product.ThemeProductTitleFontSizePx).HasDefaultValue(15).IsRequired();
+        products.Property(product => product.ThemeDetailsFontSizePx).HasDefaultValue(13).IsRequired();
         products.Property(product => product.CurrencyCode).HasMaxLength(3).IsRequired();
         products.Property(product => product.FlashSaleLabel).HasMaxLength(100).IsRequired();
         products.Property(product => product.FlashSaleDiscountType).HasMaxLength(20).HasDefaultValue("percentage").IsRequired();

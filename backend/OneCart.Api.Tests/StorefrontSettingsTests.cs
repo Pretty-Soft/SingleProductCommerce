@@ -51,7 +51,8 @@ public sealed class StorefrontSettingsTests
         var request = new StorefrontSettingsRequest(
             "Pretty Shop", "Your trust, Your Love", "Subtitle",
             new AdminFlashSaleRequest(false, "", "percentage", 0, null, null),
-            true, true, "+15551234567", "Ask us about this product", []);
+            true, true, "+15551234567", "Ask us about this product", [],
+            Theme: new StorefrontThemeRequest("#171717", "#d17e8e", "#282326", "#777078", "#fbf8f8", "#ffffff", "#eee5e8", 16, 12));
         var result = await new StorefrontSettingsService(database).SaveAsync(
             request, Guid.NewGuid(), "owner@example.test", CancellationToken.None);
 
@@ -62,7 +63,41 @@ public sealed class StorefrontSettingsTests
         Assert.Equal("Product description", product.Description);
         Assert.Equal("PC-1", variant.Sku);
         Assert.Equal(8, variant.StockQuantity);
+        Assert.Equal("#d17e8e", result.Settings.Theme.AccentColor);
+        Assert.Equal(16, result.Settings.Theme.ProductTitleFontSizePx);
+        Assert.Equal(12, result.Settings.Theme.DetailsFontSizePx);
         Assert.Contains(database.AdminAuditEvents, item => item.Action == "storefront.settings.update");
+    }
+
+    [Fact]
+    public async Task StoreManagerSettingsRejectInvalidThemeColorsAndFontSizes()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<StoreDbContext>().UseSqlite(connection).Options;
+        await using var database = new StoreDbContext(options);
+        await database.Database.EnsureCreatedAsync();
+        database.Products.Add(new StoreProduct
+        {
+            Id = Guid.NewGuid(), Name = "Computer", Slug = "computer", CurrencyCode = "USD",
+            CreatedAtUtc = DateTimeOffset.UtcNow, UpdatedAtUtc = DateTimeOffset.UtcNow
+        });
+        await database.SaveChangesAsync();
+
+        var request = new StorefrontSettingsRequest(
+            "Pretty Shop", "", "",
+            new AdminFlashSaleRequest(false, "", "percentage", 0, null, null),
+            true, false, "", "", [],
+            Theme: new StorefrontThemeRequest("red", "#c17b88", "#282326", "#777078", "#fbf8f8", "#ffffff", "#eee5e8", 18, 10));
+        var result = await new StorefrontSettingsService(database).SaveAsync(
+            request, Guid.NewGuid(), "owner@example.test", CancellationToken.None);
+
+        Assert.NotNull(result.Errors);
+        Assert.Contains("Theme.PrimaryColor", result.Errors.Keys);
+        Assert.Contains("Theme.ProductTitleFontSizePx", result.Errors.Keys);
+        Assert.Contains("Theme.DetailsFontSizePx", result.Errors.Keys);
+        Assert.Equal("#242020", (await database.Products.SingleAsync()).ThemePrimaryColor);
+        Assert.Empty(database.AdminAuditEvents);
     }
 
     [Fact]

@@ -29,6 +29,8 @@ public sealed class StorefrontSettingsService(StoreDbContext database)
             .SingleOrDefaultAsync(cancellationToken);
         if (product is null) return StorefrontSettingsSaveResult.NotFound();
 
+        var theme = request.Theme ?? StorefrontThemeRequest.Default;
+        request = request with { Theme = theme };
         var errors = Validate(request, product);
         if (errors.Count > 0) return StorefrontSettingsSaveResult.Invalid(errors);
 
@@ -36,6 +38,15 @@ public sealed class StorefrontSettingsService(StoreDbContext database)
         product.BrandName = request.BrandName.Trim();
         product.StorefrontHeadline = request.StorefrontHeadline?.Trim() ?? string.Empty;
         product.StorefrontSubtitle = request.StorefrontSubtitle?.Trim() ?? string.Empty;
+        product.ThemePrimaryColor = request.Theme.PrimaryColor;
+        product.ThemeAccentColor = request.Theme.AccentColor;
+        product.ThemeTextColor = request.Theme.TextColor;
+        product.ThemeMutedTextColor = request.Theme.MutedTextColor;
+        product.ThemeBackgroundColor = request.Theme.BackgroundColor;
+        product.ThemeSurfaceColor = request.Theme.SurfaceColor;
+        product.ThemeBorderColor = request.Theme.BorderColor;
+        product.ThemeProductTitleFontSizePx = request.Theme.ProductTitleFontSizePx;
+        product.ThemeDetailsFontSizePx = request.Theme.DetailsFontSizePx;
         product.StorefrontTranslationsJson = CatalogTranslations.Serialize(request.StorefrontTranslations);
         product.FlashSaleEnabled = request.FlashSale.Enabled;
         product.FlashSaleLabel = request.FlashSale.Label?.Trim() ?? string.Empty;
@@ -109,6 +120,30 @@ public sealed class StorefrontSettingsService(StoreDbContext database)
         if ((request.StorefrontSubtitle?.Length ?? 0) > 500)
             Add(nameof(request.StorefrontSubtitle), "Subtitle must be 500 characters or fewer.");
 
+        if (request.Theme is null)
+        {
+            Add(nameof(request.Theme), "Theme settings are required.");
+        }
+        else
+        {
+            foreach (var (field, value) in new[]
+            {
+                (nameof(request.Theme.PrimaryColor), request.Theme.PrimaryColor),
+                (nameof(request.Theme.AccentColor), request.Theme.AccentColor),
+                (nameof(request.Theme.TextColor), request.Theme.TextColor),
+                (nameof(request.Theme.MutedTextColor), request.Theme.MutedTextColor),
+                (nameof(request.Theme.BackgroundColor), request.Theme.BackgroundColor),
+                (nameof(request.Theme.SurfaceColor), request.Theme.SurfaceColor),
+                (nameof(request.Theme.BorderColor), request.Theme.BorderColor)
+            })
+                if (!System.Text.RegularExpressions.Regex.IsMatch(value ?? string.Empty, "^#[0-9A-Fa-f]{6}$"))
+                    Add($"Theme.{field}", "Choose a valid six-digit color.");
+            if (request.Theme.ProductTitleFontSizePx is < 14 or > 16)
+                Add("Theme.ProductTitleFontSizePx", "Product title size must be between 14 and 16 pixels.");
+            if (request.Theme.DetailsFontSizePx is < 12 or > 14)
+                Add("Theme.DetailsFontSizePx", "Details size must be between 12 and 14 pixels.");
+        }
+
         if (request.FlashSale is null)
         {
             Add(nameof(request.FlashSale), "Flash-sale settings are required.");
@@ -169,7 +204,10 @@ public sealed class StorefrontSettingsService(StoreDbContext database)
         product.Images.Where(image => image.MediaKind == "logo")
             .Select(image => new ProductImageResponse(image.Id, "/api/v1/store/product/images/" + image.Id, image.MediaKind, image.AltText, image.DisplayOrder)).SingleOrDefault(),
         product.TrustItems.OrderBy(item => item.DisplayOrder)
-            .Select(item => new AdminProductTrustItemResponse(item.Id, item.Title, item.Description, item.IsActive, item.DisplayOrder)).ToArray());
+            .Select(item => new AdminProductTrustItemResponse(item.Id, item.Title, item.Description, item.IsActive, item.DisplayOrder)).ToArray(),
+        new StorefrontThemeRequest(product.ThemePrimaryColor, product.ThemeAccentColor, product.ThemeTextColor,
+            product.ThemeMutedTextColor, product.ThemeBackgroundColor, product.ThemeSurfaceColor, product.ThemeBorderColor,
+            product.ThemeProductTitleFontSizePx, product.ThemeDetailsFontSizePx));
 }
 
 public sealed record StorefrontSettingsRequest(
@@ -182,7 +220,17 @@ public sealed record StorefrontSettingsRequest(
     string? WhatsAppPhoneNumber,
     string? WhatsAppPrefillMessage,
     IReadOnlyList<AdminProductTrustItemRequest> TrustItems,
-    Dictionary<string, Dictionary<string, string>>? StorefrontTranslations = null);
+    Dictionary<string, Dictionary<string, string>>? StorefrontTranslations = null,
+    StorefrontThemeRequest? Theme = null);
+
+public sealed record StorefrontThemeRequest(
+    string PrimaryColor, string AccentColor, string TextColor, string MutedTextColor,
+    string BackgroundColor, string SurfaceColor, string BorderColor,
+    int ProductTitleFontSizePx, int DetailsFontSizePx)
+{
+    public static StorefrontThemeRequest Default { get; } = new(
+        "#242020", "#c17b88", "#282326", "#777078", "#fbf8f8", "#ffffff", "#eee5e8", 15, 13);
+}
 
 public sealed record StorefrontSettingsResponse(
     string BrandName,
@@ -195,7 +243,8 @@ public sealed record StorefrontSettingsResponse(
     string WhatsAppPhoneNumber,
     string WhatsAppPrefillMessage,
     ProductImageResponse? BrandLogo,
-    IReadOnlyList<AdminProductTrustItemResponse> TrustItems);
+    IReadOnlyList<AdminProductTrustItemResponse> TrustItems,
+    StorefrontThemeRequest Theme);
 
 public sealed record StorefrontSettingsSaveResult(StorefrontSettingsResponse? Settings, Dictionary<string, string[]>? Errors, bool IsNotFound)
 {

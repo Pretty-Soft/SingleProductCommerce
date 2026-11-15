@@ -16,7 +16,19 @@ public sealed record StorefrontProductResponse(
     string? WhatsAppContactUrl,
     IReadOnlyList<ProductImageResponse> Images,
     string? BrandLogoUrl,
-    IReadOnlyList<StorefrontTrustItemResponse> TrustItems);
+    IReadOnlyList<StorefrontTrustItemResponse> TrustItems,
+    StorefrontThemeResponse Theme);
+
+public sealed record StorefrontThemeResponse(
+    string PrimaryColor,
+    string AccentColor,
+    string TextColor,
+    string MutedTextColor,
+    string BackgroundColor,
+    string SurfaceColor,
+    string BorderColor,
+    int ProductTitleFontSizePx,
+    int DetailsFontSizePx);
 
 public sealed record StorefrontVariantResponse(
     Guid Id,

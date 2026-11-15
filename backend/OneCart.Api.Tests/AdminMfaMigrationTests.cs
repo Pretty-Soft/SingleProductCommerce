@@ -29,4 +29,16 @@ public sealed class AdminMfaMigrationTests
 
         Assert.Contains(migrationId, database.Database.GetMigrations());
     }
+
+    [Theory]
+    [InlineData(StoreDatabaseProvider.PostgreSql, "20261115193000_StorefrontTheme")]
+    [InlineData(StoreDatabaseProvider.SqlServer, "20261115193010_StorefrontTheme")]
+    public void ProviderMigrationAssemblyDiscoversStorefrontTheme(string provider, string migrationId)
+    {
+        var options = new DbContextOptionsBuilder<StoreDbContext>();
+        StoreDatabaseProvider.Configure(options, provider, "unused migration discovery connection");
+        using var database = new StoreDbContext(options.Options);
+
+        Assert.Contains(migrationId, database.Database.GetMigrations());
+    }
 }

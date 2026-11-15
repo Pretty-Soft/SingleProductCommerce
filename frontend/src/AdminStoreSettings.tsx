@@ -14,12 +14,14 @@ interface Settings {
   brandLogo: { id: string; altText: string } | null;
   trustItems: TrustItem[];
   storefrontTranslations: Record<string, Record<string, string>>;
+  theme: { primaryColor: string; accentColor: string; textColor: string; mutedTextColor: string; backgroundColor: string; surfaceColor: string; borderColor: string; productTitleFontSizePx: number; detailsFontSizePx: number };
 }
 
 const emptySettings: Settings = {
   brandName: "Pretty Shop", storefrontHeadline: "", storefrontSubtitle: "",
   flashSale: { enabled: false, label: "", discountType: "percentage", discountValue: 10, startsAtUtc: null, endsAtUtc: null },
-  socialSharingEnabled: true, whatsAppEnabled: false, whatsAppPhoneNumber: "", whatsAppPrefillMessage: "Hello, I have a question about this product.", brandLogo: null, trustItems: [], storefrontTranslations: {}
+  socialSharingEnabled: true, whatsAppEnabled: false, whatsAppPhoneNumber: "", whatsAppPrefillMessage: "Hello, I have a question about this product.", brandLogo: null, trustItems: [], storefrontTranslations: {},
+  theme: { primaryColor: "#242020", accentColor: "#c17b88", textColor: "#282326", mutedTextColor: "#777078", backgroundColor: "#fbf8f8", surfaceColor: "#ffffff", borderColor: "#eee5e8", productTitleFontSizePx: 15, detailsFontSizePx: 13 }
 };
 
 const translationLanguages = [{ code: "bn", label: "Bangla" }, { code: "es", label: "Spanish" }] as const;
@@ -62,6 +64,10 @@ export default function AdminStoreSettings() {
       ...current.storefrontTranslations,
       [language]: { ...current.storefrontTranslations[language], [key]: value }
     } }));
+  }
+
+  function updateTheme<K extends keyof Settings["theme"]>(key: K, value: Settings["theme"][K]) {
+    setSettings(current => ({ ...current, theme: { ...current.theme, [key]: value } }));
   }
 
   async function uploadLogo() {
@@ -112,6 +118,20 @@ export default function AdminStoreSettings() {
       <label>Brand name<input maxLength={120} required value={settings.brandName} onChange={event => setSettings(current => ({ ...current, brandName: event.target.value }))} /></label>
       <label>Headline<input maxLength={200} value={settings.storefrontHeadline} onChange={event => setSettings(current => ({ ...current, storefrontHeadline: event.target.value }))} /></label>
       <label className="admin-field-wide">Subtitle<input maxLength={500} value={settings.storefrontSubtitle} onChange={event => setSettings(current => ({ ...current, storefrontSubtitle: event.target.value }))} /></label>
+      <fieldset className="admin-field-wide"><legend>Storefront theme</legend>
+        <p className="admin-muted">Use these controls to change storefront colors and text sizes. Custom CSS is not supported.</p>
+        <div className="admin-form-grid">
+          {([ ["primaryColor", "Primary color"], ["accentColor", "Accent color"], ["textColor", "Text color"], ["mutedTextColor", "Muted text"], ["backgroundColor", "Page background"], ["surfaceColor", "Card background"], ["borderColor", "Borders"] ] as const).map(([key, label]) => <label key={key}>{label}<input type="color" value={settings.theme[key]} onChange={event => updateTheme(key, event.target.value)} /></label>)}
+          <label>Product title size<select value={settings.theme.productTitleFontSizePx} onChange={event => updateTheme("productTitleFontSizePx", Number(event.target.value))}>{[14, 15, 16].map(size => <option key={size} value={size}>{size}px</option>)}</select></label>
+          <label>Details text size<select value={settings.theme.detailsFontSizePx} onChange={event => updateTheme("detailsFontSizePx", Number(event.target.value))}>{[12, 13, 14].map(size => <option key={size} value={size}>{size}px</option>)}</select></label>
+        </div>
+        <div className="theme-preview" style={{ color: settings.theme.textColor, background: settings.theme.backgroundColor, borderColor: settings.theme.borderColor }}>
+          <strong style={{ color: settings.theme.primaryColor, fontSize: `${settings.theme.productTitleFontSizePx}px` }}>{settings.brandName || "Store name"}</strong>
+          <p style={{ color: settings.theme.mutedTextColor, fontSize: `${settings.theme.detailsFontSizePx}px` }}>{settings.storefrontHeadline || "Storefront headline preview"}</p>
+          <button type="button" style={{ background: settings.theme.primaryColor }}>Preview button</button>
+          <span style={{ background: settings.theme.surfaceColor, borderColor: settings.theme.borderColor, color: settings.theme.accentColor }}>Preview card</span>
+        </div>
+      </fieldset>
       <fieldset className="admin-field-wide"><legend>Storefront translations</legend><p className="admin-muted">English is the default and fallback. Blank translations display the English text.</p>
         {translationLanguages.map(language => <div className="admin-form-grid" key={language.code}>
           <label>{language.label} brand name<input maxLength={120} value={settings.storefrontTranslations[language.code]?.["store.brandName"] ?? ""} onChange={event => updateTranslation(language.code, "store.brandName", event.target.value)} /></label>

@@ -553,6 +553,16 @@ namespace OneCart.Api.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("ThemePrimaryColor").IsRequired().ValueGeneratedOnAdd().HasMaxLength(7).HasColumnType("character varying(7)").HasDefaultValue("#242020");
+                    b.Property<string>("ThemeAccentColor").IsRequired().ValueGeneratedOnAdd().HasMaxLength(7).HasColumnType("character varying(7)").HasDefaultValue("#c17b88");
+                    b.Property<string>("ThemeTextColor").IsRequired().ValueGeneratedOnAdd().HasMaxLength(7).HasColumnType("character varying(7)").HasDefaultValue("#282326");
+                    b.Property<string>("ThemeMutedTextColor").IsRequired().ValueGeneratedOnAdd().HasMaxLength(7).HasColumnType("character varying(7)").HasDefaultValue("#777078");
+                    b.Property<string>("ThemeBackgroundColor").IsRequired().ValueGeneratedOnAdd().HasMaxLength(7).HasColumnType("character varying(7)").HasDefaultValue("#fbf8f8");
+                    b.Property<string>("ThemeSurfaceColor").IsRequired().ValueGeneratedOnAdd().HasMaxLength(7).HasColumnType("character varying(7)").HasDefaultValue("#ffffff");
+                    b.Property<string>("ThemeBorderColor").IsRequired().ValueGeneratedOnAdd().HasMaxLength(7).HasColumnType("character varying(7)").HasDefaultValue("#eee5e8");
+                    b.Property<int>("ThemeProductTitleFontSizePx").ValueGeneratedOnAdd().HasColumnType("integer").HasDefaultValue(15);
+                    b.Property<int>("ThemeDetailsFontSizePx").ValueGeneratedOnAdd().HasColumnType("integer").HasDefaultValue(13);
+
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
