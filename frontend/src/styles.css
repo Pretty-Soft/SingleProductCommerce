@@ -2480,13 +2480,34 @@ footer {
   font-weight: 780;
   line-height: 1.2;
   overflow-wrap: anywhere;
+  padding-bottom: 6px;
+  position: relative;
+}
+.store-brand-heading .brand-name::after {
+  background: var(--theme-accent, #c17b88);
+  border-radius: 99px;
+  bottom: 0;
+  content: "";
+  height: 2px;
+  left: 50%;
+  position: absolute;
+  transform: translateX(-50%);
+  width: 38px;
 }
 .store-brand-heading .brand-headline {
   font-size: 0.75rem;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
-.store-header-actions { grid-area: actions; justify-self: end; }
+.store-header-actions { grid-area: actions; justify-self: end; min-width: max-content; }
+.cart-toggle {
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  line-height: 1.15;
+  min-width: max-content;
+  white-space: nowrap;
+}
+.cart-toggle span { flex: 0 0 auto; line-height: 1; }
 
 .store-footer {
   align-items: center;
