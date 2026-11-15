@@ -14,4 +14,12 @@ describe("storefront language support", () => {
       expect(labels.emptyCart.length).toBeGreaterThan(0);
     }
   });
+
+  it("provides about and WhatsApp footer labels in each language", () => {
+    for (const language of storeLanguages) {
+      const labels = storeText(language.code);
+      expect(labels.aboutUs.length).toBeGreaterThan(0);
+      expect(labels.whatsappMessage.length).toBeGreaterThan(0);
+    }
+  });
 });

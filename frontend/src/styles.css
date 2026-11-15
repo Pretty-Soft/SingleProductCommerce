@@ -2450,3 +2450,71 @@ footer {
   .store-footer-links { gap: 13px 18px; }
   .store-copyright { grid-column: auto; }
 }
+
+/* Store identity requested by the shop owner: logo left, name centered, actions right. */
+.topbar {
+  display: grid;
+  grid-template-areas: "logo heading actions";
+  grid-template-columns: minmax(0, 1fr) minmax(220px, auto) minmax(0, 1fr);
+}
+.brand-logo-link {
+  align-items: center;
+  display: inline-flex;
+  grid-area: logo;
+  justify-self: start;
+  min-width: 0;
+}
+.store-brand-heading {
+  display: grid;
+  gap: 4px;
+  grid-area: heading;
+  justify-items: center;
+  max-width: 540px;
+  min-width: 0;
+  text-align: center;
+}
+.store-brand-heading .brand-name {
+  font-size: clamp(0.96rem, 1.35vw, 1.14rem);
+  font-weight: 780;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.store-brand-heading .brand-headline {
+  font-size: 0.75rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.store-header-actions { grid-area: actions; justify-self: end; }
+
+.store-footer {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  padding-block: 20px;
+}
+.store-copyright { flex: 1; grid-column: auto; margin: 0; }
+.store-footer-links { justify-content: flex-end; }
+.store-footer-links .footer-whatsapp { align-items: center; display: inline-flex; gap: 7px; }
+.store-footer-links .whatsapp-icon { height: 18px; width: 18px; }
+
+@media (max-width: 600px) {
+  .topbar {
+    grid-template-areas: "logo heading actions";
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+  }
+  .brand-mark { height: 34px; width: 34px; }
+  .brand-logo { max-width: 72px; }
+  .store-brand-heading .brand-name { font-size: 0.9rem; }
+  .store-brand-heading .brand-headline { font-size: 0.67rem; }
+}
+
+@media (max-width: 470px) {
+  .topbar {
+    grid-template-areas: "logo heading" "actions actions";
+    grid-template-columns: 36px minmax(0, 1fr);
+    row-gap: 10px;
+  }
+  .store-header-actions { justify-self: center; }
+  .store-footer { align-items: flex-start; flex-direction: column; gap: 13px; }
+  .store-footer-links { align-self: center; justify-content: center; }
+}
