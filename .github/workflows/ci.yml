@@ -17,7 +17,9 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - name: Restore
-        run: dotnet restore backend/OneCart.Api.Tests/OneCart.Api.Tests.csproj
+        run: |
+          dotnet restore backend/OneCart.Api.Tests/OneCart.Api.Tests.csproj
+          dotnet restore backend/OneCart.Persistence.Tests/OneCart.Persistence.Tests.csproj
       - name: Run API workflow tests
         run: dotnet test backend/OneCart.Api.Tests/OneCart.Api.Tests.csproj --no-restore --configuration Release
       - name: Run persistence tests
