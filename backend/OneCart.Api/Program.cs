@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using OneCart.Api;
 using OneCart.Api.Admin;
 using OneCart.Api.Catalog;
 using OneCart.Api.Data;
@@ -113,16 +114,9 @@ builder.Services.AddAntiforgery(options =>
     options.Cookie.SameSite = SameSiteMode.None;
 });
 
-var allowedAdminOrigins = builder.Configuration
-    .GetSection("Cors:AllowedOrigins")
-    .Get<string[]>() ?? [];
-if (builder.Environment.IsDevelopment())
-{
-    allowedAdminOrigins = allowedAdminOrigins
-        .Concat(["http://localhost:5173", "http://127.0.0.1:5173"])
-        .Distinct(StringComparer.OrdinalIgnoreCase)
-        .ToArray();
-}
+var allowedAdminOrigins = CorsOriginConfiguration.GetAllowedOrigins(
+    builder.Configuration,
+    builder.Environment.IsDevelopment());
 
 builder.Services.AddCors(options => options.AddPolicy("AdminUi", policy =>
 {

@@ -11,6 +11,13 @@ This is the current manual installation path for local development. A guided web
 
 PostgreSQL is the default and first-release provider. SQL Server has an experimental local path and is not a supported release provider. The Visual Studio Development launch profiles select SQL Server; configure `ConnectionStrings:Store` in .NET user-secrets for your local instance. The normal provider default in code remains PostgreSQL.
 
+For a local SQL Server instance, configure the provider and connection string in user-secrets. Keep the password out of launch settings and source control:
+
+```powershell
+dotnet user-secrets set --project backend/OneCart.Api "Database:Provider" "SqlServer"
+dotnet user-secrets set --project backend/OneCart.Api "ConnectionStrings:Store" "Data Source=localhost\SQLEXPRESS;Initial Catalog=OneCartCommerce;User ID=YOUR_LOGIN;Password=YOUR_PASSWORD;Encrypt=False;TrustServerCertificate=True"
+```
+
 ## Configure PostgreSQL
 
 Create an empty database and configure its connection string in .NET user secrets. Update the username/password to match the local PostgreSQL instance. Do not put credentials in `appsettings.json`, `.env`, or Git.
@@ -51,7 +58,7 @@ $env:ASPNETCORE_ENVIRONMENT = 'Development'
 dotnet run --project backend/OneCart.Api
 ```
 
-In Development, API startup applies pending PostgreSQL migrations automatically. Restart the API after pulling schema changes; production deployments should apply reviewed migrations through the operator's release process.
+In Development, API startup applies pending migrations for the selected provider automatically. Restart the API after pulling schema changes; production deployments should apply reviewed migrations through the operator's release process.
 
 Run the storefront from a second terminal:
 
@@ -61,7 +68,7 @@ npm ci
 npm run dev
 ```
 
-The default local URLs are `https://localhost:7241` for the API and `http://127.0.0.1:5173` for the storefront. The API rejects plain HTTP requests. Set `VITE_API_BASE_URL` only to an HTTPS API URL. Stop a running API process before rebuilding the same configuration in Visual Studio; a running .NET process may hold its output assemblies open. Alternatively, use separate Debug and Release outputs for concurrent runs.
+The API URL is `https://localhost:7241`. Vite normally serves the storefront at `http://127.0.0.1:5173`; if that port is occupied, it may select `http://127.0.0.1:5174`. Development CORS explicitly allows those two ports on `localhost` and `127.0.0.1`. The API rejects plain HTTP requests. Set `VITE_API_BASE_URL` only to an HTTPS API URL. Stop a running API process before rebuilding the same configuration in Visual Studio; a running .NET process may hold its output assemblies open. Alternatively, use separate Debug and Release outputs for concurrent runs.
 
 ## Local files and operational settings
 

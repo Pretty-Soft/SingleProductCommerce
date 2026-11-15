@@ -113,10 +113,12 @@ public sealed class SqlServerCatalogIntegrationTests
 
             var publicImage = await mediaService.OpenPublishedImageAsync(image.Id, CancellationToken.None);
             Assert.NotNull(publicImage);
-            await using var content = publicImage!.Content;
-            await using var copy = new MemoryStream();
-            await content.CopyToAsync(copy);
-            Assert.Equal(pngSignature, copy.ToArray());
+            await using (var content = publicImage!.Content)
+            await using (var copy = new MemoryStream())
+            {
+                await content.CopyToAsync(copy);
+                Assert.Equal(pngSignature, copy.ToArray());
+            }
 
             var update = await mediaService.UpdateAsync(image.Id, "Updated product front", 3, Guid.NewGuid(), "media@onecart.local", CancellationToken.None);
             Assert.Equal("Updated product front", update.Image?.AltText);
