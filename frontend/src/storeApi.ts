@@ -13,6 +13,7 @@ export interface StorefrontProduct {
   currencyCode: string;
   brandName: string;
   storefrontHeadline: string;
+  aboutUs: string;
   storefrontSubtitle: string;
   variants: StorefrontVariant[];
   attributeGroups: StorefrontAttributeGroup[];

@@ -68,6 +68,7 @@ public sealed class StorefrontCatalogService(StoreDbContext database)
             product.CurrencyCode,
             Store("store.brandName", product.BrandName),
             Store("store.headline", product.StorefrontHeadline),
+            Store("store.aboutUs", product.AboutUs),
             Store("store.subtitle", product.StorefrontSubtitle),
             variants,
             product.AttributeGroups

@@ -5,6 +5,7 @@ interface TrustItem { id: string | null; title: string; description: string; isA
 interface Settings {
   brandName: string;
   storefrontHeadline: string;
+  aboutUs: string;
   storefrontSubtitle: string;
   flashSale: { enabled: boolean; label: string; discountType: "percentage" | "fixedAmount"; discountValue: number; startsAtUtc: string | null; endsAtUtc: string | null };
   socialSharingEnabled: boolean;
@@ -12,15 +13,16 @@ interface Settings {
   whatsAppPhoneNumber: string;
   whatsAppPrefillMessage: string;
   brandLogo: { id: string; altText: string } | null;
+  productImages: Array<{ id: string; url: string; mediaKind: "product"; altText: string; displayOrder: number }>;
   trustItems: TrustItem[];
   storefrontTranslations: Record<string, Record<string, string>>;
   theme: { primaryColor: string; accentColor: string; textColor: string; mutedTextColor: string; backgroundColor: string; surfaceColor: string; borderColor: string; productTitleFontSizePx: number; detailsFontSizePx: number };
 }
 
 const emptySettings: Settings = {
-  brandName: "Pretty Shop", storefrontHeadline: "", storefrontSubtitle: "",
+  brandName: "Pretty Shop", storefrontHeadline: "", aboutUs: "", storefrontSubtitle: "",
   flashSale: { enabled: false, label: "", discountType: "percentage", discountValue: 10, startsAtUtc: null, endsAtUtc: null },
-  socialSharingEnabled: true, whatsAppEnabled: false, whatsAppPhoneNumber: "", whatsAppPrefillMessage: "Hello, I have a question about this product.", brandLogo: null, trustItems: [], storefrontTranslations: {},
+  socialSharingEnabled: true, whatsAppEnabled: false, whatsAppPhoneNumber: "", whatsAppPrefillMessage: "Hello, I have a question about this product.", brandLogo: null, productImages: [], trustItems: [], storefrontTranslations: {},
   theme: { primaryColor: "#242020", accentColor: "#c17b88", textColor: "#282326", mutedTextColor: "#777078", backgroundColor: "#fbf8f8", surfaceColor: "#ffffff", borderColor: "#eee5e8", productTitleFontSizePx: 15, detailsFontSizePx: 13 }
 };
 
@@ -39,20 +41,33 @@ export default function AdminStoreSettings() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [logoPreview, setLogoPreview] = useState("");
+  const [productImagePreviews, setProductImagePreviews] = useState<Record<string, string>>({});
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoAltText, setLogoAltText] = useState("");
 
   useEffect(() => {
     let active = true;
+    const imageUrls: string[] = [];
     void adminRequest<Settings>("/api/v1/admin/storefront/settings")
       .then(async value => {
         if (!active) return;
         setSettings(value);
-        if (value.brandLogo) setLogoPreview(await loadAdminImagePreview(value.brandLogo.id));
+        if (value.brandLogo) {
+          const preview = await loadAdminImagePreview(value.brandLogo.id).catch(() => "");
+          if (preview) imageUrls.push(preview);
+          if (active) setLogoPreview(preview);
+        }
+        const previews = await Promise.all((value.productImages ?? []).map(async image => {
+          const preview = await loadAdminImagePreview(image.id).catch(() => "");
+          if (preview) imageUrls.push(preview);
+          return [image.id, preview] as const;
+        }));
+        if (active) setProductImagePreviews(Object.fromEntries(previews.filter(([, preview]) => preview)));
+        else imageUrls.forEach(URL.revokeObjectURL);
       })
       .catch(reason => { if (active) setError(reason instanceof Error ? reason.message : "Could not load storefront settings."); })
       .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+    return () => { active = false; imageUrls.forEach(URL.revokeObjectURL); };
   }, []);
 
   function updateSale(changes: Partial<Settings["flashSale"]>) {
@@ -117,6 +132,7 @@ export default function AdminStoreSettings() {
     <form className="admin-form-grid" onSubmit={save}>
       <label>Brand name<input maxLength={120} required value={settings.brandName} onChange={event => setSettings(current => ({ ...current, brandName: event.target.value }))} /></label>
       <label>Headline<input maxLength={200} value={settings.storefrontHeadline} onChange={event => setSettings(current => ({ ...current, storefrontHeadline: event.target.value }))} /></label>
+      <label className="admin-field-wide">About Us<textarea maxLength={5000} rows={5} value={settings.aboutUs} onChange={event => setSettings(current => ({ ...current, aboutUs: event.target.value }))} placeholder="Tell customers about your shop." /></label>
       <label className="admin-field-wide">Subtitle<input maxLength={500} value={settings.storefrontSubtitle} onChange={event => setSettings(current => ({ ...current, storefrontSubtitle: event.target.value }))} /></label>
       <fieldset className="admin-field-wide"><legend>Storefront theme</legend>
         <p className="admin-muted">Use these controls to change storefront colors and text sizes. Custom CSS is not supported.</p>
@@ -126,16 +142,35 @@ export default function AdminStoreSettings() {
           <label>Details text size<select value={settings.theme.detailsFontSizePx} onChange={event => updateTheme("detailsFontSizePx", Number(event.target.value))}>{[12, 13, 14].map(size => <option key={size} value={size}>{size}px</option>)}</select></label>
         </div>
         <div className="theme-preview" style={{ color: settings.theme.textColor, background: settings.theme.backgroundColor, borderColor: settings.theme.borderColor }}>
-          <strong style={{ color: settings.theme.primaryColor, fontSize: `${settings.theme.productTitleFontSizePx}px` }}>{settings.brandName || "Store name"}</strong>
-          <p style={{ color: settings.theme.mutedTextColor, fontSize: `${settings.theme.detailsFontSizePx}px` }}>{settings.storefrontHeadline || "Storefront headline preview"}</p>
-          <button type="button" style={{ background: settings.theme.primaryColor }}>Preview button</button>
-          <span style={{ background: settings.theme.surfaceColor, borderColor: settings.theme.borderColor, color: settings.theme.accentColor }}>Preview card</span>
+          <div className="theme-preview-header">
+            {logoPreview
+              ? <img className="theme-preview-logo" src={logoPreview} alt="" />
+              : <span className="theme-preview-logo-fallback">{(settings.brandName || "S").slice(0, 1).toUpperCase()}</span>}
+            <div className="theme-preview-brand">
+              <strong style={{ color: settings.theme.primaryColor, fontSize: `${settings.theme.productTitleFontSizePx}px`, borderBottom: `2px solid ${settings.theme.accentColor}` }}>{settings.brandName || "Store name"}</strong>
+              <span style={{ color: settings.theme.mutedTextColor, fontSize: `${settings.theme.detailsFontSizePx}px` }}>{settings.storefrontHeadline || "Storefront headline preview"}</span>
+            </div>
+            <button className="theme-preview-cart" type="button"><span>Cart</span><b>0</b></button>
+          </div>
+          <div className="theme-preview-product">
+            <div className="theme-preview-image-zone" style={{ background: settings.theme.surfaceColor, borderColor: settings.theme.borderColor }}>
+              {settings.productImages[0] && productImagePreviews[settings.productImages[0].id]
+                ? <img src={productImagePreviews[settings.productImages[0].id]} alt="" />
+                : <span>Product image area</span>}
+            </div>
+            <div className="theme-preview-card" style={{ background: settings.theme.surfaceColor, borderColor: settings.theme.borderColor }}>
+              <strong style={{ fontSize: `${settings.theme.productTitleFontSizePx}px` }}>{settings.brandName || "Preview card"}</strong>
+              <p style={{ color: settings.theme.mutedTextColor, fontSize: `${settings.theme.detailsFontSizePx}px` }}>{settings.aboutUs || settings.storefrontSubtitle || "Storefront details preview"}</p>
+              <button className="theme-preview-button" type="button" style={{ background: settings.theme.primaryColor }}>Preview button</button>
+            </div>
+          </div>
         </div>
       </fieldset>
       <fieldset className="admin-field-wide"><legend>Storefront translations</legend><p className="admin-muted">English is the default and fallback. Blank translations display the English text.</p>
         {translationLanguages.map(language => <div className="admin-form-grid" key={language.code}>
           <label>{language.label} brand name<input maxLength={120} value={settings.storefrontTranslations[language.code]?.["store.brandName"] ?? ""} onChange={event => updateTranslation(language.code, "store.brandName", event.target.value)} /></label>
           <label>{language.label} headline<input maxLength={200} value={settings.storefrontTranslations[language.code]?.["store.headline"] ?? ""} onChange={event => updateTranslation(language.code, "store.headline", event.target.value)} /></label>
+          <label className="admin-field-wide">{language.label} About Us<textarea maxLength={5000} rows={4} value={settings.storefrontTranslations[language.code]?.["store.aboutUs"] ?? ""} onChange={event => updateTranslation(language.code, "store.aboutUs", event.target.value)} /></label>
           <label>{language.label} subtitle<input maxLength={500} value={settings.storefrontTranslations[language.code]?.["store.subtitle"] ?? ""} onChange={event => updateTranslation(language.code, "store.subtitle", event.target.value)} /></label>
         </div>)}
       </fieldset>

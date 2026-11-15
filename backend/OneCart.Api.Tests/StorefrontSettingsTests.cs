@@ -52,13 +52,16 @@ public sealed class StorefrontSettingsTests
             "Pretty Shop", "Your trust, Your Love", "Subtitle",
             new AdminFlashSaleRequest(false, "", "percentage", 0, null, null),
             true, true, "+15551234567", "Ask us about this product", [],
-            Theme: new StorefrontThemeRequest("#171717", "#d17e8e", "#282326", "#777078", "#fbf8f8", "#ffffff", "#eee5e8", 16, 12));
+            Theme: new StorefrontThemeRequest("#171717", "#d17e8e", "#282326", "#777078", "#fbf8f8", "#ffffff", "#eee5e8", 16, 12),
+            AboutUs: "Thoughtfully selected products for everyday care.");
         var result = await new StorefrontSettingsService(database).SaveAsync(
             request, Guid.NewGuid(), "owner@example.test", CancellationToken.None);
 
         Assert.False(result.IsNotFound);
         Assert.Null(result.Errors);
         Assert.Equal("Pretty Shop", result.Settings!.BrandName);
+        Assert.Equal("Thoughtfully selected products for everyday care.", result.Settings.AboutUs);
+        Assert.Equal(result.Settings.AboutUs, product.AboutUs);
         Assert.Equal("computer", product.Slug);
         Assert.Equal("Product description", product.Description);
         Assert.Equal("PC-1", variant.Sku);

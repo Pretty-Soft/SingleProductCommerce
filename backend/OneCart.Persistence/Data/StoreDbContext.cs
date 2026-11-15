@@ -63,6 +63,7 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
         products.Property(product => product.StorefrontTranslationsJson).HasColumnType(isSqlServer ? "nvarchar(max)" : "jsonb").HasDefaultValue("{}").IsRequired();
         products.Property(product => product.BrandName).HasMaxLength(120).HasDefaultValue("OneCart").IsRequired();
         products.Property(product => product.StorefrontHeadline).HasMaxLength(200).IsRequired();
+        products.Property(product => product.AboutUs).HasMaxLength(5000).HasDefaultValue("").IsRequired();
         products.Property(product => product.StorefrontSubtitle).HasMaxLength(500).IsRequired();
         products.Property(product => product.ThemePrimaryColor).HasMaxLength(7).HasDefaultValue("#242020").IsRequired();
         products.Property(product => product.ThemeAccentColor).HasMaxLength(7).HasDefaultValue("#c17b88").IsRequired();

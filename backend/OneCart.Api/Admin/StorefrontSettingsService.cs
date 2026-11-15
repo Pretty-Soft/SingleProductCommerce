@@ -37,6 +37,7 @@ public sealed class StorefrontSettingsService(StoreDbContext database)
         var before = ToResponse(product);
         product.BrandName = request.BrandName.Trim();
         product.StorefrontHeadline = request.StorefrontHeadline?.Trim() ?? string.Empty;
+        product.AboutUs = request.AboutUs?.Trim() ?? string.Empty;
         product.StorefrontSubtitle = request.StorefrontSubtitle?.Trim() ?? string.Empty;
         product.ThemePrimaryColor = request.Theme.PrimaryColor;
         product.ThemeAccentColor = request.Theme.AccentColor;
@@ -117,6 +118,8 @@ public sealed class StorefrontSettingsService(StoreDbContext database)
             Add(nameof(request.BrandName), "Brand name is required and must be 120 characters or fewer.");
         if ((request.StorefrontHeadline?.Length ?? 0) > 200)
             Add(nameof(request.StorefrontHeadline), "Headline must be 200 characters or fewer.");
+        if ((request.AboutUs?.Length ?? 0) > 5000)
+            Add(nameof(request.AboutUs), "About Us must be 5,000 characters or fewer.");
         if ((request.StorefrontSubtitle?.Length ?? 0) > 500)
             Add(nameof(request.StorefrontSubtitle), "Subtitle must be 500 characters or fewer.");
 
@@ -193,6 +196,7 @@ public sealed class StorefrontSettingsService(StoreDbContext database)
     private static StorefrontSettingsResponse ToResponse(StoreProduct product) => new(
         product.BrandName,
         product.StorefrontHeadline,
+        product.AboutUs,
         product.StorefrontSubtitle,
         CatalogTranslations.Parse(product.StorefrontTranslationsJson),
         new AdminFlashSaleRequest(product.FlashSaleEnabled, product.FlashSaleLabel, product.FlashSaleDiscountType,
@@ -203,6 +207,9 @@ public sealed class StorefrontSettingsService(StoreDbContext database)
         product.WhatsAppPrefillMessage,
         product.Images.Where(image => image.MediaKind == "logo")
             .Select(image => new ProductImageResponse(image.Id, "/api/v1/store/product/images/" + image.Id, image.MediaKind, image.AltText, image.DisplayOrder)).SingleOrDefault(),
+        product.Images.Where(image => image.MediaKind == "product")
+            .OrderBy(image => image.DisplayOrder)
+            .Select(image => new ProductImageResponse(image.Id, "/api/v1/store/product/images/" + image.Id, image.MediaKind, image.AltText, image.DisplayOrder)).ToArray(),
         product.TrustItems.OrderBy(item => item.DisplayOrder)
             .Select(item => new AdminProductTrustItemResponse(item.Id, item.Title, item.Description, item.IsActive, item.DisplayOrder)).ToArray(),
         new StorefrontThemeRequest(product.ThemePrimaryColor, product.ThemeAccentColor, product.ThemeTextColor,
@@ -221,7 +228,8 @@ public sealed record StorefrontSettingsRequest(
     string? WhatsAppPrefillMessage,
     IReadOnlyList<AdminProductTrustItemRequest> TrustItems,
     Dictionary<string, Dictionary<string, string>>? StorefrontTranslations = null,
-    StorefrontThemeRequest? Theme = null);
+    StorefrontThemeRequest? Theme = null,
+    string? AboutUs = null);
 
 public sealed record StorefrontThemeRequest(
     string PrimaryColor, string AccentColor, string TextColor, string MutedTextColor,
@@ -235,6 +243,7 @@ public sealed record StorefrontThemeRequest(
 public sealed record StorefrontSettingsResponse(
     string BrandName,
     string StorefrontHeadline,
+    string AboutUs,
     string StorefrontSubtitle,
     Dictionary<string, Dictionary<string, string>> StorefrontTranslations,
     AdminFlashSaleRequest FlashSale,
@@ -243,6 +252,7 @@ public sealed record StorefrontSettingsResponse(
     string WhatsAppPhoneNumber,
     string WhatsAppPrefillMessage,
     ProductImageResponse? BrandLogo,
+    IReadOnlyList<ProductImageResponse> ProductImages,
     IReadOnlyList<AdminProductTrustItemResponse> TrustItems,
     StorefrontThemeRequest Theme);
 

@@ -8,6 +8,7 @@ public sealed record StorefrontProductResponse(
     string CurrencyCode,
     string BrandName,
     string StorefrontHeadline,
+    string AboutUs,
     string StorefrontSubtitle,
     IReadOnlyList<StorefrontVariantResponse> Variants,
     IReadOnlyList<StorefrontAttributeGroupResponse> AttributeGroups,

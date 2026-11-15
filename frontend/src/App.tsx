@@ -221,7 +221,7 @@ function Storefront() {
         <section className="hero" role="alert"><h1>{text.unavailable}</h1><p className="intro">{error}</p></section>
       ) : product ? (
         <section id="product" className={`store-product${product.images.length > 0 ? " has-images" : ""}`} aria-labelledby="hero-title">
-          <div id="about-us" className="product-copy">
+          <div className="product-copy">
             <h1 id="hero-title">{product.name}</h1>
             {product.storefrontSubtitle && <p className="product-subtitle">{product.storefrontSubtitle}</p>}
             <p className="intro">{product.description}</p>
@@ -350,10 +350,18 @@ function Storefront() {
           )}
         </section>
       ) : (
-        <section id="about-us" className="hero">
+        <section className="hero">
           <h1>{text.story}</h1>
           <p className="intro">{text.empty}</p>
           <a className="button store-admin-link" href="/admin">{text.openAdmin}</a>
+        </section>
+      )}
+
+      {product?.aboutUs.trim() && (
+        <section id="about-us" className="store-about" aria-labelledby="about-us-title">
+          <p className="eyebrow">{text.aboutUs}</p>
+          <h2 id="about-us-title">{text.aboutUs}</h2>
+          <p>{product.aboutUs}</p>
         </section>
       )}
 
@@ -421,7 +429,7 @@ function Storefront() {
 
       <footer className="store-footer">
         <nav className="store-footer-links" aria-label={text.storeNavigation}>
-          <a href="#about-us">{text.aboutUs}</a>
+          {product?.aboutUs.trim() && <a href="#about-us">{text.aboutUs}</a>}
           {product?.whatsAppContactUrl && <a className="footer-whatsapp" href={product.whatsAppContactUrl} target="_blank" rel="noopener noreferrer">
             <svg className="whatsapp-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
               <path fill="currentColor" d="M16.04 3A12.9 12.9 0 0 0 4.93 22.47L3.2 28.8l6.49-1.7A12.9 12.9 0 1 0 16.04 3Zm0 23.47c-1.92 0-3.8-.51-5.44-1.47l-.39-.23-3.85 1.01 1.03-3.75-.25-.4a10.57 10.57 0 1 1 8.9 4.84Zm5.8-7.92c-.32-.16-1.9-.94-2.2-1.05-.3-.11-.52-.16-.74.16-.22.32-.84 1.05-1.03 1.27-.19.21-.38.24-.7.08-.32-.16-1.36-.5-2.59-1.59-.96-.86-1.61-1.92-1.8-2.24-.19-.32-.02-.49.14-.65.14-.14.32-.38.48-.56.16-.19.21-.32.32-.54.11-.21.05-.4-.03-.56-.08-.16-.73-1.76-1-2.41-.27-.63-.54-.55-.73-.56h-.62c-.21 0-.56.08-.86.4-.3.32-1.13 1.1-1.13 2.68s1.16 3.11 1.32 3.32c.16.22 2.28 3.48 5.51 4.88.77.33 1.37.53 1.84.68.77.24 1.47.21 2.03.13.62-.09 1.9-.78 2.17-1.54.27-.75.27-1.4.19-1.54-.08-.13-.29-.21-.62-.37Z" />

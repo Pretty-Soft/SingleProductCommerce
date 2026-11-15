@@ -28,6 +28,8 @@ The project should be developed with human review and release quality in mind. C
 - Product reviews and ratings should be displayable on the product page, with review submission governed by the store's configured review policy.
 - The storefront should use a polished, responsive single-product presentation: clear brand/header, product imagery, concise headline and description, social proof, a prominent purchase action, and configurable trust/service details. Use the attached skincare-store mockup as visual direction; do not add its multi-category navigation to the single-product catalog.
 - Administrators must be able to configure the storefront presentation and product-page content, including branding, headline/copy, product media, and trust/service details, without editing source code.
+- Provide an administrator-managed About Us section, with translated content where configured, and display it on the storefront with a navigation link when content exists.
+- The storefront theme editor must preview the branded header and product image zone using the current brand/logo/theme choices and an uploaded product image when available.
 - Product image and logo files must be stored on local project-host storage; cloud object storage is not required for this product.
 - Initial storefront branding is “Pretty Shop” with the headline “Your trust, Your Love.” Show the headline beneath the shop name in the top bar only; use the product name as the main product-page heading.
 - Keep the storefront product-name text restrained at 14–16 px, with product details and supporting line capped at 12–14 px; the shop name and slogan should remain compact in the top bar.

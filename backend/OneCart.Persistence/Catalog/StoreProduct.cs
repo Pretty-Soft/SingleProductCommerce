@@ -18,6 +18,8 @@ public sealed class StoreProduct
 
     public string StorefrontHeadline { get; set; } = string.Empty;
 
+    public string AboutUs { get; set; } = string.Empty;
+
     public string StorefrontSubtitle { get; set; } = string.Empty;
 
     public string ThemePrimaryColor { get; set; } = "#242020";
