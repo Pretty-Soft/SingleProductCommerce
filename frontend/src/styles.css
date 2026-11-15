@@ -2468,6 +2468,8 @@ footer {
   display: grid;
   gap: 4px;
   grid-area: heading;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto;
   justify-items: center;
   max-width: 540px;
   min-width: 0;

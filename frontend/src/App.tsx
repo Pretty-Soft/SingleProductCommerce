@@ -205,7 +205,7 @@ function Storefront() {
             : <span className="brand-mark">{(product?.brandName ?? "Pretty Shop").slice(0, 1).toUpperCase()}</span>}
         </a>
         <div className="store-brand-heading">
-          <span className="brand-name">{product?.brandName ?? "Pretty Shop"}</span>
+          <strong className="brand-name">{product?.brandName ?? "Pretty Shop"}</strong>
           <span className="brand-headline">{product?.storefrontHeadline ?? "Your trust, Your Love"}</span>
         </div>
         <div className="store-header-actions">
