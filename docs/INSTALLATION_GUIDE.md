@@ -51,6 +51,8 @@ $env:ASPNETCORE_ENVIRONMENT = 'Development'
 dotnet run --project backend/OneCart.Api
 ```
 
+In Development, API startup applies pending PostgreSQL migrations automatically. Restart the API after pulling schema changes; production deployments should apply reviewed migrations through the operator's release process.
+
 Run the storefront from a second terminal:
 
 ```powershell

@@ -157,6 +157,13 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
 var app = builder.Build();
 
+if (app.Environment.IsDevelopment())
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    var database = scope.ServiceProvider.GetRequiredService<StoreDbContext>();
+    await database.Database.MigrateAsync();
+}
+
 app.UseForwardedHeaders();
 app.UseRouting();
 app.UseRateLimiter();
