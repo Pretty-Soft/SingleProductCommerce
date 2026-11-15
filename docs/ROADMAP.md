@@ -37,7 +37,7 @@ Acceptance: protected operations enforce authorization server-side, validate inp
 
 ## Stage 4 — Localization and presentation settings (localization and theme controls complete)
 
-The storefront language selector supports English, Bangla, and Spanish, remembers the visitor's selection, and loads localized product/storefront text from the API. English is the default and per-field fallback. Administrators can edit translations for product names/descriptions, variants, attribute groups/options, store branding, sale labels, WhatsApp copy, and trust/service details. UI-language strings ship with the application. Currency conversion/configuration and theme editing/preview remain future work and retain their open decisions.
+The storefront language selector supports English, Bangla, and Spanish, remembers the visitor's selection, and loads localized product/storefront text from the API. English is the default and per-field fallback. Administrators can edit translations for product names/descriptions, variants, attribute groups/options, store branding, sale labels, WhatsApp copy, and trust/service details. UI-language strings ship with the application. Currency conversion and its product-price conversion rule remain future work and retain their open decision.
 
 Acceptance: storefront UI and configured content can be presented in the three supported languages. Storefront color pickers and constrained font-size controls have a live preview and persistent settings; arbitrary CSS entry is intentionally unsupported. Currency conversion remains pending.
 
