@@ -51,7 +51,7 @@ public static class AdminBootstrapper
             Id = Guid.NewGuid(),
             UserName = email,
             Email = email,
-            EmailConfirmed = false,
+            EmailConfirmed = true,
             MustChangePassword = false
         };
 

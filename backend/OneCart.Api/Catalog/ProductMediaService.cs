@@ -174,6 +174,12 @@ public sealed class ProductMediaService(StoreDbContext database, IProductImageSt
         return stream is null ? null : new ProductImageFile(stream, image.ContentType);
     }
 
+    public Task<string?> GetMediaKindAsync(Guid imageId, CancellationToken cancellationToken) =>
+        database.ProductImages.AsNoTracking()
+            .Where(item => item.Id == imageId)
+            .Select(item => item.MediaKind)
+            .SingleOrDefaultAsync(cancellationToken);
+
     public static ProductImageResponse ToResponse(ProductImage image) => new(
         image.Id,
         "/api/v1/store/product/images/" + image.Id,

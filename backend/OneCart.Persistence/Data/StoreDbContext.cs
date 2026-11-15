@@ -28,6 +28,8 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
 
     public DbSet<AdminAuditEvent> AdminAuditEvents => Set<AdminAuditEvent>();
 
+    public DbSet<AdminSystemSetting> AdminSystemSettings => Set<AdminSystemSetting>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -57,6 +59,8 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
         products.Property(product => product.Slug).HasMaxLength(180).IsRequired();
         products.HasIndex(product => product.Slug).IsUnique();
         products.Property(product => product.Description).HasMaxLength(8000).IsRequired();
+        products.Property(product => product.CatalogTranslationsJson).HasColumnType(isSqlServer ? "nvarchar(max)" : "jsonb").HasDefaultValue("{}").IsRequired();
+        products.Property(product => product.StorefrontTranslationsJson).HasColumnType(isSqlServer ? "nvarchar(max)" : "jsonb").HasDefaultValue("{}").IsRequired();
         products.Property(product => product.BrandName).HasMaxLength(120).HasDefaultValue("OneCart").IsRequired();
         products.Property(product => product.StorefrontHeadline).HasMaxLength(200).IsRequired();
         products.Property(product => product.StorefrontSubtitle).HasMaxLength(500).IsRequired();
@@ -206,5 +210,12 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
             .IsRequired();
         auditEvents.Property(auditEvent => auditEvent.CreatedAtUtc).IsRequired();
         auditEvents.HasIndex(auditEvent => auditEvent.CreatedAtUtc);
+
+        var adminSettings = modelBuilder.Entity<AdminSystemSetting>();
+        adminSettings.ToTable("admin_system_settings", table => table.HasCheckConstraint(
+            "ck_admin_system_settings_singleton", isSqlServer ? "[Id] = 1" : "\"Id\" = 1"));
+        adminSettings.HasKey(setting => setting.Id);
+        adminSettings.Property(setting => setting.Id).ValueGeneratedNever();
+        adminSettings.Property(setting => setting.MfaRequired).HasDefaultValue(false).IsRequired();
     }
 }

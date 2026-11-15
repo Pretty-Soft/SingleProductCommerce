@@ -30,6 +30,8 @@ interface EditableProduct {
   storefrontSubtitle: string;
   images: EditableProductImage[];
   trustItems: EditableTrustItem[];
+  catalogTranslations: Record<string, Record<string, string>>;
+  storefrontTranslations?: Record<string, Record<string, string>>;
 }
 
 interface EditableProductImage {
@@ -74,6 +76,8 @@ interface EditableAttributeOption {
   displayOrder: number;
 }
 
+type CatalogSectionId = "basics" | "trust" | "variants" | "attributes" | "promotions" | "contact";
+
 const emptyProduct = (): EditableProduct => ({
   id: null,
   name: "",
@@ -92,16 +96,19 @@ const emptyProduct = (): EditableProduct => ({
   storefrontHeadline: "Your trust, Your Love",
   storefrontSubtitle: "",
   images: [],
-  trustItems: []
+  trustItems: [],
+  catalogTranslations: {}
 });
 
-function emptyVariant(): EditableVariant {
+const LANGUAGES = [{ code: "bn", label: "Bangla" }, { code: "es", label: "Spanish" }] as const;
+
+function emptyVariant(currencyCode = ""): EditableVariant {
   return {
     id: null,
     sku: "",
     displayName: "",
     price: 0,
-    currencyCode: "",
+    currencyCode,
     stockQuantity: 0,
     isActive: true
   };
@@ -122,28 +129,37 @@ function emptyAttributeOption(displayOrder: number): EditableAttributeOption {
   return { id: null, name: "", priceAdjustment: 0, isActive: true, displayOrder };
 }
 
-export default function AdminCatalogEditor() {
+export default function AdminCatalogEditor({ canManageStoreSettings = true }: { canManageStoreSettings?: boolean }) {
   const [product, setProduct] = useState<EditableProduct>(emptyProduct);
+  const [savedProduct, setSavedProduct] = useState<EditableProduct | null>(null);
+  const [editingSection, setEditingSection] = useState<CatalogSectionId | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [imagePreviews, setImagePreviews] = useState<Record<string, string>>({});
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadKind, setUploadKind] = useState<"product" | "logo">("product");
-  const [uploadAltText, setUploadAltText] = useState("");
-  const [uploadResetKey, setUploadResetKey] = useState(0);
+  const [productImageFile, setProductImageFile] = useState<File | null>(null);
+  const [productImageAltText, setProductImageAltText] = useState("");
+  const [productImageResetKey, setProductImageResetKey] = useState(0);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoAltText, setLogoAltText] = useState("");
+  const [logoResetKey, setLogoResetKey] = useState(0);
 
   useEffect(() => {
     let active = true;
     void adminRequest<EditableProduct>("/api/v1/admin/catalog/product")
       .then((loaded) => {
-        if (active) setProduct(loaded);
+        if (active) {
+          setProduct(loaded);
+          setSavedProduct(loaded);
+        }
       })
       .catch((reason: unknown) => {
         if (!active) return;
         if (reason instanceof Error && reason.message.includes("404")) {
-          setProduct(emptyProduct());
+          const blankProduct = emptyProduct();
+          setProduct(blankProduct);
+          setSavedProduct(blankProduct);
         } else {
           setError(reason instanceof Error ? reason.message : "Could not load product settings.");
         }
@@ -154,10 +170,25 @@ export default function AdminCatalogEditor() {
     return () => { active = false; };
   }, []);
 
+  const hasUnsavedChanges = savedProduct !== null
+    && JSON.stringify({ ...product, images: [] }) !== JSON.stringify({ ...savedProduct, images: [] });
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warnBeforeLeaving);
+    return () => window.removeEventListener("beforeunload", warnBeforeLeaving);
+  }, [hasUnsavedChanges]);
+
   useEffect(() => {
     let active = true;
     let previewUrls: string[] = [];
-    void Promise.all(product.images.map(async (image) => [image.id, await loadAdminImagePreview(image.id)] as const))
+    void Promise.all(product.images
+      .filter(image => image.mediaKind === "product" || canManageStoreSettings)
+      .map(async (image) => [image.id, await loadAdminImagePreview(image.id)] as const))
       .then((entries) => {
         previewUrls = entries.map(([, url]) => url);
         if (active) setImagePreviews(Object.fromEntries(entries));
@@ -170,7 +201,7 @@ export default function AdminCatalogEditor() {
       active = false;
       previewUrls.forEach(URL.revokeObjectURL);
     };
-  }, [product.images]);
+  }, [product.images, canManageStoreSettings]);
 
   function updateProduct<K extends keyof EditableProduct>(key: K, value: EditableProduct[K]) {
     setProduct((current) => ({ ...current, [key]: value }));
@@ -216,12 +247,83 @@ export default function AdminCatalogEditor() {
         body: JSON.stringify(product)
       });
       setProduct(saved);
+      setSavedProduct(saved);
+      setEditingSection(null);
       setMessage("Product, storefront content, variants, and attributes saved.");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Product settings could not be saved.");
     } finally {
       setBusy(false);
     }
+  }
+
+  function isSectionEditable(section: CatalogSectionId) {
+    return !product.id || editingSection === section;
+  }
+
+  function beginSectionEdit(section: CatalogSectionId) {
+    if (editingSection && hasUnsavedChanges) {
+      setError("Save or cancel the current section before editing another one.");
+      return;
+    }
+    setError("");
+    setMessage("");
+    setEditingSection(section);
+  }
+
+  function cancelSectionEdit(section: CatalogSectionId) {
+    if (!savedProduct) return;
+    const sectionFields: Record<CatalogSectionId, (keyof EditableProduct)[]> = {
+      basics: ["currencyCode", "brandName", "storefrontHeadline", "storefrontSubtitle", "name", "slug", "description", "isPublished"],
+      trust: ["trustItems"],
+      variants: ["variants"],
+      attributes: ["attributeGroups"],
+      promotions: ["flashSale"],
+      contact: ["socialSharingEnabled", "whatsAppEnabled", "whatsAppPhoneNumber", "whatsAppPrefillMessage"]
+    };
+    const fields = sectionFields[section];
+    setProduct((current) => Object.assign({}, current, ...fields.map((field) => ({ [field]: savedProduct[field] }))));
+    setEditingSection(null);
+    setError("");
+    setMessage("Changes discarded.");
+  }
+
+  async function saveSection(section: CatalogSectionId) {
+    if (editingSection !== section || !hasUnsavedChanges) return;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const saved = await adminRequest<EditableProduct>("/api/v1/admin/catalog/product", {
+        method: "PUT",
+        body: JSON.stringify(product)
+      });
+      setProduct(saved);
+      setSavedProduct(saved);
+      setEditingSection(null);
+      setMessage("Section changes saved.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Section changes could not be saved.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function sectionActions(section: CatalogSectionId) {
+    if (!product.id) return null;
+    if (editingSection === section) {
+      return (
+        <div className="section-edit-actions">
+          <button className="button button-quiet" type="button" onClick={() => cancelSectionEdit(section)} disabled={busy}>Cancel</button>
+          <button className="button" type="button" onClick={() => void saveSection(section)} disabled={busy || !hasUnsavedChanges}>{busy ? "Saving…" : "Save section"}</button>
+        </div>
+      );
+    }
+    return (
+      <button className="button button-quiet" type="button" onClick={() => beginSectionEdit(section)} disabled={busy || Boolean(editingSection)}>
+        Edit
+      </button>
+    );
   }
 
   function updateFlashSale(changes: Partial<EditableFlashSale>) {
@@ -239,9 +341,15 @@ export default function AdminCatalogEditor() {
     }));
   }
 
-  async function uploadProductImage() {
-    if (!uploadFile) {
-      setError("Choose an image first.");
+  async function uploadCatalogImage(mediaKind: "product" | "logo") {
+    const file = mediaKind === "logo" ? logoFile : productImageFile;
+    const altText = mediaKind === "logo" ? logoAltText : productImageAltText;
+    if (!file) {
+      setError(mediaKind === "logo" ? "Choose a logo image first." : "Choose a product image first.");
+      return;
+    }
+    if (!altText.trim()) {
+      setError("Add alternative text before uploading the image.");
       return;
     }
     setBusy(true);
@@ -249,23 +357,29 @@ export default function AdminCatalogEditor() {
     setMessage("");
     try {
       const form = new FormData();
-      form.set("file", uploadFile);
-      form.set("mediaKind", uploadKind);
-      form.set("altText", uploadAltText);
+      form.set("file", file);
+      form.set("mediaKind", mediaKind);
+      form.set("altText", altText);
       const image = await adminRequest<EditableProductImage>("/api/v1/admin/catalog/product/images", {
         method: "POST",
         body: form
       });
       setProduct((current) => ({
         ...current,
-        images: uploadKind === "logo"
+        images: mediaKind === "logo"
           ? [...current.images.filter((item) => item.mediaKind !== "logo"), image]
           : [...current.images, image]
       }));
-      setUploadFile(null);
-      setUploadAltText("");
-      setUploadResetKey((current) => current + 1);
-      setMessage(uploadKind === "logo" ? "Brand logo uploaded." : "Product image uploaded.");
+      if (mediaKind === "logo") {
+        setLogoFile(null);
+        setLogoAltText("");
+        setLogoResetKey((current) => current + 1);
+      } else {
+        setProductImageFile(null);
+        setProductImageAltText("");
+        setProductImageResetKey((current) => current + 1);
+      }
+      setMessage(mediaKind === "logo" ? "Brand logo saved." : "Product image saved.");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Image upload failed.");
     } finally {
@@ -309,6 +423,10 @@ export default function AdminCatalogEditor() {
     return Number.isNaN(date.getTime()) ? "" : new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
   }
 
+  function goToSection(sectionId: string) {
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   return (
     <section className="admin-card">
       <div className="section-heading">
@@ -320,6 +438,37 @@ export default function AdminCatalogEditor() {
       </div>
       {loading ? <p className="admin-muted">Loading catalog…</p> : (
         <form className="catalog-form" onSubmit={handleSave}>
+          <div className="catalog-toolbar">
+            <div className="catalog-save-status" role="status" aria-live="polite">
+              <strong>{hasUnsavedChanges ? "Unsaved changes" : !product.id ? "New product" : product.isPublished ? "Product published" : "Draft saved"}</strong>
+              <span>{hasUnsavedChanges ? product.id ? "Save or cancel the section you’re editing." : "Complete the product setup and save when ready." : !product.id ? "Complete the product setup and save when ready." : "Edit a section to make changes."}</span>
+            </div>
+            {!product.id && <button className="button" type="submit" disabled={busy || loading || !hasUnsavedChanges}>
+              {busy ? "Saving…" : "Save product"}
+            </button>}
+          </div>
+          {message && <p className="admin-message catalog-feedback" role="status">{message}</p>}
+          {error && <p className="admin-error catalog-feedback" role="alert">{error}</p>}
+          <nav className="catalog-section-nav" aria-label="Product editor sections">
+            {[
+              ["product-basics", "Basics"],
+              ["product-media", "Product images"],
+              ["product-logo", "Brand logo"],
+              ["product-trust", "Store details"],
+              ["product-variants", "Variants"],
+              ["product-attributes", "Attributes"],
+              ["product-promotions", "Flash sale"],
+              ["product-contact", "Sharing & contact"]
+            ].filter(([sectionId]) => canManageStoreSettings || !["product-logo", "product-trust", "product-promotions", "product-contact"].includes(sectionId)).map(([sectionId, label]) => (
+              <button type="button" key={sectionId} onClick={() => goToSection(sectionId)}>{label}</button>
+            ))}
+          </nav>
+          <div className="catalog-basics-section catalog-section" id="product-basics">
+          <div className="section-heading">
+            <div><h3>Product basics</h3><p className="admin-muted">Name, description, currency and publication status.</p></div>
+            {sectionActions("basics")}
+          </div>
+          <fieldset className="catalog-form-fields" disabled={busy || !isSectionEditable("basics")}>
           <div className="store-currency-setting">
             <label>
               Store currency
@@ -344,6 +493,7 @@ export default function AdminCatalogEditor() {
             <p className="admin-muted">Applies to all variant prices and orders. Changing it after setup is locked until the price conversion rule is configured.</p>
           </div>
           <div className="catalog-fields">
+            {canManageStoreSettings && <>
             <label>
               Shop name
               <input maxLength={120} required value={product.brandName} onChange={(event) => updateProduct("brandName", event.target.value)} />
@@ -359,6 +509,7 @@ export default function AdminCatalogEditor() {
               <input maxLength={500} value={product.storefrontSubtitle} onChange={(event) => updateProduct("storefrontSubtitle", event.target.value)} placeholder="Add one short supporting sentence" />
               <small className="field-help">Appears below the storefront slogan.</small>
             </label>
+            </>}
             <label>
               Product name
               <input maxLength={200} required value={product.name} onChange={(event) => updateProduct("name", event.target.value)} />
@@ -372,65 +523,108 @@ export default function AdminCatalogEditor() {
             Product description
             <textarea maxLength={8000} rows={5} value={product.description} onChange={(event) => updateProduct("description", event.target.value)} />
           </label>
+          <fieldset className="admin-field-wide"><legend>Product translations</legend>
+            <p className="admin-muted">English is the source and fallback. Add Bangla and Spanish content below; blank fields fall back to English.</p>
+            {LANGUAGES.map(language => <div className="admin-form-grid" key={language.code}>
+              <label>{language.label} product name<input maxLength={200} value={product.catalogTranslations[language.code]?.["product.name"] ?? ""} onChange={event => setProduct(current => ({ ...current, catalogTranslations: { ...current.catalogTranslations, [language.code]: { ...current.catalogTranslations[language.code], "product.name": event.target.value } } }))} /></label>
+              <label>{language.label} description<textarea maxLength={8000} rows={3} value={product.catalogTranslations[language.code]?.["product.description"] ?? ""} onChange={event => setProduct(current => ({ ...current, catalogTranslations: { ...current.catalogTranslations, [language.code]: { ...current.catalogTranslations[language.code], "product.description": event.target.value } } }))} /></label>
+            </div>)}
+          </fieldset>
+          <label className="role-option publish-toggle">
+            <input type="checkbox" checked={product.isPublished} onChange={(event) => updateProduct("isPublished", event.target.checked)} />
+            <span>Publish product to the storefront</span>
+          </label>
+          </fieldset>
+          </div>
 
-          <section className="catalog-settings">
-            <h3>Store branding and product images</h3>
-            <p className="admin-muted">Upload a brand logo or up to eight product images. JPEG, PNG, and WebP are accepted, up to 10 MB each.</p>
+          <section className="catalog-settings catalog-section" id="product-media">
+            <h3>Product images</h3>
+            <p className="admin-muted">Upload up to eight product images. JPEG, PNG, and WebP are accepted, up to 10 MB each.</p>
             <div className="image-upload-form">
               <label>
-                Image type
-                <select value={uploadKind} onChange={(event) => setUploadKind(event.target.value as "product" | "logo")}>
-                  <option value="product">Product image</option>
-                  <option value="logo">Brand logo (replaces current logo)</option>
-                </select>
-              </label>
-              <label>
                 Image file
-                <input key={uploadResetKey} type="file" accept="image/jpeg,image/png,image/webp" required onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} />
+                <input key={productImageResetKey} type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setProductImageFile(event.target.files?.[0] ?? null)} />
               </label>
               <label>
                 Alternative text
-                <input maxLength={200} required value={uploadAltText} onChange={(event) => setUploadAltText(event.target.value)} placeholder="Describe the image" />
+                <input maxLength={200} value={productImageAltText} onChange={(event) => setProductImageAltText(event.target.value)} placeholder="Describe the image" />
               </label>
-              <button className="button button-quiet" type="button" onClick={() => void uploadProductImage()} disabled={busy || !product.id}>{busy ? "Uploading…" : "Upload image"}</button>
+              <button className="button button-quiet" type="button" onClick={() => void uploadCatalogImage("product")} disabled={busy || !product.id}>{busy ? "Saving…" : "Save product image"}</button>
               {!product.id && <p className="admin-muted">Save the product draft before uploading media.</p>}
             </div>
             <div className="admin-media-list">
-              {product.images.map((image) => (
+              {product.images.filter((image) => image.mediaKind === "product").map((image) => (
                 <article className="admin-media-row" key={image.id}>
                   {imagePreviews[image.id] ? <img src={imagePreviews[image.id]} alt={image.altText} /> : <div className="admin-media-preview" aria-label="Loading image preview" />}
                   <div className="catalog-fields">
                     <label>
-                      {image.mediaKind === "logo" ? "Logo alternative text" : "Image alternative text"}
+                      Image alternative text
                       <input maxLength={200} value={image.altText} onChange={(event) => setProduct((current) => ({ ...current, images: current.images.map((item) => item.id === image.id ? { ...item, altText: event.target.value } : item) }))} />
                     </label>
-                    {image.mediaKind === "product" && (
-                      <label>
-                        Display order
-                        <input type="number" min="0" step="1" value={image.displayOrder} onChange={(event) => setProduct((current) => ({ ...current, images: current.images.map((item) => item.id === image.id ? { ...item, displayOrder: Number(event.target.value) } : item) }))} />
-                      </label>
-                    )}
+                    <label>
+                      Display order
+                      <input type="number" min="0" step="1" value={image.displayOrder} onChange={(event) => setProduct((current) => ({ ...current, images: current.images.map((item) => item.id === image.id ? { ...item, displayOrder: Number(event.target.value) } : item) }))} />
+                    </label>
                   </div>
                   <div className="variant-actions">
                     <button className="button button-quiet" type="button" onClick={() => void saveImageDetails(image)} disabled={busy}>Save details</button>
-                    <button className="button button-quiet" type="button" onClick={() => void deleteImage(image)} disabled={busy}>Remove image</button>
+                    <button className="button button-quiet" type="button" onClick={() => void deleteImage(image)} disabled={busy}>Delete image</button>
                   </div>
                 </article>
               ))}
-              {product.images.length === 0 && <p className="admin-muted">No product images or logo uploaded.</p>}
+              {product.images.filter((image) => image.mediaKind === "product").length === 0 && <p className="admin-muted">No product images uploaded.</p>}
             </div>
           </section>
 
-          <section className="catalog-settings">
+          {canManageStoreSettings && <section className="catalog-settings catalog-section" id="product-logo">
+            <h3>Brand logo</h3>
+            <p className="admin-muted">Upload or replace the logo shown in the storefront header. This is managed separately from product images.</p>
+            <div className="image-upload-form">
+              <label>
+                Logo file
+                <input key={logoResetKey} type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setLogoFile(event.target.files?.[0] ?? null)} />
+              </label>
+              <label>
+                Alternative text
+                <input maxLength={200} value={logoAltText} onChange={(event) => setLogoAltText(event.target.value)} placeholder="Describe the shop logo" />
+              </label>
+              <button className="button button-quiet" type="button" onClick={() => void uploadCatalogImage("logo")} disabled={busy || !product.id}>{busy ? "Saving…" : "Save brand logo"}</button>
+              {!product.id && <p className="admin-muted">Save the product draft before uploading a logo.</p>}
+            </div>
+            <div className="admin-media-list">
+              {product.images.filter((image) => image.mediaKind === "logo").map((image) => (
+                <article className="admin-media-row" key={image.id}>
+                  {imagePreviews[image.id] ? <img src={imagePreviews[image.id]} alt={image.altText} /> : <div className="admin-media-preview" aria-label="Loading logo preview" />}
+                  <div className="catalog-fields">
+                    <label>
+                      Logo alternative text
+                      <input maxLength={200} value={image.altText} onChange={(event) => setProduct((current) => ({ ...current, images: current.images.map((item) => item.id === image.id ? { ...item, altText: event.target.value } : item) }))} />
+                    </label>
+                  </div>
+                  <div className="variant-actions">
+                    <button className="button button-quiet" type="button" onClick={() => void saveImageDetails(image)} disabled={busy}>Save logo details</button>
+                    <button className="button button-quiet" type="button" onClick={() => void deleteImage(image)} disabled={busy}>Delete logo</button>
+                  </div>
+                </article>
+              ))}
+              {product.images.every((image) => image.mediaKind !== "logo") && <p className="admin-muted">No brand logo uploaded.</p>}
+            </div>
+          </section>}
+
+          {canManageStoreSettings && <section className="catalog-settings catalog-section" id="product-trust">
             <div className="section-heading">
               <div>
                 <h3>Trust and service details</h3>
                 <p className="admin-muted">Add short store promises shown below the product.</p>
               </div>
-              <button className="button button-quiet" type="button" onClick={() => updateProduct("trustItems", [...product.trustItems, { id: null, title: "", description: "", isActive: true, displayOrder: product.trustItems.length }])} disabled={busy || product.trustItems.length >= 8}>
-                Add detail
-              </button>
+              <div className="section-action-stack">
+                {sectionActions("trust")}
+                <button className="button button-quiet" type="button" onClick={() => updateProduct("trustItems", [...product.trustItems, { id: null, title: "", description: "", isActive: true, displayOrder: product.trustItems.length }])} disabled={busy || !isSectionEditable("trust") || product.trustItems.length >= 8}>
+                  Add detail
+                </button>
+              </div>
             </div>
+            <fieldset className="catalog-form-fields" disabled={busy || !isSectionEditable("trust")}>
             {product.trustItems.map((item, index) => (
               <fieldset className="variant-card" key={item.id ?? `trust-${index}`}>
                 <legend>Store detail {index + 1}</legend>
@@ -455,18 +649,24 @@ export default function AdminCatalogEditor() {
                 <button className="button button-quiet" type="button" onClick={() => updateProduct("trustItems", product.trustItems.filter((_, itemIndex) => itemIndex !== index).map((entry, order) => ({ ...entry, displayOrder: order })))} disabled={busy}>Remove detail</button>
               </fieldset>
             ))}
-          </section>
+            </fieldset>
+          </section>}
 
+          <section className="catalog-settings catalog-section" id="product-variants">
           <div className="section-heading variant-heading">
             <div>
               <h3>Variants</h3>
-              <p className="admin-muted">Each variant has its own SKU, display name, price, and stock count. All prices use the store currency.</p>
+              <p className="admin-muted">{product.variants.length} of 100 variants added. Add multiple options; each one has its own SKU, display name, price, and stock count.</p>
             </div>
-            <button className="button button-quiet" type="button" onClick={() => updateProduct("variants", [...product.variants, emptyVariant()])} disabled={busy || product.variants.length >= 100}>
-              Add variant
-            </button>
+            <div className="section-action-stack">
+              {sectionActions("variants")}
+              <button className="button button-quiet" type="button" onClick={() => updateProduct("variants", [...product.variants, emptyVariant(product.currencyCode)])} disabled={busy || !isSectionEditable("variants") || product.variants.length >= 100}>
+                Add another variant
+              </button>
+            </div>
           </div>
 
+          <fieldset className="catalog-form-fields" disabled={busy || !isSectionEditable("variants")}>
           {product.variants.map((variant, index) => (
             <fieldset className="variant-card" key={variant.id ?? `new-${index}`}>
               <legend>Variant {index + 1}</legend>
@@ -488,6 +688,7 @@ export default function AdminCatalogEditor() {
                   <input type="number" min="0" step="1" required value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: Number(event.target.value) })} />
                 </label>
               </div>
+              {variant.id && <div className="admin-form-grid">{LANGUAGES.map(language => <label key={language.code}>{language.label} display name<input maxLength={200} value={product.catalogTranslations[language.code]?.[`variant.${variant.id}.name`] ?? ""} onChange={event => setProduct(current => ({ ...current, catalogTranslations: { ...current.catalogTranslations, [language.code]: { ...current.catalogTranslations[language.code], [`variant.${variant.id}.name`]: event.target.value } } }))} /></label>)}</div>}
               <div className="variant-actions">
                 <label className="role-option">
                   <input type="checkbox" checked={variant.isActive} onChange={(event) => updateVariant(index, { isActive: event.target.checked })} />
@@ -499,17 +700,24 @@ export default function AdminCatalogEditor() {
               </div>
             </fieldset>
           ))}
+          </fieldset>
+          </section>
 
+          <section className="catalog-settings catalog-section" id="product-attributes">
           <div className="section-heading variant-heading">
             <div>
-              <h3>Configurable attributes</h3>
-              <p className="admin-muted">Add required selections or optional add-ons. Choices can increase the selected variant price.</p>
+              <h3>Attribute groups</h3>
+              <p className="admin-muted">{product.attributeGroups.length} of 30 groups added. Add multiple groups and choices for required selections or optional add-ons.</p>
             </div>
-            <button className="button button-quiet" type="button" onClick={() => updateProduct("attributeGroups", [...product.attributeGroups, emptyAttributeGroup(product.attributeGroups.length)])} disabled={busy || product.attributeGroups.length >= 30}>
-              Add attribute
-            </button>
+            <div className="section-action-stack">
+              {sectionActions("attributes")}
+              <button className="button button-quiet" type="button" onClick={() => updateProduct("attributeGroups", [...product.attributeGroups, emptyAttributeGroup(product.attributeGroups.length)])} disabled={busy || !isSectionEditable("attributes") || product.attributeGroups.length >= 30}>
+                Add attribute group
+              </button>
+            </div>
           </div>
 
+          <fieldset className="catalog-form-fields" disabled={busy || !isSectionEditable("attributes")}>
           {product.attributeGroups.map((group, groupIndex) => (
             <fieldset className="variant-card" key={group.id ?? `attribute-${groupIndex}`}>
               <legend>Attribute {groupIndex + 1}</legend>
@@ -518,6 +726,7 @@ export default function AdminCatalogEditor() {
                   Name
                   <input maxLength={100} required value={group.name} onChange={(event) => updateAttributeGroup(groupIndex, { name: event.target.value })} placeholder="e.g. Processor" />
                 </label>
+                {group.id && LANGUAGES.map(language => <label key={language.code}>{language.label} name<input maxLength={100} value={product.catalogTranslations[language.code]?.[`attributeGroup.${group.id}.name`] ?? ""} onChange={event => setProduct(current => ({ ...current, catalogTranslations: { ...current.catalogTranslations, [language.code]: { ...current.catalogTranslations[language.code], [`attributeGroup.${group.id}.name`]: event.target.value } } }))} /></label>)}
                 <label className="role-option">
                   <input type="checkbox" checked={group.isRequired} onChange={(event) => updateAttributeGroup(groupIndex, { isRequired: event.target.checked })} />
                   <span>Shopper must choose an option</span>
@@ -539,6 +748,7 @@ export default function AdminCatalogEditor() {
                     Choice
                     <input maxLength={150} required value={option.name} onChange={(event) => updateAttributeOption(groupIndex, optionIndex, { name: event.target.value })} placeholder="e.g. 16 GB RAM" />
                   </label>
+                  {option.id && LANGUAGES.map(language => <label key={language.code}>{language.label} choice<input maxLength={150} value={product.catalogTranslations[language.code]?.[`attributeOption.${option.id}.name`] ?? ""} onChange={event => setProduct(current => ({ ...current, catalogTranslations: { ...current.catalogTranslations, [language.code]: { ...current.catalogTranslations[language.code], [`attributeOption.${option.id}.name`]: event.target.value } } }))} /></label>)}
                   <label>
                     Added price
                     <input type="number" min="0" step="0.0001" required value={option.priceAdjustment} onChange={(event) => updateAttributeOption(groupIndex, optionIndex, { priceAdjustment: Number(event.target.value) })} />
@@ -557,10 +767,15 @@ export default function AdminCatalogEditor() {
               </button>
             </fieldset>
           ))}
+          </fieldset>
+          </section>
 
-          <section className="catalog-settings">
-            <h3>Flash sale</h3>
-            <p className="admin-muted">Set a scheduled discount. The storefront shows the regular and sale prices only during the configured window.</p>
+          {canManageStoreSettings && <section className="catalog-settings catalog-section" id="product-promotions">
+            <div className="section-heading">
+              <div><h3>Flash sale</h3><p className="admin-muted">Schedule a discount for a chosen time window.</p></div>
+              {sectionActions("promotions")}
+            </div>
+            <fieldset className="catalog-form-fields" disabled={busy || !isSectionEditable("promotions")}>
             <label className="role-option">
               <input type="checkbox" checked={product.flashSale.enabled} onChange={(event) => updateFlashSale({ enabled: event.target.checked })} />
               <span>Enable flash sale</span>
@@ -592,10 +807,15 @@ export default function AdminCatalogEditor() {
                 </label>
               </div>
             )}
-          </section>
+            </fieldset>
+          </section>}
 
-          <section className="catalog-settings">
-            <h3>Storefront contact and sharing</h3>
+          {canManageStoreSettings && <section className="catalog-settings catalog-section" id="product-contact">
+            <div className="section-heading">
+              <div><h3>Sharing and contact</h3><p className="admin-muted">Configure product sharing and WhatsApp contact.</p></div>
+              {sectionActions("contact")}
+            </div>
+            <fieldset className="catalog-form-fields" disabled={busy || !isSectionEditable("contact")}>
             <label className="role-option">
               <input type="checkbox" checked={product.socialSharingEnabled} onChange={(event) => updateProduct("socialSharingEnabled", event.target.checked)} />
               <span>Show product share action</span>
@@ -616,17 +836,10 @@ export default function AdminCatalogEditor() {
                 </label>
               </div>
             )}
-          </section>
-
-          <label className="role-option publish-toggle">
-            <input type="checkbox" checked={product.isPublished} onChange={(event) => updateProduct("isPublished", event.target.checked)} />
-            <span>Publish product to the storefront</span>
-          </label>
-          <button className="button" type="submit" disabled={busy || loading}>{busy ? "Saving…" : "Save catalog"}</button>
+            </fieldset>
+          </section>}
         </form>
       )}
-      {message && <p className="admin-message" role="status">{message}</p>}
-      {error && <p className="admin-error" role="alert">{error}</p>}
     </section>
   );
 }

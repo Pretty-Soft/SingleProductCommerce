@@ -1,4 +1,5 @@
 using System.Net;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
@@ -21,11 +22,33 @@ builder.Services.AddDbContext<StoreDbContext>(options =>
         storeConnectionString));
 builder.Services.AddScoped<StorefrontCatalogService>();
 builder.Services.AddScoped<AdminCatalogService>();
+builder.Services.AddScoped<StorefrontSettingsService>();
+builder.Services.AddScoped<IAdminEmailSender, SmtpAdminEmailSender>();
+builder.Services.AddScoped<AdminSecuritySettingsService>();
 builder.Services.AddScoped<ProductMediaService>();
 builder.Services.AddScoped<CartQuoteService>();
 builder.Services.AddScoped<CheckoutService>();
 builder.Services.AddScoped<OrderManagementService>();
-builder.Services.AddDataProtection();
+var dataProtectionKeyDirectory = builder.Configuration["DataProtection:KeyDirectory"];
+if (builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(dataProtectionKeyDirectory))
+{
+    dataProtectionKeyDirectory = Path.Combine(builder.Environment.ContentRootPath, "App_Data", "data-protection-keys");
+}
+
+var dataProtection = builder.Services.AddDataProtection();
+if (!string.IsNullOrWhiteSpace(dataProtectionKeyDirectory))
+{
+    var fullKeyDirectory = Path.IsPathRooted(dataProtectionKeyDirectory)
+        ? dataProtectionKeyDirectory
+        : Path.Combine(builder.Environment.ContentRootPath, dataProtectionKeyDirectory);
+    Directory.CreateDirectory(fullKeyDirectory);
+    dataProtection.PersistKeysToFileSystem(new DirectoryInfo(Path.GetFullPath(fullKeyDirectory)));
+    if (OperatingSystem.IsWindows())
+    {
+        dataProtection.ProtectKeysWithDpapi();
+    }
+}
+
 builder.Services.AddSingleton(services => services.GetRequiredService<IDataProtectionProvider>()
     .CreateProtector("OneCart.CartQuote.v1"));
 builder.Services.AddSingleton<IProductImageStorage>(services =>
@@ -68,6 +91,18 @@ builder.Services.Configure<SecurityStampValidatorOptions>(options =>
     options.ValidationInterval = TimeSpan.Zero;
 });
 builder.Services.AddAuthorization();
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddPolicy("AdminPasswordReset", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromMinutes(15),
+            QueueLimit = 0,
+            AutoReplenishment = true
+        }));
+});
 builder.Services.AddAntiforgery(options =>
 {
     options.HeaderName = "X-CSRF-TOKEN";
@@ -123,6 +158,8 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 var app = builder.Build();
 
 app.UseForwardedHeaders();
+app.UseRouting();
+app.UseRateLimiter();
 
 if (!app.Environment.IsDevelopment())
 {
@@ -156,10 +193,14 @@ app.MapGet("/health", () => Results.Ok(new
 }));
 
 app.MapGet("/api/v1/store/product", async (
+    string? language,
     StorefrontCatalogService catalog,
     CancellationToken cancellationToken) =>
 {
-    var product = await catalog.GetPublishedProductAsync(cancellationToken);
+    var selectedLanguage = string.IsNullOrWhiteSpace(language) ? "en" : language.Trim().ToLowerInvariant();
+    if (!OneCart.Api.Catalog.CatalogTranslations.Languages.Contains(selectedLanguage, StringComparer.Ordinal))
+        return Results.ValidationProblem(new Dictionary<string, string[]> { ["language"] = ["Choose en, bn, or es."] });
+    var product = await catalog.GetPublishedProductAsync(selectedLanguage, cancellationToken);
     return product is null ? Results.NotFound() : Results.Ok(product);
 });
 app.MapGet("/api/v1/store/product/images/{imageId:guid}", async (
@@ -174,6 +215,7 @@ app.MapGet("/api/v1/store/product/images/{imageId:guid}", async (
 });
 app.MapAdminEndpoints();
 app.MapOrderEndpoints();
+app.MapAdminCustomerEndpoints();
 
 if (args.Length == 2 && args[0] == "--bootstrap-system-admin")
 {

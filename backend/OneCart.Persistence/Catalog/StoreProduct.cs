@@ -10,6 +10,10 @@ public sealed class StoreProduct
 
     public string Description { get; set; } = string.Empty;
 
+    public string CatalogTranslationsJson { get; set; } = "{}";
+
+    public string StorefrontTranslationsJson { get; set; } = "{}";
+
     public string BrandName { get; set; } = "Pretty Shop";
 
     public string StorefrontHeadline { get; set; } = string.Empty;

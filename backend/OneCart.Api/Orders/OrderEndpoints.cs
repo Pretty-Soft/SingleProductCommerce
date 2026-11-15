@@ -30,14 +30,19 @@ public static class OrderEndpoints
         }).AllowAnonymous();
 
         var admin = endpoints.MapGroup("/api/v1/admin/orders");
+        admin.MapGet("/summary", async (OrderManagementService orders, CancellationToken cancellationToken) =>
+                Results.Ok(await orders.GetOrderTotalsAsync(cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(AdminRoles.OrderAccess))
+            .AddEndpointFilter(AdminEndpoints.RequireChangedPasswordAsync);
+
         admin.MapGet("", async (OrderManagementService orders, CancellationToken cancellationToken) =>
                 Results.Ok(await orders.GetRecentOrdersAsync(cancellationToken)))
-            .RequireAuthorization(policy => policy.RequireRole(AdminRoles.SystemAdmin))
+            .RequireAuthorization(policy => policy.RequireRole(AdminRoles.OrderAccess))
             .AddEndpointFilter(AdminEndpoints.RequireChangedPasswordAsync);
 
         admin.MapGet("/{orderId:guid}", async (Guid orderId, OrderManagementService orders, CancellationToken cancellationToken) =>
                 await orders.GetOrderAsync(orderId, cancellationToken) is { } order ? Results.Ok(order) : Results.NotFound())
-            .RequireAuthorization(policy => policy.RequireRole(AdminRoles.SystemAdmin))
+            .RequireAuthorization(policy => policy.RequireRole(AdminRoles.OrderAccess))
             .AddEndpointFilter(AdminEndpoints.RequireChangedPasswordAsync);
 
         admin.MapPut("/{orderId:guid}/status", async (
@@ -57,7 +62,7 @@ public static class OrderEndpoints
             if (result.IsNotFound) return Results.NotFound();
             return result.Error is not null ? Results.BadRequest(new { error = result.Error }) : Results.Ok(result.Order);
         })
-            .RequireAuthorization(policy => policy.RequireRole(AdminRoles.SystemAdmin))
+            .RequireAuthorization(policy => policy.RequireRole(AdminRoles.OrderAccess))
             .AddEndpointFilter(AdminEndpoints.ValidateAntiforgeryAsync)
             .AddEndpointFilter(AdminEndpoints.RequireChangedPasswordAsync);
 

@@ -86,8 +86,8 @@ export interface StorefrontVariant {
   isAvailable: boolean;
 }
 
-export async function getPublishedProduct(): Promise<StorefrontProduct | null> {
-  const response = await fetch(`${apiBase}/api/v1/store/product`, { credentials: "omit" });
+export async function getPublishedProduct(language = "en"): Promise<StorefrontProduct | null> {
+  const response = await fetch(`${apiBase}/api/v1/store/product?language=${encodeURIComponent(language)}`, { credentials: "omit" });
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`The catalog could not be loaded (${response.status}).`);
   return (await response.json()) as StorefrontProduct;

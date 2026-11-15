@@ -6,6 +6,30 @@ namespace OneCart.Persistence.Tests;
 public sealed class CatalogValidationTests
 {
     [Fact]
+    public void Resolves_requested_language_and_falls_back_to_english()
+    {
+        var translations = new Dictionary<string, Dictionary<string, string>>
+        {
+            ["bn"] = new() { ["product.name"] = "বাংলা নাম" }
+        };
+
+        Assert.Equal("বাংলা নাম", CatalogTranslations.Resolve(translations, "bn", "product.name", "English name"));
+        Assert.Equal("English name", CatalogTranslations.Resolve(translations, "es", "product.name", "English name"));
+        Assert.Equal("English name", CatalogTranslations.Resolve(translations, "bn", "product.description", "English name"));
+    }
+
+    [Fact]
+    public void Rejects_languages_outside_the_supported_three()
+    {
+        var errors = CatalogTranslations.Validate(new Dictionary<string, Dictionary<string, string>>
+        {
+            ["fr"] = new() { ["product.name"] = "nom" }
+        }, "translations");
+
+        Assert.Contains("translations.fr", errors.Keys);
+    }
+
+    [Fact]
     public void Accepts_a_valid_published_product_with_one_active_variant()
     {
         var errors = AdminCatalogService.ValidateProduct(ValidPublishedProduct(), null);

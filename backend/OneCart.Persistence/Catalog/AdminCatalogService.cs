@@ -70,6 +70,7 @@ public sealed class AdminCatalogService(StoreDbContext database)
         product.Name = request.Name.Trim();
         product.Slug = request.Slug.Trim();
         product.Description = request.Description.Trim();
+        product.CatalogTranslationsJson = CatalogTranslations.Serialize(request.CatalogTranslations);
         product.BrandName = (request.BrandName ?? "Pretty Shop").Trim();
         product.StorefrontHeadline = request.StorefrontHeadline?.Trim() ?? string.Empty;
         product.StorefrontSubtitle = request.StorefrontSubtitle?.Trim() ?? string.Empty;
@@ -230,6 +231,8 @@ public sealed class AdminCatalogService(StoreDbContext database)
     public static Dictionary<string, string[]> ValidateProduct(AdminProductRequest request, StoreProduct? product)
     {
         var errors = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        foreach (var (field, messages) in CatalogTranslations.Validate(request.CatalogTranslations, nameof(request.CatalogTranslations)))
+            foreach (var message in messages) errors[field] = [message];
         void AddError(string field, string message)
         {
             if (!errors.TryGetValue(field, out var fieldErrors))
@@ -588,13 +591,17 @@ public sealed class AdminCatalogService(StoreDbContext database)
         product.Images.OrderBy(image => image.MediaKind).ThenBy(image => image.DisplayOrder)
             .Select(image => new ProductImageResponse(image.Id, "/api/v1/store/product/images/" + image.Id, image.MediaKind, image.AltText, image.DisplayOrder)).ToArray(),
         product.TrustItems.OrderBy(item => item.DisplayOrder).Select(item => new AdminProductTrustItemResponse(
-            item.Id, item.Title, item.Description, item.IsActive, item.DisplayOrder)).ToArray());
+            item.Id, item.Title, item.Description, item.IsActive, item.DisplayOrder)).ToArray(),
+        CatalogTranslations.Parse(product.CatalogTranslationsJson),
+        CatalogTranslations.Parse(product.StorefrontTranslationsJson));
 
     private static object CreateAuditSnapshot(StoreProduct product) => new
     {
         product.Name,
         product.Slug,
         product.Description,
+        CatalogTranslationsJson = product.CatalogTranslationsJson,
+        StorefrontTranslationsJson = product.StorefrontTranslationsJson,
         product.CurrencyCode,
         product.BrandName,
         product.StorefrontHeadline,
@@ -658,7 +665,8 @@ public sealed record AdminProductRequest(
     string? StorefrontHeadline = null,
     string? StorefrontSubtitle = null,
     IReadOnlyList<AdminProductTrustItemRequest>? TrustItems = null,
-    string? CurrencyCode = null);
+    string? CurrencyCode = null,
+    Dictionary<string, Dictionary<string, string>>? CatalogTranslations = null);
 
 public sealed record AdminFlashSaleRequest(
     bool Enabled,
@@ -713,7 +721,9 @@ public sealed record AdminProductResponse(
     string WhatsAppPhoneNumber,
     string WhatsAppPrefillMessage,
     IReadOnlyList<ProductImageResponse> Images,
-    IReadOnlyList<AdminProductTrustItemResponse> TrustItems);
+    IReadOnlyList<AdminProductTrustItemResponse> TrustItems,
+    Dictionary<string, Dictionary<string, string>> CatalogTranslations,
+    Dictionary<string, Dictionary<string, string>> StorefrontTranslations);
 
 public sealed record AdminProductTrustItemRequest(Guid? Id, string Title, string Description, bool IsActive, int DisplayOrder);
 

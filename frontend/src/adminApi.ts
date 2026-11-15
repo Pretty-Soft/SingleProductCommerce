@@ -12,6 +12,8 @@ export interface AdminUser {
   email: string;
   roles: string[];
   mustChangePassword: boolean;
+  twoFactorEnabled: boolean;
+  mfaRequired?: boolean;
   lockoutEnd: string | null;
 }
 

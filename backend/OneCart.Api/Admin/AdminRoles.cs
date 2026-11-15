@@ -16,6 +16,11 @@ public static class AdminRoles
         OrderManager,
         StoreManager
     ];
+
+    public static string[] CatalogAccess => [SystemAdmin, CatalogManager];
+    public static string[] OrderAccess => [SystemAdmin, OrderManager];
+    public static string[] StoreAccess => [SystemAdmin, StoreManager];
+    public static string[] MediaAccess => [SystemAdmin, CatalogManager, StoreManager];
 }
 
 public static class AdminRoleSeeder

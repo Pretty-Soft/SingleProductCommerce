@@ -8,6 +8,71 @@ namespace OneCart.Api.Orders;
 
 public sealed class OrderManagementService(StoreDbContext database)
 {
+    public async Task<AdminCustomerContactPage> SearchCustomerContactsAsync(
+        string? search,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+        var query = database.StoreOrders.AsNoTracking();
+        var searchTerm = search?.Trim();
+        if (!string.IsNullOrEmpty(searchTerm))
+        {
+            var loweredSearch = searchTerm.ToLowerInvariant();
+            query = query.Where(order => order.CustomerName.ToLower().Contains(loweredSearch)
+                || order.PhoneNumber.Contains(searchTerm)
+                || order.OrderNumber.ToLower().Contains(loweredSearch));
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var pageCount = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
+        page = Math.Min(page, pageCount);
+        var items = await query
+            .OrderByDescending(order => order.OrderNumber)
+            .ThenByDescending(order => order.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(order => new AdminCustomerOrderContact(
+                order.Id,
+                order.OrderNumber,
+                order.Status,
+                order.CustomerName,
+                order.PhoneNumber,
+                order.DeliveryAddress,
+                order.CurrencyCode,
+                order.Total,
+                order.CreatedAtUtc))
+            .ToListAsync(cancellationToken);
+
+        return new AdminCustomerContactPage(items, totalCount, page, pageSize);
+    }
+
+    public async Task<IReadOnlyList<AdminOrderCurrencyTotals>> GetOrderTotalsAsync(CancellationToken cancellationToken)
+    {
+        var statuses = await database.StoreOrders.AsNoTracking()
+            .GroupBy(order => new { order.CurrencyCode, order.Status })
+            .Select(group => new
+            {
+                group.Key.CurrencyCode,
+                group.Key.Status,
+                OrderCount = group.Count(),
+                OrderTotal = group.Sum(order => order.Total)
+            })
+            .ToListAsync(cancellationToken);
+
+        return statuses
+            .GroupBy(summary => summary.CurrencyCode, StringComparer.Ordinal)
+            .OrderBy(group => group.Key, StringComparer.Ordinal)
+            .Select(group => new AdminOrderCurrencyTotals(
+                group.Key,
+                group.OrderBy(summary => StatusOrder(summary.Status))
+                    .Select(summary => new AdminOrderStatusTotals(summary.Status, summary.OrderCount, summary.OrderTotal))
+                    .ToArray()))
+            .ToArray();
+    }
+
     public async Task<IReadOnlyList<AdminOrderSummary>> GetRecentOrdersAsync(CancellationToken cancellationToken)
     {
         var orders = await database.StoreOrders.AsNoTracking()
@@ -96,6 +161,15 @@ public sealed class OrderManagementService(StoreDbContext database)
         _ => false
     };
 
+    private static int StatusOrder(string status) => status switch
+    {
+        StoreOrderStatus.Pending => 0,
+        StoreOrderStatus.Processing => 1,
+        StoreOrderStatus.Completed => 2,
+        StoreOrderStatus.Cancelled => 3,
+        _ => int.MaxValue
+    };
+
     private static AdminOrderDetails ToDetails(StoreOrder order) => new(
         order.Id,
         order.OrderNumber,
@@ -117,6 +191,10 @@ public sealed class OrderManagementService(StoreDbContext database)
 }
 
 public sealed record AdminOrderSummary(Guid Id, string OrderNumber, string Status, string CustomerName, string PhoneNumber, string CurrencyCode, decimal Total, DateTimeOffset CreatedAtUtc, int ItemCount);
+public sealed record AdminCustomerOrderContact(Guid Id, string OrderNumber, string Status, string CustomerName, string PhoneNumber, string DeliveryAddress, string CurrencyCode, decimal OrderTotal, DateTimeOffset CreatedAtUtc);
+public sealed record AdminCustomerContactPage(IReadOnlyList<AdminCustomerOrderContact> Items, int TotalCount, int Page, int PageSize);
+public sealed record AdminOrderStatusTotals(string Status, int OrderCount, decimal OrderTotal);
+public sealed record AdminOrderCurrencyTotals(string CurrencyCode, IReadOnlyList<AdminOrderStatusTotals> Statuses);
 public sealed record AdminOrderDetails(Guid Id, string OrderNumber, string Status, string CustomerName, string PhoneNumber, string DeliveryAddress, string CurrencyCode, decimal Total, DateTimeOffset CreatedAtUtc, DateTimeOffset UpdatedAtUtc, IReadOnlyList<AdminOrderLine> Lines);
 public sealed record AdminOrderLine(string ProductName, string Sku, string VariantName, IReadOnlyList<CartQuoteOption> SelectedOptions, int Quantity, decimal UnitPrice);
 

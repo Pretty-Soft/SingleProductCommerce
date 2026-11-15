@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import AdminApp from "./AdminApp";
 import { getMediaUrl, getPublishedProduct, placeStoreOrder, quoteCartSelection, StorefrontProduct, StoreOrderConfirmation } from "./storeApi";
 import { addCartSelection, CartLine, changeCartSelectionQuantity, removeCartSelection } from "./cart";
+import { storeLanguages, StoreLanguage, storeText } from "./storeI18n";
 
 export default function App() {
   if (window.location.pathname.startsWith("/admin")) {
@@ -12,6 +13,11 @@ export default function App() {
 }
 
 function Storefront() {
+  const [language, setLanguage] = useState<StoreLanguage>(() => {
+    const saved = window.localStorage.getItem("onecart-language");
+    return saved === "bn" || saved === "es" ? saved : "en";
+  });
+  const text = storeText(language);
   const [product, setProduct] = useState<StorefrontProduct | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState("");
   const [selectedImageId, setSelectedImageId] = useState("");
@@ -35,7 +41,7 @@ function Storefront() {
 
   useEffect(() => {
     let active = true;
-    void getPublishedProduct()
+    void getPublishedProduct(language)
       .then((loaded) => {
         if (!active) return;
         setProduct(loaded);
@@ -50,7 +56,12 @@ function Storefront() {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, []);
+  }, [language]);
+
+  useEffect(() => {
+    window.localStorage.setItem("onecart-language", language);
+    document.documentElement.lang = language;
+  }, [language]);
 
   useEffect(() => {
     if (!product?.flashSale.enabled || !product.flashSale.endsAtUtc) return;
@@ -190,15 +201,16 @@ function Storefront() {
           </span>
         </a>
         <div className="store-header-actions">
-          {product && <button className="cart-toggle" type="button" onClick={() => setCartOpen((open) => !open)} aria-expanded={cartOpen}>Cart <span>{cartItemCount}</span></button>}
-          <a className="status" href="/admin">Admin</a>
+          <label className="store-language-picker"><span className="visually-hidden">Language</span><select value={language} onChange={event => setLanguage(event.target.value as StoreLanguage)} aria-label="Language">{storeLanguages.map(item => <option key={item.code} value={item.code}>{item.label}</option>)}</select></label>
+          {product && <button className="cart-toggle" type="button" onClick={() => setCartOpen((open) => !open)} aria-expanded={cartOpen}>{text.cart} <span>{cartItemCount}</span></button>}
+          <a className="status" href="/admin">{text.admin}</a>
         </div>
       </header>
 
       {loading ? (
-        <section className="hero" aria-live="polite"><h1>Loading store…</h1></section>
+        <section className="hero" aria-live="polite"><h1>{text.loading}</h1></section>
       ) : error ? (
-        <section className="hero" role="alert"><h1>Store temporarily unavailable</h1><p className="intro">{error}</p></section>
+        <section className="hero" role="alert"><h1>{text.unavailable}</h1><p className="intro">{error}</p></section>
       ) : product ? (
         <section className={`store-product${product.images.length > 0 ? " has-images" : ""}`} aria-labelledby="hero-title">
           <div className="product-copy">
@@ -207,19 +219,19 @@ function Storefront() {
             <p className="intro">{product.description}</p>
           </div>
           {selectedImage && (
-            <div className="product-gallery" aria-label="Product images">
+            <div className="product-gallery" aria-label={text.productImages}>
               <figure className="product-image-stage">
                 <img src={getMediaUrl(selectedImage.url)} alt={selectedImage.altText} />
               </figure>
               {product.images.length > 1 && (
-                <div className="product-thumbnails" aria-label="Choose product image">
+                <div className="product-thumbnails" aria-label={text.chooseImage}>
                   {product.images.map((image) => (
                     <button
                       className={`product-thumbnail${selectedImage.id === image.id ? " selected" : ""}`}
                       type="button"
                       key={image.id}
                       onClick={() => setSelectedImageId(image.id)}
-                      aria-label={`Show image: ${image.altText}`}
+                      aria-label={`${text.chooseImage}: ${image.altText}`}
                       aria-pressed={selectedImage.id === image.id}
                     >
                       <img src={getMediaUrl(image.url)} alt="" />
@@ -232,11 +244,11 @@ function Storefront() {
           <div className="purchase-panel">
             {flashSaleActive && (
               <div className="flash-sale-banner" aria-live="polite">
-                <span className="flash-sale-label">{product.flashSale.label || "Flash sale"}</span>
-                <span className="flash-sale-timer">Ends in {formatCountdown(saleRemainingSeconds)}</span>
+                <span className="flash-sale-label">{product.flashSale.label || text.flash}</span>
+                <span className="flash-sale-timer">{text.ends} {formatCountdown(saleRemainingSeconds)}</span>
               </div>
             )}
-            <p className="eyebrow">Choose your product</p>
+            <p className="eyebrow">{text.choose}</p>
             <div className="variant-options" role="radiogroup" aria-label="Product variants">
               {product.variants.map((variant) => (
                 <label className={`store-variant${selectedVariantId === variant.id ? " selected" : ""}`} key={variant.id}>
@@ -257,7 +269,7 @@ function Storefront() {
                     ) : formatPrice(variant.price, variant.currencyCode)}
                   </span>
                   <span className={variant.isAvailable ? "availability" : "availability unavailable"}>
-                    {variant.isAvailable ? "In stock" : "Out of stock"}
+                    {variant.isAvailable ? text.stock : text.out}
                   </span>
                 </label>
               ))}
@@ -286,35 +298,40 @@ function Storefront() {
               </fieldset>
             ))}
             <div className="quantity-control">
-              <label htmlFor="store-quantity">Quantity</label>
+              <label htmlFor="store-quantity">{text.quantity}</label>
               <div className="quantity-stepper">
-                <button type="button" aria-label="Decrease quantity" disabled={quantity <= 1} onClick={() => setQuantity((value) => Math.max(1, value - 1))}>−</button>
+                <button type="button" aria-label={text.decrease} disabled={quantity <= 1} onClick={() => setQuantity((value) => Math.max(1, value - 1))}>−</button>
                 <input id="store-quantity" type="number" inputMode="numeric" min="1" step="1" value={quantity} onChange={(event) => setQuantity(Math.max(1, Math.trunc(Number(event.target.value) || 1)))} />
-                <button type="button" aria-label="Increase quantity" onClick={() => setQuantity((value) => value + 1)}>+</button>
+                <button type="button" aria-label={text.increase} onClick={() => setQuantity((value) => value + 1)}>+</button>
               </div>
             </div>
-            <p className="store-total" aria-live="polite">Total: {formatPrice(currentTotal * quantity, selectedVariant?.currencyCode ?? "USD")}</p>
+            <p className="store-total" aria-live="polite">{text.total}: {formatPrice(currentTotal * quantity, selectedVariant?.currencyCode ?? "USD")}</p>
             {flashSaleActive && selectedVariant?.salePrice != null && (
               <p className="discount-note">
-                Save {product.flashSale.discountType === "percentage"
+                {text.save} {product.flashSale.discountType === "percentage"
                   ? `${product.flashSale.discountValue}%`
-                  : formatPrice(selectedVariant.price - selectedVariant.salePrice, selectedVariant.currencyCode)} during this sale
+                  : formatPrice(selectedVariant.price - selectedVariant.salePrice, selectedVariant.currencyCode)} {text.duringSale}
               </p>
             )}
             <button type="button" disabled={!selectedVariant?.isAvailable || !requiredAttributesSelected || checkoutBusy} onClick={() => void addToCart()}>
-              Add to cart
+              {text.add}
             </button>
-            <p className="note">{!requiredAttributesSelected ? "Choose an option for every required attribute." : !selectedVariant?.isAvailable ? "This option is currently out of stock." : "Cash on Delivery checkout will be available after store setup is complete."}</p>
+            <p className="note">{!requiredAttributesSelected ? text.chooseRequired : !selectedVariant?.isAvailable ? text.soldOut : `${text.cod} ${text.availableAfter}`}</p>
             {(product.socialSharingEnabled || product.whatsAppContactUrl) && (
               <div className="product-contact-actions">
-                {product.socialSharingEnabled && <button className="button-secondary" type="button" onClick={() => void shareProduct()}>Share product</button>}
-                {product.whatsAppContactUrl && <a className="button-whatsapp" href={product.whatsAppContactUrl} target="_blank" rel="noopener noreferrer">Chat with us on WhatsApp</a>}
+                {product.socialSharingEnabled && <button className="button-secondary" type="button" onClick={() => void shareProduct()}>{text.share}</button>}
+                {product.whatsAppContactUrl && <a className="button-whatsapp" href={product.whatsAppContactUrl} target="_blank" rel="noopener noreferrer">
+                  <svg className="whatsapp-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                    <path fill="currentColor" d="M16.04 3A12.9 12.9 0 0 0 4.93 22.47L3.2 28.8l6.49-1.7A12.9 12.9 0 1 0 16.04 3Zm0 23.47c-1.92 0-3.8-.51-5.44-1.47l-.39-.23-3.85 1.01 1.03-3.75-.25-.4a10.57 10.57 0 1 1 8.9 4.84Zm5.8-7.92c-.32-.16-1.9-.94-2.2-1.05-.3-.11-.52-.16-.74.16-.22.32-.84 1.05-1.03 1.27-.19.21-.38.24-.7.08-.32-.16-1.36-.5-2.59-1.59-.96-.86-1.61-1.92-1.8-2.24-.19-.32-.02-.49.14-.65.14-.14.32-.38.48-.56.16-.19.21-.32.32-.54.11-.21.05-.4-.03-.56-.08-.16-.73-1.76-1-2.41-.27-.63-.54-.55-.73-.56h-.62c-.21 0-.56.08-.86.4-.3.32-1.13 1.1-1.13 2.68s1.16 3.11 1.32 3.32c.16.22 2.28 3.48 5.51 4.88.77.33 1.37.53 1.84.68.77.24 1.47.21 2.03.13.62-.09 1.9-.78 2.17-1.54.27-.75.27-1.4.19-1.54-.08-.13-.29-.21-.62-.37Z" />
+                  </svg>
+                  <span>{text.whatsapp}</span>
+                </a>}
               </div>
             )}
             {shareMessage && <p className="share-message" role="status">{shareMessage}</p>}
           </div>
           {product.trustItems.length > 0 && (
-            <ul className="store-trust-items" aria-label="Store service details">
+            <ul className="store-trust-items" aria-label={text.storeDetails}>
               {product.trustItems.map((item) => (
                 <li key={item.title}>
                   <span className="trust-mark" aria-hidden="true">✓</span>
@@ -326,19 +343,19 @@ function Storefront() {
         </section>
       ) : (
         <section className="hero">
-          <h1>Your product story starts here.</h1>
-          <p className="intro">This store is ready for its first product. A System Admin can configure and publish it from the admin panel.</p>
-          <a className="button store-admin-link" href="/admin">Open admin</a>
+          <h1>{text.story}</h1>
+          <p className="intro">{text.empty}</p>
+          <a className="button store-admin-link" href="/admin">{text.openAdmin}</a>
         </section>
       )}
 
       {product && cartOpen && (
         <section className="cart-panel" aria-labelledby="cart-title">
           <div className="cart-heading">
-            <div><p className="eyebrow">Your selections</p><h2 id="cart-title">Shopping cart ({cartItemCount})</h2></div>
-            <button className="button-secondary" type="button" onClick={() => setCartOpen(false)}>Close cart</button>
+            <div><p className="eyebrow">{text.selections}</p><h2 id="cart-title">{text.shoppingCart} ({cartItemCount})</h2></div>
+            <button className="button-secondary" type="button" onClick={() => setCartOpen(false)}>{text.closeCart}</button>
           </div>
-          {cartItems.length === 0 ? <p className="note">Your cart is empty. Choose your product options and add them here.</p> : (
+          {cartItems.length === 0 ? <p className="note">{text.emptyCart}</p> : (
             <>
               <ul className="cart-list">
                 {cartItems.map((item) => {
@@ -350,33 +367,33 @@ function Storefront() {
                       <div className="cart-item-copy">
                         <strong>{product.name} · {variant.displayName}</strong>
                         {chosenOptions.length > 0 && <small>{chosenOptions.map((option) => option.name).join(", ")}</small>}
-                        <span>{formatPrice(item.unitPrice, item.currencyCode)} each</span>
+                        <span>{formatPrice(item.unitPrice, item.currencyCode)} {text.each}</span>
                       </div>
                       <div className="cart-item-actions" aria-label={`Quantity for ${variant.displayName}`}>
-                        <button type="button" aria-label="Decrease quantity" onClick={() => changeCartQuantity(item.key, -1)}>−</button>
+                        <button type="button" aria-label={text.decrease} onClick={() => changeCartQuantity(item.key, -1)}>−</button>
                         <span>{item.quantity}</span>
-                        <button type="button" aria-label="Increase quantity" onClick={() => changeCartQuantity(item.key, 1)}>+</button>
-                        <button className="remove-cart-item" type="button" onClick={() => removeCartItem(item.key)}>Remove</button>
+                        <button type="button" aria-label={text.increase} onClick={() => changeCartQuantity(item.key, 1)}>+</button>
+                        <button className="remove-cart-item" type="button" onClick={() => removeCartItem(item.key)}>{text.remove}</button>
                       </div>
                     </li>
                   );
                 })}
               </ul>
               <div className="cart-summary">
-                <div><strong>Estimated subtotal</strong>{Object.entries(cartSubtotals).map(([currency, amount]) => <strong key={currency}>{formatPrice(amount, currency)}</strong>)}</div>
-                <p>Price and currency are locked from when each cart line was added. Stock is confirmed when you place the order.</p>
-                {!checkoutOpen && <button type="button" onClick={() => { setCheckoutError(""); setCheckoutOpen(true); }}>Cash on Delivery checkout</button>}
+                <div><strong>{text.estimatedSubtotal}</strong>{Object.entries(cartSubtotals).map(([currency, amount]) => <strong key={currency}>{formatPrice(amount, currency)}</strong>)}</div>
+                <p>{text.priceLocked}</p>
+                {!checkoutOpen && <button type="button" onClick={() => { setCheckoutError(""); setCheckoutOpen(true); }}>{text.cod}</button>}
               </div>
               {checkoutOpen && (
                 <form className="checkout-form" onSubmit={(event) => void submitOrder(event)}>
-                  <h3>Delivery details</h3>
-                  <label>Customer name<input autoComplete="name" maxLength={200} required value={customerName} onChange={(event) => setCustomerName(event.target.value)} /></label>
-                  <label>Phone number<input type="tel" autoComplete="tel" maxLength={50} required value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} /></label>
-                  <label>Delivery address<textarea autoComplete="street-address" maxLength={1000} required rows={3} value={deliveryAddress} onChange={(event) => setDeliveryAddress(event.target.value)} /></label>
+                  <h3>{text.deliveryDetails}</h3>
+                  <label>{text.customerName}<input autoComplete="name" maxLength={200} required value={customerName} onChange={(event) => setCustomerName(event.target.value)} /></label>
+                  <label>{text.phoneNumber}<input type="tel" autoComplete="tel" maxLength={50} required value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} /></label>
+                  <label>{text.deliveryAddress}<textarea autoComplete="street-address" maxLength={1000} required rows={3} value={deliveryAddress} onChange={(event) => setDeliveryAddress(event.target.value)} /></label>
                   {checkoutError && <p className="form-error" role="alert">{checkoutError}</p>}
-                  <p className="note">Your order will be saved as Pending. Pay by Cash on Delivery when it arrives.</p>
-                  <button type="submit" disabled={checkoutBusy || cartItems.length === 0}>{checkoutBusy ? "Placing order…" : "Place COD order"}</button>
-                  <button className="button-secondary" type="button" onClick={() => setCheckoutOpen(false)} disabled={checkoutBusy}>Back to cart</button>
+                  <p className="note">{text.pendingPayment}</p>
+                  <button type="submit" disabled={checkoutBusy || cartItems.length === 0}>{checkoutBusy ? text.placingOrder : text.placeOrder}</button>
+                  <button className="button-secondary" type="button" onClick={() => setCheckoutOpen(false)} disabled={checkoutBusy}>{text.backToCart}</button>
                 </form>
               )}
             </>
@@ -384,11 +401,11 @@ function Storefront() {
           {cartMessage && <p className="share-message" role="status">{cartMessage}</p>}
           {orderConfirmation && (
             <div className="order-confirmation" role="status">
-              <p className="eyebrow">Order placed</p>
-              <h3>Thank you. Your COD order is pending.</h3>
-              <p>Order number: <strong>{orderConfirmation.orderNumber}</strong></p>
+              <p className="eyebrow">{text.orderPlaced}</p>
+              <h3>{text.thankYou}</h3>
+              <p>{text.orderNumber}: <strong>{orderConfirmation.orderNumber}</strong></p>
               <p>Total: <strong>{formatPrice(orderConfirmation.total, orderConfirmation.currencyCode)}</strong></p>
-              <p>Keep your order number for reference. Payment is due on delivery.</p>
+              <p>{text.keepNumber}</p>
             </div>
           )}
         </section>

@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore
+        run: dotnet restore backend/OneCart.Api.Tests/OneCart.Api.Tests.csproj
+      - name: Run API workflow tests
+        run: dotnet test backend/OneCart.Api.Tests/OneCart.Api.Tests.csproj --no-restore --configuration Release
+      - name: Run persistence tests
+        run: dotnet test backend/OneCart.Persistence.Tests/OneCart.Persistence.Tests.csproj --no-restore --configuration Release
+
+  frontend:
+    name: Frontend checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build

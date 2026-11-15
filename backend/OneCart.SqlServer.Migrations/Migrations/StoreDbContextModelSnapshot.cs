@@ -492,6 +492,18 @@ namespace OneCart.SqlServer.Migrations.Migrations
                         .HasMaxLength(8000)
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("CatalogTranslationsJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("nvarchar(max)")
+                        .HasDefaultValue("{}");
+
+                    b.Property<string>("StorefrontTranslationsJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("nvarchar(max)")
+                        .HasDefaultValue("{}");
+
                     b.Property<string>("FlashSaleDiscountType")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -824,6 +836,24 @@ namespace OneCart.SqlServer.Migrations.Migrations
             modelBuilder.Entity("OneCart.Api.Catalog.ProductVariant", b =>
                 {
                     b.Navigation("OrderLines");
+                });
+
+            modelBuilder.Entity("OneCart.Api.Admin.AdminSystemSetting", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("MfaRequired")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.HasKey("Id");
+
+                    b.ToTable("admin_system_settings", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_admin_system_settings_singleton", "[Id] = 1");
+                        });
                 });
 
             modelBuilder.Entity("OneCart.Api.Catalog.StoreProduct", b =>

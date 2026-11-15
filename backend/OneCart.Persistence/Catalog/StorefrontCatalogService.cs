@@ -5,7 +5,11 @@ namespace OneCart.Api.Catalog;
 
 public sealed class StorefrontCatalogService(StoreDbContext database)
 {
+    public Task<StorefrontProductResponse?> GetPublishedProductAsync(CancellationToken cancellationToken) =>
+        GetPublishedProductAsync("en", cancellationToken);
+
     public async Task<StorefrontProductResponse?> GetPublishedProductAsync(
+        string language,
         CancellationToken cancellationToken)
     {
         var product = await database.Products
@@ -30,6 +34,10 @@ public sealed class StorefrontCatalogService(StoreDbContext database)
             return null;
         }
 
+        var catalogTranslations = CatalogTranslations.Parse(product.CatalogTranslationsJson);
+        var storefrontTranslations = CatalogTranslations.Parse(product.StorefrontTranslationsJson);
+        string Catalog(string key, string value) => CatalogTranslations.Resolve(catalogTranslations, language, key, value);
+        string Store(string key, string value) => CatalogTranslations.Resolve(storefrontTranslations, language, key, value);
         var serverTimeUtc = DateTimeOffset.UtcNow;
         var hasValidSaleWindow = product.FlashSaleStartsAtUtc is not null
             && product.FlashSaleEndsAtUtc is not null
@@ -39,7 +47,7 @@ public sealed class StorefrontCatalogService(StoreDbContext database)
         var variants = product.Variants
             .Select(variant => new StorefrontVariantResponse(
                 variant.Id,
-                variant.DisplayName,
+                Catalog($"variant.{variant.Id}.name", variant.DisplayName),
                 variant.Price,
                 saleConfigured ? CalculateSalePrice(variant.Price, product.FlashSaleDiscountType, product.FlashSaleDiscountValue) : null,
                 product.CurrencyCode,
@@ -47,34 +55,35 @@ public sealed class StorefrontCatalogService(StoreDbContext database)
             .ToArray();
 
         var phoneDigits = new string(product.WhatsAppPhoneNumber.Where(char.IsDigit).ToArray());
+        var whatsAppMessage = Store("contact.whatsAppPrefillMessage", product.WhatsAppPrefillMessage);
         var whatsAppUrl = product.WhatsAppEnabled && phoneDigits.Length is >= 7 and <= 15
-            ? $"https://wa.me/{phoneDigits}?text={Uri.EscapeDataString(product.WhatsAppPrefillMessage)}"
+            ? $"https://wa.me/{phoneDigits}?text={Uri.EscapeDataString(whatsAppMessage)}"
             : null;
 
         return new StorefrontProductResponse(
             product.Id,
-            product.Name,
+            Catalog("product.name", product.Name),
             product.Slug,
-            product.Description,
+            Catalog("product.description", product.Description),
             product.CurrencyCode,
-            product.BrandName,
-            product.StorefrontHeadline,
-            product.StorefrontSubtitle,
+            Store("store.brandName", product.BrandName),
+            Store("store.headline", product.StorefrontHeadline),
+            Store("store.subtitle", product.StorefrontSubtitle),
             variants,
             product.AttributeGroups
                 .Select(group => new StorefrontAttributeGroupResponse(
                     group.Id,
-                    group.Name,
+                    Catalog($"attributeGroup.{group.Id}.name", group.Name),
                     group.IsRequired,
                     group.AllowMultiple,
                     group.Options.Select(option => new StorefrontAttributeOptionResponse(
                         option.Id,
-                        option.Name,
+                        Catalog($"attributeOption.{option.Id}.name", option.Name),
                         option.PriceAdjustment)).ToArray()))
                 .ToArray(),
             new StorefrontFlashSaleResponse(
                 saleConfigured,
-                product.FlashSaleLabel,
+                Store("promotion.flashSaleLabel", product.FlashSaleLabel),
                 product.FlashSaleDiscountType,
                 product.FlashSaleDiscountValue,
                 product.FlashSaleStartsAtUtc,
@@ -90,7 +99,9 @@ public sealed class StorefrontCatalogService(StoreDbContext database)
                 .Select(image => "/api/v1/store/product/images/" + image.Id)
                 .SingleOrDefault(),
             product.TrustItems.OrderBy(item => item.DisplayOrder)
-                .Select(item => new StorefrontTrustItemResponse(item.Title, item.Description))
+                .Select(item => new StorefrontTrustItemResponse(
+                    Store($"trust.{item.Id}.title", item.Title),
+                    Store($"trust.{item.Id}.description", item.Description)))
                 .ToArray());
     }
 

@@ -11,6 +11,81 @@ namespace OneCart.Api.Tests;
 public sealed class OrderWorkflowTests
 {
     [Fact]
+    public async Task CustomerContactDirectoryKeepsEachOrderSeparateAndPaginates()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<StoreDbContext>().UseSqlite(connection).Options;
+        await using var database = new StoreDbContext(options);
+        await database.Database.EnsureCreatedAsync();
+        var now = DateTimeOffset.UtcNow;
+        database.StoreOrders.AddRange(
+            CreateOrder("OC-20261115-0001", "USD", "Pending", 100m, now),
+            CreateOrder("OC-20261115-0002", "USD", "Completed", 200m, now.AddMinutes(1)),
+            CreateOrder("OC-20261115-0003", "USD", "Cancelled", 50m, now.AddMinutes(2)));
+        await database.SaveChangesAsync();
+
+        var service = new OrderManagementService(database);
+        var firstPage = await service.SearchCustomerContactsAsync(null, 1, 1, CancellationToken.None);
+        Assert.Equal(3, firstPage.TotalCount);
+        Assert.Equal("OC-20261115-0003", Assert.Single(firstPage.Items).OrderNumber);
+        Assert.Equal(1, firstPage.Page);
+        var lastPage = await service.SearchCustomerContactsAsync(null, 99, 1, CancellationToken.None);
+        Assert.Equal(3, lastPage.Page);
+        Assert.Equal("OC-20261115-0001", lastPage.Items.Single().OrderNumber);
+
+        var matchingContact = await service.SearchCustomerContactsAsync("customer", 1, 25, CancellationToken.None);
+        Assert.Equal(3, matchingContact.TotalCount);
+        Assert.Equal(3, matchingContact.Items.Count);
+
+        var matchingOrder = await service.SearchCustomerContactsAsync("0002", 1, 25, CancellationToken.None);
+        var contact = Assert.Single(matchingOrder.Items);
+        Assert.Equal("OC-20261115-0002", contact.OrderNumber);
+        Assert.Equal("Customer", contact.CustomerName);
+    }
+
+    [Fact]
+    public async Task OrderTotalsStayGroupedByHistoricalCurrencyAndStatus()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<StoreDbContext>().UseSqlite(connection).Options;
+        await using var database = new StoreDbContext(options);
+        await database.Database.EnsureCreatedAsync();
+
+        var now = DateTimeOffset.UtcNow;
+        database.StoreOrders.AddRange(
+            CreateOrder("OC-USD-1", "USD", "Pending", 100m, now),
+            CreateOrder("OC-USD-2", "USD", "Pending", 25m, now.AddMinutes(1)),
+            CreateOrder("OC-USD-3", "USD", "Cancelled", 40m, now.AddMinutes(2)),
+            CreateOrder("OC-BDT-1", "BDT", "Completed", 3000m, now.AddMinutes(3)));
+        await database.SaveChangesAsync();
+
+        var summary = await new OrderManagementService(database).GetOrderTotalsAsync(CancellationToken.None);
+
+        Assert.Equal(2, summary.Count);
+        var usd = Assert.Single(summary, currency => currency.CurrencyCode == "USD");
+        Assert.Collection(usd.Statuses,
+            pending =>
+            {
+                Assert.Equal("Pending", pending.Status);
+                Assert.Equal(2, pending.OrderCount);
+                Assert.Equal(125m, pending.OrderTotal);
+            },
+            cancelled =>
+            {
+                Assert.Equal("Cancelled", cancelled.Status);
+                Assert.Equal(1, cancelled.OrderCount);
+                Assert.Equal(40m, cancelled.OrderTotal);
+            });
+
+        var bdt = Assert.Single(summary, currency => currency.CurrencyCode == "BDT");
+        var completed = Assert.Single(bdt.Statuses);
+        Assert.Equal("Completed", completed.Status);
+        Assert.Equal(3000m, completed.OrderTotal);
+    }
+
+    [Fact]
     public async Task CheckoutSnapshotsQuoteAndCancellationRestoresStockOnce()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
@@ -108,4 +183,18 @@ public sealed class OrderWorkflowTests
         Assert.Equal(3, await database.ProductVariants.Where(item => item.Id == variant.Id).Select(item => item.StockQuantity).SingleAsync());
         Assert.Empty(await database.StoreOrders.ToListAsync());
     }
+
+    private static StoreOrder CreateOrder(string orderNumber, string currencyCode, string status, decimal total, DateTimeOffset createdAtUtc) => new()
+    {
+        Id = Guid.NewGuid(),
+        OrderNumber = orderNumber,
+        CurrencyCode = currencyCode,
+        Status = status,
+        CustomerName = "Customer",
+        PhoneNumber = "+15550100",
+        DeliveryAddress = "1 Test Street",
+        Total = total,
+        CreatedAtUtc = createdAtUtc,
+        UpdatedAtUtc = createdAtUtc
+    };
 }

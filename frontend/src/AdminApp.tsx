@@ -1,6 +1,11 @@
 import { FormEvent, useEffect, useState } from "react";
 import AdminCatalogEditor from "./AdminCatalogEditor";
+import AdminCustomers from "./AdminCustomers";
 import AdminOrders from "./AdminOrders";
+import AdminStoreSettings from "./AdminStoreSettings";
+import AdminMfaEnrollment from "./AdminMfaEnrollment";
+import AdminMfaDisable from "./AdminMfaDisable";
+import AdminPasswordReset from "./AdminPasswordReset";
 import { adminRequest, AdminAuditEvent, AdminRole, AdminUser, refreshCsrfToken } from "./adminApi";
 
 type RoleChanges = Record<string, string[]>;
@@ -10,9 +15,13 @@ export default function AdminApp() {
   const [roles, setRoles] = useState<AdminRole[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [auditEvents, setAuditEvents] = useState<AdminAuditEvent[]>([]);
+  const [mfaPolicyRequired, setMfaPolicyRequired] = useState(false);
   const [roleChanges, setRoleChanges] = useState<RoleChanges>({});
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
+  const [authenticatorCode, setAuthenticatorCode] = useState("");
+  const [showMfaSetup, setShowMfaSetup] = useState(false);
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -23,14 +32,16 @@ export default function AdminApp() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   async function loadAdminData() {
-    const [loadedRoles, loadedUsers, loadedAuditEvents] = await Promise.all([
+    const [loadedRoles, loadedUsers, loadedAuditEvents, mfaPolicy] = await Promise.all([
       adminRequest<AdminRole[]>("/api/v1/admin/roles"),
       adminRequest<AdminUser[]>("/api/v1/admin/users"),
-      adminRequest<AdminAuditEvent[]>("/api/v1/admin/audit")
+      adminRequest<AdminAuditEvent[]>("/api/v1/admin/audit"),
+      adminRequest<{ required: boolean }>("/api/v1/admin/security/mfa-policy")
     ]);
     setRoles(loadedRoles);
     setUsers(loadedUsers);
     setAuditEvents(loadedAuditEvents);
+    setMfaPolicyRequired(mfaPolicy.required);
     setRoleChanges(Object.fromEntries(loadedUsers.map((user) => [user.id, user.roles])));
   }
 
@@ -38,7 +49,7 @@ export default function AdminApp() {
     await refreshCsrfToken();
     const user = await adminRequest<AdminUser>("/api/v1/admin/me");
     setCurrentUser(user);
-    if (!user.mustChangePassword && user.roles.includes("SystemAdmin")) {
+    if (!user.mustChangePassword && (!user.mfaRequired || user.twoFactorEnabled) && user.roles.includes("SystemAdmin")) {
       await loadAdminData();
     }
   }
@@ -65,10 +76,21 @@ export default function AdminApp() {
     setMessage("");
     try {
       await refreshCsrfToken();
-      await adminRequest("/api/v1/admin/login", {
-        method: "POST",
-        body: JSON.stringify({ email, password })
-      });
+      if (requiresTwoFactor) {
+        await adminRequest("/api/v1/admin/two-factor/login", { method: "POST", body: JSON.stringify({ code: authenticatorCode }) });
+        setRequiresTwoFactor(false);
+        setAuthenticatorCode("");
+      } else {
+        const result = await adminRequest<{ requiresTwoFactor: boolean }>("/api/v1/admin/login", {
+          method: "POST", body: JSON.stringify({ email, password })
+        });
+        if (result.requiresTwoFactor) {
+          setRequiresTwoFactor(true);
+          setPassword("");
+          setMessage("Enter the current code from your authenticator app.");
+          return;
+        }
+      }
       await loadSession();
       setPassword("");
       setMessage("Signed in successfully.");
@@ -77,6 +99,15 @@ export default function AdminApp() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function handleForgotPassword() {
+    setBusy(true); setError(""); setMessage("");
+    try {
+      await adminRequest("/api/v1/admin/password/forgot", { method: "POST", body: JSON.stringify({ email }) });
+      setMessage("If that administrator account exists, a reset link will be sent.");
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Password recovery is currently unavailable."); }
+    finally { setBusy(false); }
   }
 
   async function handleCreateUser(event: FormEvent<HTMLFormElement>) {
@@ -125,6 +156,28 @@ export default function AdminApp() {
     }
   }
 
+  async function handleResetMfa(userId: string) {
+    if (!window.confirm("Reset authenticator enrollment? This admin will need to enroll again before using admin features.")) return;
+    setBusy(true); setError(""); setMessage("");
+    try {
+      await adminRequest<void>(`/api/v1/admin/users/${userId}/mfa/reset`, { method: "POST" });
+      await loadAdminData();
+      setMessage("Authenticator enrollment reset. The user must enroll again before using admin features.");
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Authenticator enrollment could not be reset."); }
+    finally { setBusy(false); }
+  }
+
+  async function handleMfaPolicyChange(required: boolean) {
+    setBusy(true); setError(""); setMessage("");
+    try {
+      await adminRequest<void>("/api/v1/admin/security/mfa-policy", { method: "PUT", body: JSON.stringify({ required }) });
+      setMfaPolicyRequired(required);
+      setCurrentUser(current => current ? { ...current, mfaRequired: required } : current);
+      setMessage(required ? "Authenticator MFA is now required for all administrators." : "Authenticator MFA is optional for administrators.");
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "MFA policy could not be saved."); }
+    finally { setBusy(false); }
+  }
+
   async function handlePasswordChange(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -154,6 +207,7 @@ export default function AdminApp() {
       setUsers([]);
       setRoles([]);
       setAuditEvents([]);
+      setShowMfaSetup(false);
       await refreshCsrfToken();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Sign-out failed.");
@@ -163,7 +217,20 @@ export default function AdminApp() {
   }
 
   const isSystemAdmin = currentUser?.roles.includes("SystemAdmin") ?? false;
-  const hasWorkspace = Boolean(currentUser && !currentUser.mustChangePassword && isSystemAdmin);
+  const canCatalog = isSystemAdmin || (currentUser?.roles.includes("CatalogManager") ?? false);
+  const canManageOrders = isSystemAdmin || (currentUser?.roles.includes("OrderManager") ?? false);
+  const canManageStore = isSystemAdmin || (currentUser?.roles.includes("StoreManager") ?? false);
+  const hasWorkspace = Boolean(currentUser && !currentUser.mustChangePassword
+    && (!(currentUser.mfaRequired ?? false) || currentUser.twoFactorEnabled)
+    && (isSystemAdmin || canCatalog || canManageOrders || canManageStore));
+  const visibleMenuItems = adminMenuItems.filter(item => item.id === "overview"
+    || (item.id === "catalog" && canCatalog)
+    || (item.id === "orders" && canManageOrders)
+    || (item.id === "customers" && canManageOrders)
+    || (item.id === "storefront" && canManageStore)
+    || ((item.id === "accounts" || item.id === "audit") && isSystemAdmin));
+
+  if (window.location.pathname === "/admin/reset-password") return <AdminPasswordReset />;
 
   function navigateSection(sectionId: string) {
     setActiveSection(sectionId);
@@ -182,7 +249,7 @@ export default function AdminApp() {
             </a>
             <nav className="admin-sidebar-nav" aria-label="Admin sections">
               <p className="admin-nav-label">STORE WORKSPACE</p>
-              {adminMenuItems.map((item) => (
+              {visibleMenuItems.map((item) => (
                 <button
                   className={`admin-nav-item${activeSection === item.id ? " active" : ""}`}
                   type="button"
@@ -211,7 +278,7 @@ export default function AdminApp() {
             </button>
             <div className="admin-page-heading">
               <p>ONECART ADMIN</p>
-              <strong>{adminMenuItems.find((item) => item.id === activeSection)?.label ?? "Overview"}</strong>
+              <strong>{visibleMenuItems.find((item) => item.id === activeSection)?.label ?? "Overview"}</strong>
             </div>
           </>
         ) : (
@@ -234,17 +301,16 @@ export default function AdminApp() {
         {!currentUser ? (
           <form className="admin-card login-card" onSubmit={handleLogin}>
             <p className="eyebrow">Secure access</p>
-            <h1>Administrator sign in</h1>
-            <p className="admin-muted">Use the email and password created for your account.</p>
-            <label>
-              Email address
-              <input type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} />
-            </label>
-            <label>
-              Password
-              <input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} />
-            </label>
-            <button className="button" type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
+            <h1>{requiresTwoFactor ? "Authenticator verification" : "Administrator sign in"}</h1>
+            <p className="admin-muted">{requiresTwoFactor ? "Enter the current code from your authenticator app." : "Use the email and password created for your account."}</p>
+            {!requiresTwoFactor ? <>
+              <label>Email address<input type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} /></label>
+              <label>Password<input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+            </> : <label>Authenticator code<input inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]{6,12}" required value={authenticatorCode} onChange={event => setAuthenticatorCode(event.target.value)} /></label>}
+            <button className="button login-submit" type="submit" disabled={busy}>{busy ? "Signing in…" : requiresTwoFactor ? "Verify and sign in" : "Sign in"}</button>
+            {!requiresTwoFactor && <button className="button button-quiet" type="button" onClick={() => void handleForgotPassword()} disabled={busy || !email}>{busy ? "Sending…" : "Forgot password? Send reset link"}</button>}
+            {message && <p className="admin-message login-feedback" role="status">{message}</p>}
+            {error && <p className="admin-error login-feedback" role="alert">{error}</p>}
           </form>
         ) : currentUser.mustChangePassword ? (
           <form className="admin-card login-card" onSubmit={handlePasswordChange}>
@@ -261,7 +327,9 @@ export default function AdminApp() {
             <p className="admin-muted">Use at least 12 characters with uppercase, lowercase, a number, and a symbol.</p>
             <button className="button" type="submit" disabled={busy}>Update password</button>
           </form>
-        ) : !isSystemAdmin ? (
+        ) : currentUser.mfaRequired && !currentUser.twoFactorEnabled ? (
+          <AdminMfaEnrollment onComplete={loadSession} />
+        ) : !hasWorkspace ? (
           <section className="admin-card">
             <p className="eyebrow">Account ready</p>
             <h1>Welcome</h1>
@@ -275,11 +343,11 @@ export default function AdminApp() {
                 <h1>Overview</h1>
                 <p className="admin-muted">Manage your product, customer orders, and administrator access.</p>
               </div>
-              <span className="admin-badge">System Admin</span>
+              <span className="admin-badge">{isSystemAdmin ? "System Admin" : currentUser.roles.join(" · ")}</span>
             </div>
 
             <div className="admin-overview-links" aria-label="Workspace shortcuts">
-              {adminMenuItems.filter((item) => item.id !== "overview").map((item) => (
+              {visibleMenuItems.filter((item) => item.id !== "overview").map((item) => (
                 <button className="admin-overview-link" type="button" key={item.id} onClick={() => navigateSection(item.id)}>
                   <AdminMenuIcon name={item.id} />
                   <span><strong>{item.label}</strong><small>{item.description}</small></span>
@@ -288,11 +356,29 @@ export default function AdminApp() {
               ))}
             </div>
 
-            <div id="catalog" className="admin-nav-target"><AdminCatalogEditor /></div>
+            {!currentUser.twoFactorEnabled && <section className="admin-card mfa-optional-card">
+              <div><h2>Protect your admin sign-in</h2><p className="admin-muted">Authenticator MFA is currently optional. Enroll now to require a one-time code when you sign in.</p></div>
+              {!showMfaSetup && <button className="button" type="button" onClick={() => setShowMfaSetup(true)}>Set up authenticator app</button>}
+            </section>}
+            {showMfaSetup && !currentUser.twoFactorEnabled && <AdminMfaEnrollment onComplete={loadSession} />}
+            {currentUser.twoFactorEnabled && !currentUser.mfaRequired && <section className="admin-card mfa-optional-card">
+              <div><h2>Authenticator MFA is enabled</h2><p className="admin-muted">MFA is optional under the current System Admin policy. You can disable it after verifying a current code.</p></div>
+              <AdminMfaDisable onComplete={loadSession} />
+            </section>}
 
-            <div id="orders" className="admin-nav-target"><AdminOrders /></div>
+            {canCatalog && <div id="catalog" className="admin-nav-target"><AdminCatalogEditor canManageStoreSettings={isSystemAdmin} /></div>}
 
-            <div id="accounts" className="admin-nav-target">
+            {canManageOrders && <div id="orders" className="admin-nav-target"><AdminOrders /></div>}
+
+            {canManageOrders && <div id="customers" className="admin-nav-target"><AdminCustomers /></div>}
+
+            {canManageStore && <div id="storefront" className="admin-nav-target"><AdminStoreSettings /></div>}
+
+            {isSystemAdmin && <div id="accounts" className="admin-nav-target">
+              <section className="admin-card">
+                <div className="section-heading"><div><h2>Admin MFA policy</h2><p className="admin-muted">Choose whether authenticator codes are optional or required for every administrator.</p></div></div>
+                <label className="role-option"><input type="checkbox" checked={mfaPolicyRequired} disabled={busy} onChange={event => void handleMfaPolicyChange(event.target.checked)} />Require authenticator MFA for all admin accounts</label>
+              </section>
               <section className="admin-card">
                 <div className="section-heading">
                   <div>
@@ -345,7 +431,7 @@ export default function AdminApp() {
                     <article className="user-row" key={user.id}>
                       <div className="user-summary">
                         <strong>{user.email}</strong>
-                        <span>{user.mustChangePassword ? "Must change password" : user.roles.join(", ")}</span>
+                        <span>{user.mustChangePassword ? "Must change password" : user.roles.join(", ")} · {user.twoFactorEnabled ? "MFA enabled" : "MFA off"}</span>
                       </div>
                       <div className="role-editor">
                         {roles.map((role) => (
@@ -370,14 +456,15 @@ export default function AdminApp() {
                       <button className="button button-quiet" onClick={() => void handleSaveRoles(user.id)} disabled={busy || (roleChanges[user.id] ?? user.roles).length === 0}>
                         Save roles
                       </button>
+                      {user.twoFactorEnabled && <button className="button button-quiet" onClick={() => void handleResetMfa(user.id)} disabled={busy}>Reset MFA</button>}
                     </article>
                   ))}
                   {users.length === 0 && <p className="admin-muted">No accounts yet.</p>}
                 </div>
               </section>
-            </div>
+            </div>}
 
-            <section className="admin-card admin-nav-target" id="audit">
+            {isSystemAdmin && <section className="admin-card admin-nav-target" id="audit">
               <div className="section-heading">
                 <div>
                   <h2>Audit history</h2>
@@ -404,12 +491,12 @@ export default function AdminApp() {
                 ))}
                 {auditEvents.length === 0 && <p className="admin-muted">No administrative changes recorded yet.</p>}
               </div>
-            </section>
+            </section>}
           </>
         )}
 
         {message && <p className="admin-message" role="status">{message}</p>}
-        {error && <p className="admin-error" role="alert">{error}</p>}
+        {error && currentUser && <p className="admin-error" role="alert">{error}</p>}
       </section>
       <footer className="admin-footer">OneCart Commerce · Secure administrator access</footer>
       </div>
@@ -421,6 +508,8 @@ const adminMenuItems = [
   { id: "overview", label: "Overview", description: "Store workspace summary" },
   { id: "catalog", label: "Catalog", description: "Product, pricing, and storefront" },
   { id: "orders", label: "Orders", description: "Review and update customer orders" },
+  { id: "customers", label: "Customers", description: "Search contact details from orders" },
+  { id: "storefront", label: "Storefront settings", description: "Brand, promotions, contact and trust details" },
   { id: "accounts", label: "Accounts & roles", description: "Manage administrator access" },
   { id: "audit", label: "Audit history", description: "Review administrator activity" }
 ];
@@ -431,6 +520,8 @@ function AdminMenuIcon({ name }: { name: string }) {
       {name === "overview" ? <><path d="m3 10 9-7 9 7" /><path d="M5 9v12h14V9" /><path d="M9 21v-7h6v7" /></>
         : name === "catalog" ? <><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" /></>
           : name === "orders" ? <><path d="M6 3h9l4 4v14H6z" /><path d="M14 3v5h5M9 12h7M9 16h7" /></>
+          : name === "customers" ? <><circle cx="9" cy="8" r="3" /><path d="M3.5 20v-1.5a5.5 5.5 0 0 1 11 0V20zM16 8h5M18.5 5.5v5" /></>
+            : name === "storefront" ? <><path d="M3 10h18l-2-6H5zM5 10v10h14V10M9 20v-6h6v6" /></>
             : name === "accounts" ? <><circle cx="9" cy="8" r="3" /><path d="M3.5 20v-1.5a5.5 5.5 0 0 1 11 0V20zM16 5.5a3 3 0 0 1 0 5.8M18 15a4.5 4.5 0 0 1 2.5 4v1" /></>
               : <><path d="M4 5h16M4 12h16M4 19h16" /><circle cx="7" cy="5" r="1" /><circle cx="7" cy="12" r="1" /><circle cx="7" cy="19" r="1" /></>}
     </svg>

@@ -26,8 +26,20 @@ interface AdminOrderDetails extends AdminOrderSummary {
   }>;
 }
 
+interface AdminOrderStatusTotals {
+  status: string;
+  orderCount: number;
+  orderTotal: number;
+}
+
+interface AdminOrderCurrencyTotals {
+  currencyCode: string;
+  statuses: AdminOrderStatusTotals[];
+}
+
 export default function AdminOrders() {
   const [orders, setOrders] = useState<AdminOrderSummary[]>([]);
+  const [totals, setTotals] = useState<AdminOrderCurrencyTotals[]>([]);
   const [selected, setSelected] = useState<AdminOrderDetails | null>(null);
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
@@ -35,8 +47,12 @@ export default function AdminOrders() {
   const [message, setMessage] = useState("");
 
   async function loadOrders(selectedId?: string) {
-    const loaded = await adminRequest<AdminOrderSummary[]>("/api/v1/admin/orders");
+    const [loaded, loadedTotals] = await Promise.all([
+      adminRequest<AdminOrderSummary[]>("/api/v1/admin/orders"),
+      adminRequest<AdminOrderCurrencyTotals[]>("/api/v1/admin/orders/summary")
+    ]);
     setOrders(loaded);
+    setTotals(loadedTotals);
     const orderId = selectedId ?? selected?.id ?? loaded[0]?.id;
     if (!orderId) {
       setSelected(null);
@@ -95,6 +111,26 @@ export default function AdminOrders() {
         <div><h2>Orders</h2><p className="admin-muted">Recent Cash on Delivery orders. Cancelling a pending or processing order restores its stock.</p></div>
         <span className="user-count">Latest {orders.length}</span>
       </div>
+      <section className="order-summary" aria-label="Order totals by currency and status">
+        <div className="section-heading">
+          <div><h3>Order totals</h3><p className="admin-muted">All recorded orders, grouped by their saved currency and current status.</p></div>
+        </div>
+        {totals.map((currency) => (
+          <div className="order-currency-summary" key={currency.currencyCode}>
+            <h4>{currency.currencyCode}</h4>
+            <div className="order-total-grid">
+              {currency.statuses.map((summary) => (
+                <article className="order-total-card" key={`${currency.currencyCode}-${summary.status}`}>
+                  <span>{summary.status}</span>
+                  <strong>{summary.orderCount} {summary.orderCount === 1 ? "order" : "orders"}</strong>
+                  <small>{formatPrice(summary.orderTotal, currency.currencyCode)} order value</small>
+                </article>
+              ))}
+            </div>
+          </div>
+        ))}
+        {totals.length === 0 && <p className="admin-muted">No order totals to show yet.</p>}
+      </section>
       <div className="orders-layout">
         <div className="orders-list">
           {orders.map((order) => (
