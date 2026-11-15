@@ -1,7 +1,9 @@
 using Microsoft.Data.SqlClient;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using OneCart.Api.Catalog;
 using OneCart.Api.Data;
+using OneCart.Api.Orders;
 using Xunit;
 
 namespace OneCart.Persistence.IntegrationTests;
@@ -124,7 +126,43 @@ public sealed class SqlServerCatalogIntegrationTests
             Assert.Equal("Updated product front", update.Image?.AltText);
             Assert.True(await mediaService.DeleteAsync(image.Id, Guid.NewGuid(), "media@onecart.local", CancellationToken.None));
             Assert.Empty((await readService.GetPublishedProductAsync(CancellationToken.None))!.Images);
-            Assert.Equal(4, await database.AdminAuditEvents.AsNoTracking().CountAsync());
+            var protector = new EphemeralDataProtectionProvider().CreateProtector("OneCart.CartQuote.v1");
+            var quoteService = new CartQuoteService(database, protector);
+            var productOption = published.AttributeGroups[0].Options[0];
+            var quote = await quoteService.CreateAsync(
+                new CartQuoteRequest(published.Variants[0].Id, [productOption.Id]),
+                CancellationToken.None);
+            Assert.NotNull(quote.Quote);
+
+            var checkout = new CheckoutService(database, quoteService);
+            var placement = await checkout.PlaceOrderAsync(
+                new OrderPlacementRequest(
+                    "Integration Customer",
+                    "+8801712345678",
+                    "Integration test delivery address",
+                    [new OrderLineRequest(quote.Quote!.Token, 2)]),
+                CancellationToken.None);
+            Assert.NotNull(placement.Order);
+            Assert.Equal("Pending", placement.Order!.Status);
+            Assert.Equal(5, await database.ProductVariants.AsNoTracking()
+                .Where(variant => variant.Id == published.Variants[0].Id)
+                .Select(variant => variant.StockQuantity)
+                .SingleAsync());
+
+            var order = await database.StoreOrders.SingleAsync(order => order.OrderNumber == placement.Order.OrderNumber);
+            var orderManagement = new OrderManagementService(database);
+            var cancellation = await orderManagement.UpdateStatusAsync(
+                order.Id,
+                "Cancelled",
+                Guid.NewGuid(),
+                "integration-test@onecart.local",
+                CancellationToken.None);
+            Assert.Equal("Cancelled", cancellation.Order?.Status);
+            Assert.Equal(7, await database.ProductVariants.AsNoTracking()
+                .Where(variant => variant.Id == published.Variants[0].Id)
+                .Select(variant => variant.StockQuantity)
+                .SingleAsync());
+            Assert.Equal(5, await database.AdminAuditEvents.AsNoTracking().CountAsync());
         }
         finally
         {

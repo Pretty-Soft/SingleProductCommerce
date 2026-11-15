@@ -51,7 +51,7 @@ Acceptance: a clean installation and a supported upgrade can be completed from d
 
 ## Stage 6 — Additional persistence providers
 
-An experimental SQL Server provider and isolated initial migration set exist for local evaluation. A local integration test covers schema migration and catalog write/read behavior. Keep PostgreSQL as the default. Complete provider-specific installation, deployment, concurrency, backup/restore, and broader integration verification before advertising SQL Server support. Add any other required provider only after the first complete workflow establishes the persistence contract.
+An experimental SQL Server provider and isolated initial migration set exist for local evaluation. An opt-in local integration test covers schema migration, catalog/media operations, COD order creation, inventory decrement, and stock restoration after cancellation. A SQL Server restore runbook is available for local rehearsal. Keep PostgreSQL as the default. Complete provider-specific installation, deployment, concurrency, restore rehearsal, and broader integration verification before advertising SQL Server support. Add any other required provider only after the first complete workflow establishes the persistence contract.
 
 Acceptance: the published support matrix matches verified provider capabilities. “Hybrid” remains undefined until the owner confirms its intended meaning.
 

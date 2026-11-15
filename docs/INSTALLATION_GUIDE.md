@@ -72,7 +72,7 @@ The API URL is `https://localhost:7241`. Vite normally serves the storefront at 
 
 ## Local files and operational settings
 
-Product images are stored on the API host under `backend/OneCart.Api/App_Data/product-images` by default. Data Protection keys are stored under `backend/OneCart.Api/App_Data/data-protection-keys`; Windows protects local keys with DPAPI. These folders are ignored by Git and must be included in a store backup. See the [PostgreSQL backup and restore runbook](OPERATIONS_POSTGRES.md).
+Product images are stored on the API host under `backend/OneCart.Api/App_Data/product-images` by default. Data Protection keys are stored under `backend/OneCart.Api/App_Data/data-protection-keys`; Windows protects local keys with DPAPI. These folders are ignored by Git and must be included in a store backup. See the [PostgreSQL backup and restore runbook](OPERATIONS_POSTGRES.md) or the [experimental SQL Server backup and restore runbook](OPERATIONS_SQLSERVER_EXPERIMENTAL.md).
 
 To enable administrator password-reset email, configure SMTP and the HTTPS reset URL using user secrets. See the [README setup section](../README.md#run-locally). Email recovery is unavailable until SMTP is configured.
 
