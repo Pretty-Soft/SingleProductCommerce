@@ -7,7 +7,7 @@ namespace OneCart.Api.Tests;
 public sealed class CorsOriginConfigurationTests
 {
     [Fact]
-    public void DevelopmentAllowsTheViteOriginsOnBothSupportedPorts()
+    public void DevelopmentAllowsTheViteOriginsOnSupportedPorts()
     {
         var configuration = new ConfigurationBuilder().Build();
 
@@ -17,6 +17,8 @@ public sealed class CorsOriginConfigurationTests
         Assert.Contains("http://127.0.0.1:5173", origins);
         Assert.Contains("http://localhost:5174", origins);
         Assert.Contains("http://127.0.0.1:5174", origins);
+        Assert.Contains("http://localhost:5175", origins);
+        Assert.Contains("http://127.0.0.1:5175", origins);
     }
 
     [Fact]
