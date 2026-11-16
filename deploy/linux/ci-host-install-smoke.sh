@@ -3,6 +3,7 @@ set -euo pipefail
 
 api_output="${1:?Pass the published API directory}"
 store_output="${2:?Pass the built storefront directory}"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 host="shop.example.test"
 origin="https://${host}"
 database_password="onecart-ci-only"
@@ -45,6 +46,7 @@ sudo chown root:onecart /etc/onecart/setup-token
 sudo chmod 0640 /etc/onecart/setup-token
 
 dotnet_path="$(command -v dotnet)"
+cd /opt/onecart/api
 sudo -u onecart env \
   ASPNETCORE_ENVIRONMENT=Production \
   ASPNETCORE_URLS=http://127.0.0.1:8080 \
@@ -57,7 +59,7 @@ sudo -u onecart env \
   Setup__BootstrapTokenFile=/etc/onecart/setup-token \
   "$dotnet_path" /opt/onecart/api/OneCart.Api.dll --migrate
 
-sudo install -o root -g root -m 0644 deploy/linux/onecart-api.service /etc/systemd/system/onecart-api.service
+sudo install -o root -g root -m 0644 "$repo_root/deploy/linux/onecart-api.service" /etc/systemd/system/onecart-api.service
 sudo systemctl daemon-reload
 sudo systemctl enable onecart-api.service
 sudo systemctl start onecart-api.service
@@ -75,7 +77,7 @@ sudo sed \
   -e "s#/etc/letsencrypt/live/shop.example.com/fullchain.pem#${certificate_dir}/fullchain.pem#g" \
   -e "s#/etc/letsencrypt/live/shop.example.com/privkey.pem#${certificate_dir}/key.pem#g" \
   -e "s#shop.example.com#${host}#g" \
-  deploy/linux/nginx-onecart.conf | sudo tee /etc/nginx/sites-available/onecart >/dev/null
+  "$repo_root/deploy/linux/nginx-onecart.conf" | sudo tee /etc/nginx/sites-available/onecart >/dev/null
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo ln -sfn /etc/nginx/sites-available/onecart /etc/nginx/sites-enabled/onecart
 sudo nginx -t
