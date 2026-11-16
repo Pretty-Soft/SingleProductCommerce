@@ -3054,6 +3054,22 @@ footer {
 .store-footer-links .footer-admin { color: #fff; font-size: 0.78rem; }
 .store-footer-links { gap: 18px; }
 .store-footer-links .footer-whatsapp { font-size: 1rem; font-weight: 750; }
+.store-footer { align-items: center; box-shadow: 0 -8px 28px color-mix(in srgb, var(--theme-accent, #e8437a) 12%, transparent); min-height: 82px; }
+.store-copyright { color: #fff; font-size: 0.94rem; font-weight: 700; letter-spacing: 0.01em; }
+.store-footer-links { gap: clamp(14px, 2.5vw, 28px); }
+.store-footer-links .footer-whatsapp { align-items: center; border-right: 1px solid rgb(255 255 255 / 42%); gap: 10px; padding-right: clamp(14px, 2.5vw, 28px); }
+.store-footer-links .whatsapp-icon { height: 28px; width: 28px; }
+.footer-contact-copy { display: grid; gap: 1px; }
+.footer-contact-copy small { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.footer-contact-copy strong { font-size: 1.08rem; line-height: 1.2; }
+.store-footer-links .footer-admin { align-items: center; background: rgb(255 255 255 / 16%); border: 1px solid rgb(255 255 255 / 52%); border-radius: 999px; display: inline-flex; font-size: 0.9rem; font-weight: 750; gap: 7px; min-height: 40px; padding: 7px 15px; }
+.store-footer-links .footer-admin:hover { background: #fff; color: var(--theme-primary, #9d1c4d); }
+.reviews-section { background: color-mix(in srgb, var(--theme-accent, #e8437a) 5%, var(--theme-surface, #fff)); border: 1px solid color-mix(in srgb, var(--theme-accent, #e8437a) 20%, var(--theme-border, #f1dce4)); border-radius: 20px; padding: clamp(18px, 3vw, 30px); }
+.reviews-section .section-title { margin-bottom: 22px; }
+.reviews-section .section-title h2 { color: var(--theme-primary, #171316); }
+.review-summary { margin: 0 0 20px; }
+.review-card { box-shadow: 0 6px 18px color-mix(in srgb, var(--theme-primary, #171316) 5%, transparent); }
+.no-reviews-message { background: var(--theme-surface, #fff); border: 1px dashed color-mix(in srgb, var(--theme-accent, #e8437a) 40%, var(--theme-border, #f1dce4)); border-radius: 12px; color: var(--theme-text, #211b1e); font-weight: 600; margin: 0; padding: 22px 16px; }
 
 @media (max-width: 900px) {
   .store-product, .store-product.has-images { column-gap: 20px; grid-template-areas: "gallery copy" "gallery purchase"; grid-template-columns: minmax(0, 0.92fr) minmax(0, 1fr); }
@@ -3108,6 +3124,12 @@ footer {
   .product-promo-banner img { flex-basis: 32%; max-height: 150px; }
   .product-promo-banner h2 { font-size: clamp(1.1rem, 5vw, 1.6rem); }
   .product-promo-banner span { font-size: 0.72rem; }
-  .store-footer { align-items: flex-start; flex-direction: column; gap: 10px; margin-inline: -12px; padding: 16px 14px; }
-  .store-footer-links { flex-wrap: wrap; gap: 10px 15px; }
+  .store-footer { align-items: flex-start; flex-direction: column; gap: 12px; margin-inline: -12px; min-height: 0; padding: 17px 14px; }
+  .store-copyright { font-size: 0.86rem; }
+  .store-footer-links { align-items: center; flex-wrap: wrap; gap: 10px 13px; justify-content: space-between; width: 100%; }
+  .store-footer-links .footer-whatsapp { border-right: 0; gap: 8px; padding-right: 0; }
+  .store-footer-links .whatsapp-icon { height: 26px; width: 26px; }
+  .footer-contact-copy strong { font-size: 1rem; }
+  .store-footer-links .footer-admin { font-size: 0.84rem; min-height: 38px; padding: 6px 12px; }
+  .reviews-section { border-radius: 16px; padding: 16px 12px; }
 }
