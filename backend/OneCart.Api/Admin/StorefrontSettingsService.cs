@@ -11,6 +11,7 @@ public sealed class StorefrontSettingsService(StoreDbContext database)
     {
         var product = await database.Products.AsNoTracking()
             .Include(item => item.TrustItems)
+            .Include(item => item.Reviews)
             .Include(item => item.Images)
             .SingleOrDefaultAsync(cancellationToken);
         return product is null ? null : ToResponse(product);
@@ -25,9 +26,18 @@ public sealed class StorefrontSettingsService(StoreDbContext database)
         var product = await database.Products
             .Include(item => item.Variants)
             .Include(item => item.TrustItems)
+            .Include(item => item.Reviews)
             .Include(item => item.Images)
             .SingleOrDefaultAsync(cancellationToken);
         if (product is null) return StorefrontSettingsSaveResult.NotFound();
+
+        var requestedReviewIds = request.Reviews?.Where(review => review.Id.HasValue).Select(review => review.Id!.Value).ToArray() ?? [];
+        if (requestedReviewIds.Length > 0 && await database.ProductReviews.AsNoTracking()
+                .AnyAsync(review => requestedReviewIds.Contains(review.Id) && review.ProductId != product.Id, cancellationToken))
+            return StorefrontSettingsSaveResult.Invalid(new Dictionary<string, string[]>
+            {
+                [nameof(request.Reviews)] = ["A review ID belongs to another product."]
+            });
 
         var theme = request.Theme ?? StorefrontThemeRequest.Default;
         request = request with { Theme = theme };
@@ -38,6 +48,10 @@ public sealed class StorefrontSettingsService(StoreDbContext database)
         product.BrandName = request.BrandName.Trim();
         product.StorefrontHeadline = request.StorefrontHeadline?.Trim() ?? string.Empty;
         product.AboutUs = request.AboutUs?.Trim() ?? string.Empty;
+        product.StorefrontBenefitsJson = JsonSerializer.Serialize((request.Benefits ?? [])
+            .Select(item => item with { Title = item.Title.Trim(), Description = item.Description?.Trim() ?? string.Empty }));
+        product.StorefrontUsageStepsJson = JsonSerializer.Serialize((request.UsageSteps ?? [])
+            .Select(item => item with { Title = item.Title.Trim(), Description = item.Description?.Trim() ?? string.Empty }));
         product.StorefrontSubtitle = request.StorefrontSubtitle?.Trim() ?? string.Empty;
         product.ThemePrimaryColor = request.Theme.PrimaryColor;
         product.ThemeAccentColor = request.Theme.AccentColor;
@@ -88,6 +102,44 @@ public sealed class StorefrontSettingsService(StoreDbContext database)
             product.TrustItems.Remove(removed);
         }
 
+        var existingReviews = product.Reviews.ToDictionary(review => review.Id);
+        var retainedReviewIds = new HashSet<Guid>();
+        foreach (var requested in request.Reviews ?? [])
+        {
+            ProductReview review;
+            if (requested.Id is Guid id)
+            {
+                if (existingReviews.TryGetValue(id, out var existing))
+                {
+                    review = existing;
+                    retainedReviewIds.Add(id);
+                }
+                else
+                {
+                    review = new ProductReview { Id = id, Product = product, CreatedAtUtc = DateTimeOffset.UtcNow };
+                    product.Reviews.Add(review);
+                    database.Entry(review).State = EntityState.Added;
+                }
+            }
+            else
+            {
+                review = new ProductReview { Id = Guid.NewGuid(), Product = product, CreatedAtUtc = DateTimeOffset.UtcNow };
+                product.Reviews.Add(review);
+            }
+
+            review.DisplayName = requested.DisplayName.Trim();
+            review.Rating = requested.Rating;
+            review.Title = requested.Title.Trim();
+            review.Content = requested.Content.Trim();
+            review.IsPublished = requested.IsPublished;
+            review.DisplayOrder = requested.DisplayOrder;
+        }
+        foreach (var removed in existingReviews.Values.Where(review => !retainedReviewIds.Contains(review.Id)))
+        {
+            database.ProductReviews.Remove(removed);
+            product.Reviews.Remove(removed);
+        }
+
         database.AdminAuditEvents.Add(new AdminAuditEvent
         {
             Id = Guid.NewGuid(),
@@ -120,6 +172,8 @@ public sealed class StorefrontSettingsService(StoreDbContext database)
             Add(nameof(request.StorefrontHeadline), "Headline must be 200 characters or fewer.");
         if ((request.AboutUs?.Length ?? 0) > 5000)
             Add(nameof(request.AboutUs), "About Us must be 5,000 characters or fewer.");
+        ValidateSectionItems(request.Benefits, nameof(request.Benefits), 6, Add);
+        ValidateSectionItems(request.UsageSteps, nameof(request.UsageSteps), 8, Add);
         if ((request.StorefrontSubtitle?.Length ?? 0) > 500)
             Add(nameof(request.StorefrontSubtitle), "Subtitle must be 500 characters or fewer.");
 
@@ -141,8 +195,8 @@ public sealed class StorefrontSettingsService(StoreDbContext database)
             })
                 if (!System.Text.RegularExpressions.Regex.IsMatch(value ?? string.Empty, "^#[0-9A-Fa-f]{6}$"))
                     Add($"Theme.{field}", "Choose a valid six-digit color.");
-            if (request.Theme.ProductTitleFontSizePx is < 14 or > 16)
-                Add("Theme.ProductTitleFontSizePx", "Product title size must be between 14 and 16 pixels.");
+            if (request.Theme.ProductTitleFontSizePx is < 26 or > 42)
+                Add("Theme.ProductTitleFontSizePx", "Product title size must be between 26 and 42 pixels.");
             if (request.Theme.DetailsFontSizePx is < 12 or > 14)
                 Add("Theme.DetailsFontSizePx", "Details size must be between 12 and 14 pixels.");
         }
@@ -190,6 +244,24 @@ public sealed class StorefrontSettingsService(StoreDbContext database)
                 Add($"TrustItems[{index}]", "Trust item does not belong to this product.");
         }
 
+        var reviews = request.Reviews ?? [];
+        if (reviews.Count > 30) Add(nameof(request.Reviews), "Add no more than 30 product reviews.");
+        if (reviews.Select(item => item.Id).Where(id => id.HasValue).Distinct().Count() != reviews.Count(item => item.Id.HasValue))
+            Add(nameof(request.Reviews), "A review can only appear once.");
+        for (var index = 0; index < reviews.Count; index++)
+        {
+            var review = reviews[index];
+            if (string.IsNullOrWhiteSpace(review.DisplayName) || review.DisplayName.Trim().Length > 120)
+                Add($"Reviews[{index}].DisplayName", "Enter a display name up to 120 characters.");
+            if (review.Rating is < 1 or > 5) Add($"Reviews[{index}].Rating", "Ratings must be between 1 and 5 stars.");
+            if (string.IsNullOrWhiteSpace(review.Title) || review.Title.Trim().Length > 160)
+                Add($"Reviews[{index}].Title", "A review title is required and must be up to 160 characters.");
+            if (string.IsNullOrWhiteSpace(review.Content) || review.Content.Trim().Length > 2000 || review.DisplayOrder < 0)
+                Add($"Reviews[{index}].Content", "Review text is required and must be up to 2,000 characters; order cannot be negative.");
+            if (review.Id == Guid.Empty)
+                Add($"Reviews[{index}].Id", "Review ID must be a valid identifier.");
+        }
+
         return errors.ToDictionary(pair => pair.Key, pair => pair.Value.ToArray(), StringComparer.Ordinal);
     }
 
@@ -197,6 +269,8 @@ public sealed class StorefrontSettingsService(StoreDbContext database)
         product.BrandName,
         product.StorefrontHeadline,
         product.AboutUs,
+        DeserializeSectionItems(product.StorefrontBenefitsJson),
+        DeserializeSectionItems(product.StorefrontUsageStepsJson),
         product.StorefrontSubtitle,
         CatalogTranslations.Parse(product.StorefrontTranslationsJson),
         new AdminFlashSaleRequest(product.FlashSaleEnabled, product.FlashSaleLabel, product.FlashSaleDiscountType,
@@ -212,9 +286,37 @@ public sealed class StorefrontSettingsService(StoreDbContext database)
             .Select(image => new ProductImageResponse(image.Id, "/api/v1/store/product/images/" + image.Id, image.MediaKind, image.AltText, image.DisplayOrder)).ToArray(),
         product.TrustItems.OrderBy(item => item.DisplayOrder)
             .Select(item => new AdminProductTrustItemResponse(item.Id, item.Title, item.Description, item.IsActive, item.DisplayOrder)).ToArray(),
+        product.Reviews.OrderBy(review => review.DisplayOrder)
+            .Select(review => new AdminProductReviewResponse(review.Id, review.DisplayName, review.Rating, review.Title,
+                review.Content, review.IsPublished, review.DisplayOrder)).ToArray(),
         new StorefrontThemeRequest(product.ThemePrimaryColor, product.ThemeAccentColor, product.ThemeTextColor,
             product.ThemeMutedTextColor, product.ThemeBackgroundColor, product.ThemeSurfaceColor, product.ThemeBorderColor,
             product.ThemeProductTitleFontSizePx, product.ThemeDetailsFontSizePx));
+
+    private static void ValidateSectionItems(
+        IReadOnlyList<StorefrontContentItem>? items,
+        string field,
+        int limit,
+        Action<string, string> add)
+    {
+        items ??= [];
+        if (items.Count > limit) add(field, $"Add no more than {limit} items.");
+        if (items.Select(item => item.Id).Distinct().Count() != items.Count) add(field, "Each item must have a unique ID.");
+        for (var index = 0; index < items.Count; index++)
+        {
+            if (items[index].Id == Guid.Empty) add($"{field}[{index}].Id", "A valid item ID is required.");
+            if (string.IsNullOrWhiteSpace(items[index].Title) || items[index].Title.Trim().Length > 120)
+                add($"{field}[{index}].Title", "A title is required and must be up to 120 characters.");
+            if ((items[index].Description?.Length ?? 0) > 1000)
+                add($"{field}[{index}].Description", "Descriptions must be 1,000 characters or fewer.");
+        }
+    }
+
+    private static IReadOnlyList<StorefrontContentItem> DeserializeSectionItems(string json)
+    {
+        try { return JsonSerializer.Deserialize<List<StorefrontContentItem>>(json) ?? []; }
+        catch (JsonException) { return []; }
+    }
 }
 
 public sealed record StorefrontSettingsRequest(
@@ -229,7 +331,16 @@ public sealed record StorefrontSettingsRequest(
     IReadOnlyList<AdminProductTrustItemRequest> TrustItems,
     Dictionary<string, Dictionary<string, string>>? StorefrontTranslations = null,
     StorefrontThemeRequest? Theme = null,
-    string? AboutUs = null);
+    string? AboutUs = null,
+    IReadOnlyList<StorefrontContentItem>? Benefits = null,
+    IReadOnlyList<StorefrontContentItem>? UsageSteps = null,
+    IReadOnlyList<AdminProductReviewRequest>? Reviews = null);
+
+public sealed record AdminProductReviewRequest(Guid? Id, string DisplayName, int Rating, string Title,
+    string Content, bool IsPublished, int DisplayOrder);
+
+public sealed record AdminProductReviewResponse(Guid Id, string DisplayName, int Rating, string Title,
+    string Content, bool IsPublished, int DisplayOrder);
 
 public sealed record StorefrontThemeRequest(
     string PrimaryColor, string AccentColor, string TextColor, string MutedTextColor,
@@ -237,13 +348,15 @@ public sealed record StorefrontThemeRequest(
     int ProductTitleFontSizePx, int DetailsFontSizePx)
 {
     public static StorefrontThemeRequest Default { get; } = new(
-        "#242020", "#c17b88", "#282326", "#777078", "#fbf8f8", "#ffffff", "#eee5e8", 15, 13);
+        "#242020", "#c17b88", "#282326", "#777078", "#fbf8f8", "#ffffff", "#eee5e8", 30, 13);
 }
 
 public sealed record StorefrontSettingsResponse(
     string BrandName,
     string StorefrontHeadline,
     string AboutUs,
+    IReadOnlyList<StorefrontContentItem> Benefits,
+    IReadOnlyList<StorefrontContentItem> UsageSteps,
     string StorefrontSubtitle,
     Dictionary<string, Dictionary<string, string>> StorefrontTranslations,
     AdminFlashSaleRequest FlashSale,
@@ -254,6 +367,7 @@ public sealed record StorefrontSettingsResponse(
     ProductImageResponse? BrandLogo,
     IReadOnlyList<ProductImageResponse> ProductImages,
     IReadOnlyList<AdminProductTrustItemResponse> TrustItems,
+    IReadOnlyList<AdminProductReviewResponse> Reviews,
     StorefrontThemeRequest Theme);
 
 public sealed record StorefrontSettingsSaveResult(StorefrontSettingsResponse? Settings, Dictionary<string, string[]>? Errors, bool IsNotFound)

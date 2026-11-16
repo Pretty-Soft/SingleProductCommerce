@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using OneCart.Api.Data;
 
 namespace OneCart.Api.Catalog;
@@ -27,6 +28,9 @@ public sealed class StorefrontCatalogService(StoreDbContext database)
             .Include(candidate => candidate.TrustItems
                 .Where(item => item.IsActive)
                 .OrderBy(item => item.DisplayOrder))
+            .Include(candidate => candidate.Reviews
+                .Where(review => review.IsPublished)
+                .OrderBy(review => review.DisplayOrder))
             .SingleOrDefaultAsync(cancellationToken);
 
         if (product is null)
@@ -36,8 +40,10 @@ public sealed class StorefrontCatalogService(StoreDbContext database)
 
         var catalogTranslations = CatalogTranslations.Parse(product.CatalogTranslationsJson);
         var storefrontTranslations = CatalogTranslations.Parse(product.StorefrontTranslationsJson);
+        var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         string Catalog(string key, string value) => CatalogTranslations.Resolve(catalogTranslations, language, key, value);
         string Store(string key, string value) => CatalogTranslations.Resolve(storefrontTranslations, language, key, value);
+        string Section(string key, string value) => CatalogTranslations.Resolve(storefrontTranslations, language, key, value);
         var serverTimeUtc = DateTimeOffset.UtcNow;
         var hasValidSaleWindow = product.FlashSaleStartsAtUtc is not null
             && product.FlashSaleEndsAtUtc is not null
@@ -47,6 +53,7 @@ public sealed class StorefrontCatalogService(StoreDbContext database)
         var variants = product.Variants
             .Select(variant => new StorefrontVariantResponse(
                 variant.Id,
+                variant.Sku,
                 Catalog($"variant.{variant.Id}.name", variant.DisplayName),
                 variant.Price,
                 saleConfigured ? CalculateSalePrice(variant.Price, product.FlashSaleDiscountType, product.FlashSaleDiscountValue) : null,
@@ -69,6 +76,8 @@ public sealed class StorefrontCatalogService(StoreDbContext database)
             Store("store.brandName", product.BrandName),
             Store("store.headline", product.StorefrontHeadline),
             Store("store.aboutUs", product.AboutUs),
+            DeserializeSection(product.StorefrontBenefitsJson, jsonOptions, "benefit", Section),
+            DeserializeSection(product.StorefrontUsageStepsJson, jsonOptions, "usage", Section),
             Store("store.subtitle", product.StorefrontSubtitle),
             variants,
             product.AttributeGroups
@@ -104,9 +113,40 @@ public sealed class StorefrontCatalogService(StoreDbContext database)
                     Store($"trust.{item.Id}.title", item.Title),
                     Store($"trust.{item.Id}.description", item.Description)))
                 .ToArray(),
+            product.Reviews.Count == 0 ? 0m : decimal.Round(product.Reviews.Average(review => (decimal)review.Rating), 1),
+            product.Reviews.Count,
+            product.Reviews.OrderBy(review => review.DisplayOrder)
+                .Select(review => new StorefrontReviewResponse(
+                    Store($"review.{review.Id}.displayName", review.DisplayName),
+                    review.Rating,
+                    Store($"review.{review.Id}.title", review.Title),
+                    Store($"review.{review.Id}.content", review.Content)))
+                .ToArray(),
             new StorefrontThemeResponse(product.ThemePrimaryColor, product.ThemeAccentColor, product.ThemeTextColor,
                 product.ThemeMutedTextColor, product.ThemeBackgroundColor, product.ThemeSurfaceColor, product.ThemeBorderColor,
                 product.ThemeProductTitleFontSizePx, product.ThemeDetailsFontSizePx));
+    }
+
+    private static IReadOnlyList<StorefrontContentItem> DeserializeSection(
+        string json,
+        JsonSerializerOptions options,
+        string section,
+        Func<string, string, string> translate)
+    {
+        try
+        {
+            return (JsonSerializer.Deserialize<List<StorefrontContentItem>>(json, options) ?? [])
+                .Select(item => item with
+                {
+                    Title = translate($"{section}.{item.Id}.title", item.Title),
+                    Description = translate($"{section}.{item.Id}.description", item.Description)
+                })
+                .ToArray();
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
     }
 
     public static decimal CalculateSalePrice(decimal price, string discountType, decimal discountValue)

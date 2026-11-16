@@ -14,6 +14,8 @@ export interface StorefrontProduct {
   brandName: string;
   storefrontHeadline: string;
   aboutUs: string;
+  benefits: StorefrontContentItem[];
+  usageSteps: StorefrontContentItem[];
   storefrontSubtitle: string;
   variants: StorefrontVariant[];
   attributeGroups: StorefrontAttributeGroup[];
@@ -23,6 +25,9 @@ export interface StorefrontProduct {
   images: StorefrontProductImage[];
   brandLogoUrl: string | null;
   trustItems: StorefrontTrustItem[];
+  averageRating: number;
+  reviewCount: number;
+  reviews: StorefrontReview[];
   theme: StorefrontTheme;
 }
 
@@ -67,6 +72,9 @@ export interface StorefrontTrustItem {
   description: string;
 }
 
+export interface StorefrontContentItem { id: string; title: string; description: string }
+export interface StorefrontReview { displayName: string; rating: number; title: string; content: string }
+
 export interface StorefrontFlashSale {
   enabled: boolean;
   label: string;
@@ -93,6 +101,7 @@ export interface StorefrontAttributeOption {
 
 export interface StorefrontVariant {
   id: string;
+  sku: string;
   displayName: string;
   price: number;
   salePrice: number | null;

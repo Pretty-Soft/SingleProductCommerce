@@ -20,6 +20,10 @@ public sealed class StoreProduct
 
     public string AboutUs { get; set; } = string.Empty;
 
+    public string StorefrontBenefitsJson { get; set; } = "[]";
+
+    public string StorefrontUsageStepsJson { get; set; } = "[]";
+
     public string StorefrontSubtitle { get; set; } = string.Empty;
 
     public string ThemePrimaryColor { get; set; } = "#242020";
@@ -36,7 +40,7 @@ public sealed class StoreProduct
 
     public string ThemeBorderColor { get; set; } = "#eee5e8";
 
-    public int ThemeProductTitleFontSizePx { get; set; } = 15;
+    public int ThemeProductTitleFontSizePx { get; set; } = 30;
 
     public int ThemeDetailsFontSizePx { get; set; } = 13;
 
@@ -75,4 +79,6 @@ public sealed class StoreProduct
     public ICollection<ProductImage> Images { get; } = new List<ProductImage>();
 
     public ICollection<ProductTrustItem> TrustItems { get; } = new List<ProductTrustItem>();
+
+    public ICollection<ProductReview> Reviews { get; } = new List<ProductReview>();
 }

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { CSSProperties, FormEvent, useEffect, useState } from "react";
 import { adminRequest, loadAdminImagePreview } from "./adminApi";
 
 interface TrustItem { id: string | null; title: string; description: string; isActive: boolean; displayOrder: number }
@@ -6,6 +6,9 @@ interface Settings {
   brandName: string;
   storefrontHeadline: string;
   aboutUs: string;
+  benefits: Array<{ id: string; title: string; description: string }>;
+  usageSteps: Array<{ id: string; title: string; description: string }>;
+  reviews: Array<{ id: string | null; displayName: string; rating: number; title: string; content: string; isPublished: boolean; displayOrder: number }>;
   storefrontSubtitle: string;
   flashSale: { enabled: boolean; label: string; discountType: "percentage" | "fixedAmount"; discountValue: number; startsAtUtc: string | null; endsAtUtc: string | null };
   socialSharingEnabled: boolean;
@@ -20,10 +23,10 @@ interface Settings {
 }
 
 const emptySettings: Settings = {
-  brandName: "Pretty Shop", storefrontHeadline: "", aboutUs: "", storefrontSubtitle: "",
+  brandName: "Pretty Shop", storefrontHeadline: "", aboutUs: "", benefits: [], usageSteps: [], reviews: [], storefrontSubtitle: "",
   flashSale: { enabled: false, label: "", discountType: "percentage", discountValue: 10, startsAtUtc: null, endsAtUtc: null },
   socialSharingEnabled: true, whatsAppEnabled: false, whatsAppPhoneNumber: "", whatsAppPrefillMessage: "Hello, I have a question about this product.", brandLogo: null, productImages: [], trustItems: [], storefrontTranslations: {},
-  theme: { primaryColor: "#242020", accentColor: "#c17b88", textColor: "#282326", mutedTextColor: "#777078", backgroundColor: "#fbf8f8", surfaceColor: "#ffffff", borderColor: "#eee5e8", productTitleFontSizePx: 15, detailsFontSizePx: 13 }
+  theme: { primaryColor: "#242020", accentColor: "#c17b88", textColor: "#282326", mutedTextColor: "#777078", backgroundColor: "#fbf8f8", surfaceColor: "#ffffff", borderColor: "#eee5e8", productTitleFontSizePx: 30, detailsFontSizePx: 13 }
 };
 
 const translationLanguages = [{ code: "bn", label: "Bangla" }, { code: "es", label: "Spanish" }] as const;
@@ -85,6 +88,18 @@ export default function AdminStoreSettings() {
     setSettings(current => ({ ...current, theme: { ...current.theme, [key]: value } }));
   }
 
+  function updateContent(section: "benefits" | "usageSteps", id: string, changes: Partial<Settings["benefits"][number]>) {
+    setSettings(current => ({ ...current, [section]: current[section].map(item => item.id === id ? { ...item, ...changes } : item) }));
+  }
+
+  function addContent(section: "benefits" | "usageSteps") {
+    setSettings(current => ({ ...current, [section]: [...current[section], { id: crypto.randomUUID(), title: "", description: "" }] }));
+  }
+
+  function updateReview(id: string, changes: Partial<NonNullable<Settings["reviews"][number]>>) {
+    setSettings(current => ({ ...current, reviews: current.reviews.map(item => item.id === id ? { ...item, ...changes } : item) }));
+  }
+
   async function uploadLogo() {
     if (!logoFile) return;
     setBusy(true); setError(""); setMessage("");
@@ -133,21 +148,55 @@ export default function AdminStoreSettings() {
       <label>Brand name<input maxLength={120} required value={settings.brandName} onChange={event => setSettings(current => ({ ...current, brandName: event.target.value }))} /></label>
       <label>Headline<input maxLength={200} value={settings.storefrontHeadline} onChange={event => setSettings(current => ({ ...current, storefrontHeadline: event.target.value }))} /></label>
       <label className="admin-field-wide">About Us<textarea maxLength={5000} rows={5} value={settings.aboutUs} onChange={event => setSettings(current => ({ ...current, aboutUs: event.target.value }))} placeholder="Tell customers about your shop." /></label>
+      <fieldset className="admin-field-wide"><legend>Product benefits</legend><p className="admin-muted">Add short, accurate benefits for the “Why choose this product?” section. These appear on the storefront.</p>
+        {settings.benefits.map((item, index) => <div className="admin-form-grid" key={item.id}>
+          <label>Benefit {index + 1}<input maxLength={120} required value={item.title} onChange={event => updateContent("benefits", item.id, { title: event.target.value })} /></label>
+          <label>Description<input maxLength={1000} value={item.description} onChange={event => updateContent("benefits", item.id, { description: event.target.value })} /></label>
+          {translationLanguages.flatMap(language => [
+            <label key={`${language.code}-title`}>{language.label} benefit<input maxLength={120} value={settings.storefrontTranslations[language.code]?.[`benefit.${item.id}.title`] ?? ""} onChange={event => updateTranslation(language.code, `benefit.${item.id}.title`, event.target.value)} /></label>,
+            <label key={`${language.code}-description`}>{language.label} description<input maxLength={1000} value={settings.storefrontTranslations[language.code]?.[`benefit.${item.id}.description`] ?? ""} onChange={event => updateTranslation(language.code, `benefit.${item.id}.description`, event.target.value)} /></label>
+          ])}
+          <button className="button button-quiet" type="button" onClick={() => setSettings(current => ({ ...current, benefits: current.benefits.filter(value => value.id !== item.id) }))}>Remove benefit</button>
+        </div>)}
+        <button className="button button-quiet" type="button" disabled={settings.benefits.length >= 6} onClick={() => addContent("benefits")}>Add benefit</button>
+      </fieldset>
+      <fieldset className="admin-field-wide"><legend>How to use</legend><p className="admin-muted">Add clear product-specific steps. The storefront hides this section until steps are configured.</p>
+        {settings.usageSteps.map((item, index) => <div className="admin-form-grid" key={item.id}>
+          <label>Step {index + 1}<input maxLength={120} required value={item.title} onChange={event => updateContent("usageSteps", item.id, { title: event.target.value })} placeholder="Short step heading" /></label>
+          <label className="admin-field-wide">Instructions<textarea maxLength={1000} required rows={2} value={item.description} onChange={event => updateContent("usageSteps", item.id, { description: event.target.value })} /></label>
+          {translationLanguages.flatMap(language => [
+            <label key={`${language.code}-title`}>{language.label} step<input maxLength={120} value={settings.storefrontTranslations[language.code]?.[`usage.${item.id}.title`] ?? ""} onChange={event => updateTranslation(language.code, `usage.${item.id}.title`, event.target.value)} /></label>,
+            <label key={`${language.code}-description`}>{language.label} instructions<textarea maxLength={1000} rows={2} value={settings.storefrontTranslations[language.code]?.[`usage.${item.id}.description`] ?? ""} onChange={event => updateTranslation(language.code, `usage.${item.id}.description`, event.target.value)} /></label>
+          ])}
+          <button className="button button-quiet" type="button" onClick={() => setSettings(current => ({ ...current, usageSteps: current.usageSteps.filter(value => value.id !== item.id) }))}>Remove step</button>
+        </div>)}
+        <button className="button button-quiet" type="button" disabled={settings.usageSteps.length >= 8} onClick={() => addContent("usageSteps")}>Add usage step</button>
+      </fieldset>
       <label className="admin-field-wide">Subtitle<input maxLength={500} value={settings.storefrontSubtitle} onChange={event => setSettings(current => ({ ...current, storefrontSubtitle: event.target.value }))} /></label>
       <fieldset className="admin-field-wide"><legend>Storefront theme</legend>
         <p className="admin-muted">Use these controls to change storefront colors and text sizes. Custom CSS is not supported.</p>
         <div className="admin-form-grid">
           {([ ["primaryColor", "Primary color"], ["accentColor", "Accent color"], ["textColor", "Text color"], ["mutedTextColor", "Muted text"], ["backgroundColor", "Page background"], ["surfaceColor", "Card background"], ["borderColor", "Borders"] ] as const).map(([key, label]) => <label key={key}>{label}<input type="color" value={settings.theme[key]} onChange={event => updateTheme(key, event.target.value)} /></label>)}
-          <label>Product title size<select value={settings.theme.productTitleFontSizePx} onChange={event => updateTheme("productTitleFontSizePx", Number(event.target.value))}>{[14, 15, 16].map(size => <option key={size} value={size}>{size}px</option>)}</select></label>
+          <label>Product heading size<select value={settings.theme.productTitleFontSizePx} onChange={event => updateTheme("productTitleFontSizePx", Number(event.target.value))}>{[26, 28, 30, 32, 36, 40, 42].map(size => <option key={size} value={size}>{size}px</option>)}</select></label>
           <label>Details text size<select value={settings.theme.detailsFontSizePx} onChange={event => updateTheme("detailsFontSizePx", Number(event.target.value))}>{[12, 13, 14].map(size => <option key={size} value={size}>{size}px</option>)}</select></label>
         </div>
-        <div className="theme-preview" style={{ color: settings.theme.textColor, background: settings.theme.backgroundColor, borderColor: settings.theme.borderColor }}>
+        <div className="theme-preview" style={{
+          color: settings.theme.textColor,
+          background: settings.theme.backgroundColor,
+          borderColor: settings.theme.borderColor,
+          "--theme-primary": settings.theme.primaryColor,
+          "--theme-accent": settings.theme.accentColor,
+          "--theme-text": settings.theme.textColor,
+          "--theme-muted": settings.theme.mutedTextColor,
+          "--theme-surface": settings.theme.surfaceColor,
+          "--theme-border": settings.theme.borderColor
+        } as CSSProperties}>
           <div className="theme-preview-header">
             {logoPreview
               ? <img className="theme-preview-logo" src={logoPreview} alt="" />
               : <span className="theme-preview-logo-fallback">{(settings.brandName || "S").slice(0, 1).toUpperCase()}</span>}
             <div className="theme-preview-brand">
-              <strong style={{ color: settings.theme.primaryColor, fontSize: `${settings.theme.productTitleFontSizePx}px`, borderBottom: `2px solid ${settings.theme.accentColor}` }}>{settings.brandName || "Store name"}</strong>
+              <strong style={{ color: settings.theme.primaryColor, fontSize: `${Math.min(settings.theme.productTitleFontSizePx, 16)}px`, borderBottom: `2px solid ${settings.theme.accentColor}` }}>{settings.brandName || "Store name"}</strong>
               <span style={{ color: settings.theme.mutedTextColor, fontSize: `${settings.theme.detailsFontSizePx}px` }}>{settings.storefrontHeadline || "Storefront headline preview"}</span>
             </div>
             <button className="theme-preview-cart" type="button"><span>Cart</span><b>0</b></button>
@@ -162,6 +211,22 @@ export default function AdminStoreSettings() {
               <strong style={{ fontSize: `${settings.theme.productTitleFontSizePx}px` }}>{settings.brandName || "Preview card"}</strong>
               <p style={{ color: settings.theme.mutedTextColor, fontSize: `${settings.theme.detailsFontSizePx}px` }}>{settings.aboutUs || settings.storefrontSubtitle || "Storefront details preview"}</p>
               <button className="theme-preview-button" type="button" style={{ background: settings.theme.primaryColor }}>Preview button</button>
+            </div>
+          </div>
+          <div className="theme-preview-sections">
+            <section className="theme-preview-section">
+              <strong>Why choose this product?</strong>
+              <div className="theme-preview-benefits">
+                {(settings.benefits.length ? settings.benefits.slice(0, 4) : [{ id: "benefit-preview", title: "Benefit preview", description: "Configured product benefits appear here." }]).map(item => <div key={item.id}><b>{item.title}</b><small>{item.description || "Product benefit"}</small></div>)}
+              </div>
+            </section>
+            <div className="theme-preview-section-grid">
+              <section className="theme-preview-section"><strong>Product details</strong><small>Product, SKU, variants, and configured attributes</small></section>
+              <section className="theme-preview-section"><strong>How to use</strong><small>{settings.usageSteps[0]?.description || "Configured usage steps appear here."}</small></section>
+            </div>
+            <div className="theme-preview-section-grid">
+              <section className="theme-preview-section"><strong>Trust highlights</strong><small>{settings.trustItems[0]?.title || "Configured store service details appear here."}</small></section>
+              <section className="theme-preview-section"><strong>Reviews</strong><small>{settings.reviews.length ? `${settings.reviews.filter(review => review.isPublished).length} published admin reviews` : "Admin-managed ratings appear here."}</small></section>
             </div>
           </div>
         </div>
@@ -208,6 +273,22 @@ export default function AdminStoreSettings() {
           <button className="button button-quiet" type="button" onClick={() => setSettings(current => ({ ...current, trustItems: current.trustItems.filter((_, rowIndex) => rowIndex !== index) }))}>Remove</button>
         </div>)}
         <button className="button button-quiet" type="button" disabled={settings.trustItems.length >= 8} onClick={() => setSettings(current => ({ ...current, trustItems: [...current.trustItems, { id: null, title: "", description: "", isActive: true, displayOrder: current.trustItems.length }] }))}>Add detail</button>
+      </fieldset>
+      <fieldset className="admin-field-wide"><legend>Product reviews</legend><p className="admin-muted">Only reviews you add here can appear publicly. Review submissions are disabled; uncheck Published to keep a review hidden.</p>
+        {settings.reviews.map((review, index) => <div className="admin-form-grid" key={review.id ?? `review-${index}`}>
+          <label>Display name<input maxLength={120} required value={review.displayName} onChange={event => updateReview(review.id!, { displayName: event.target.value })} /></label>
+          <label>Rating<select value={review.rating} onChange={event => updateReview(review.id!, { rating: Number(event.target.value) })}>{[5, 4, 3, 2, 1].map(value => <option key={value} value={value}>{value} stars</option>)}</select></label>
+          <label className="admin-field-wide">Review title<input maxLength={160} required value={review.title} onChange={event => updateReview(review.id!, { title: event.target.value })} /></label>
+          <label className="admin-field-wide">Review<textarea maxLength={2000} rows={3} required value={review.content} onChange={event => updateReview(review.id!, { content: event.target.value })} /></label>
+          {translationLanguages.flatMap(language => [
+            <label key={`${language.code}-name`}>{language.label} display name<input maxLength={120} value={settings.storefrontTranslations[language.code]?.[`review.${review.id}.displayName`] ?? ""} onChange={event => updateTranslation(language.code, `review.${review.id}.displayName`, event.target.value)} /></label>,
+            <label key={`${language.code}-title`}>{language.label} title<input maxLength={160} value={settings.storefrontTranslations[language.code]?.[`review.${review.id}.title`] ?? ""} onChange={event => updateTranslation(language.code, `review.${review.id}.title`, event.target.value)} /></label>,
+            <label className="admin-field-wide" key={`${language.code}-content`}>{language.label} review<textarea maxLength={2000} rows={2} value={settings.storefrontTranslations[language.code]?.[`review.${review.id}.content`] ?? ""} onChange={event => updateTranslation(language.code, `review.${review.id}.content`, event.target.value)} /></label>
+          ])}
+          <label className="role-option"><input type="checkbox" checked={review.isPublished} onChange={event => updateReview(review.id!, { isPublished: event.target.checked })} />Published</label>
+          <button className="button button-quiet" type="button" onClick={() => setSettings(current => ({ ...current, reviews: current.reviews.filter(value => value.id !== review.id) }))}>Delete review</button>
+        </div>)}
+        <button className="button button-quiet" type="button" disabled={settings.reviews.length >= 30} onClick={() => setSettings(current => ({ ...current, reviews: [...current.reviews, { id: crypto.randomUUID(), displayName: "", rating: 5, title: "", content: "", isPublished: false, displayOrder: current.reviews.length }] }))}>Add review</button>
       </fieldset>
       <button className="button" type="submit" disabled={busy}>{busy ? "Saving…" : "Save storefront settings"}</button>
       {message && <p className="admin-message" role="status">{message}</p>}{error && <p className="admin-error" role="alert">{error}</p>}

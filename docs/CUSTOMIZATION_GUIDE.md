@@ -15,7 +15,7 @@ Role assignments restrict the areas each administrator can edit. See the [admini
 
 - Backend contracts, validation, and business behavior belong in the corresponding backend application or persistence services; keep HTTP handlers and React components focused on input/output and presentation.
 - The storefront UI is in `frontend/src`. Maintain keyboard access, readable focus indicators, small-screen layouts, and the supported storefront languages when changing a component.
-- Storefront colors and limited typography sizes can be changed through Storefront settings, with a preview. Product titles are constrained to 14–16 px and details to 12–14 px. Custom CSS, arbitrary CSS values, and admin-editable stylesheets are not allowed; layout remains source-controlled in `frontend/src/styles.css`.
+- Storefront colors and limited typography sizes can be changed through Storefront settings, with a preview. Product headings are constrained to 26–42 px and details to 12–14 px. Custom CSS, arbitrary CSS values, and admin-editable stylesheets are not allowed; layout remains source-controlled in `frontend/src/styles.css`.
 - Storefront language UI strings are maintained in `frontend/src/storeI18n.ts`. Admin-entered product and store text is persisted in the catalog/storefront translation fields, not in this dictionary.
 - Public/admin routes and payload expectations are summarized in the [API contracts](API_CONTRACTS.md).
 

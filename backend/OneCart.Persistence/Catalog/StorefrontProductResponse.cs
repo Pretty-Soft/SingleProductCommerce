@@ -9,6 +9,8 @@ public sealed record StorefrontProductResponse(
     string BrandName,
     string StorefrontHeadline,
     string AboutUs,
+    IReadOnlyList<StorefrontContentItem> Benefits,
+    IReadOnlyList<StorefrontContentItem> UsageSteps,
     string StorefrontSubtitle,
     IReadOnlyList<StorefrontVariantResponse> Variants,
     IReadOnlyList<StorefrontAttributeGroupResponse> AttributeGroups,
@@ -18,6 +20,9 @@ public sealed record StorefrontProductResponse(
     IReadOnlyList<ProductImageResponse> Images,
     string? BrandLogoUrl,
     IReadOnlyList<StorefrontTrustItemResponse> TrustItems,
+    decimal AverageRating,
+    int ReviewCount,
+    IReadOnlyList<StorefrontReviewResponse> Reviews,
     StorefrontThemeResponse Theme);
 
 public sealed record StorefrontThemeResponse(
@@ -33,6 +38,7 @@ public sealed record StorefrontThemeResponse(
 
 public sealed record StorefrontVariantResponse(
     Guid Id,
+    string Sku,
     string DisplayName,
     decimal Price,
     decimal? SalePrice,
@@ -61,3 +67,5 @@ public sealed record StorefrontFlashSaleResponse(
     DateTimeOffset ServerTimeUtc);
 
 public sealed record StorefrontTrustItemResponse(string Title, string Description);
+
+public sealed record StorefrontReviewResponse(string DisplayName, int Rating, string Title, string Content);

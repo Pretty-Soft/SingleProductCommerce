@@ -415,6 +415,26 @@ namespace OneCart.Api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("OneCart.Api.Catalog.ProductReview", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<string>("Content").IsRequired().HasMaxLength(2000).HasColumnType("character varying(2000)");
+                    b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<string>("DisplayName").IsRequired().HasMaxLength(120).HasColumnType("character varying(120)");
+                    b.Property<int>("DisplayOrder").HasColumnType("integer");
+                    b.Property<bool>("IsPublished").HasColumnType("boolean");
+                    b.Property<Guid>("ProductId").HasColumnType("uuid");
+                    b.Property<int>("Rating").HasColumnType("integer");
+                    b.Property<string>("Title").IsRequired().HasMaxLength(160).HasColumnType("character varying(160)");
+                    b.HasKey("Id");
+                    b.HasIndex("ProductId", "IsPublished", "DisplayOrder");
+                    b.ToTable("product_reviews", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_product_reviews_rating", "\"Rating\" BETWEEN 1 AND 5");
+                            t.HasCheckConstraint("ck_product_reviews_display_order_non_negative", "\"DisplayOrder\" >= 0");
+                        });
+                });
+
             modelBuilder.Entity("OneCart.Api.Catalog.ProductVariant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -549,6 +569,9 @@ namespace OneCart.Api.Migrations
                         .HasDefaultValue("")
                         .HasColumnType("character varying(5000)");
 
+                    b.Property<string>("StorefrontBenefitsJson").IsRequired().ValueGeneratedOnAdd().HasColumnType("jsonb").HasDefaultValue("[]");
+                    b.Property<string>("StorefrontUsageStepsJson").IsRequired().ValueGeneratedOnAdd().HasColumnType("jsonb").HasDefaultValue("[]");
+
                     b.Property<string>("StorefrontHeadline")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -566,7 +589,7 @@ namespace OneCart.Api.Migrations
                     b.Property<string>("ThemeBackgroundColor").IsRequired().ValueGeneratedOnAdd().HasMaxLength(7).HasColumnType("character varying(7)").HasDefaultValue("#fbf8f8");
                     b.Property<string>("ThemeSurfaceColor").IsRequired().ValueGeneratedOnAdd().HasMaxLength(7).HasColumnType("character varying(7)").HasDefaultValue("#ffffff");
                     b.Property<string>("ThemeBorderColor").IsRequired().ValueGeneratedOnAdd().HasMaxLength(7).HasColumnType("character varying(7)").HasDefaultValue("#eee5e8");
-                    b.Property<int>("ThemeProductTitleFontSizePx").ValueGeneratedOnAdd().HasColumnType("integer").HasDefaultValue(15);
+                    b.Property<int>("ThemeProductTitleFontSizePx").ValueGeneratedOnAdd().HasColumnType("integer").HasDefaultValue(30);
                     b.Property<int>("ThemeDetailsFontSizePx").ValueGeneratedOnAdd().HasColumnType("integer").HasDefaultValue(13);
 
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
@@ -812,6 +835,16 @@ namespace OneCart.Api.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("OneCart.Api.Catalog.ProductReview", b =>
+                {
+                    b.HasOne("OneCart.Api.Catalog.StoreProduct", "Product")
+                        .WithMany("Reviews")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("OneCart.Api.Catalog.ProductVariant", b =>
                 {
                     b.HasOne("OneCart.Api.Catalog.StoreProduct", "Product")
@@ -875,6 +908,8 @@ namespace OneCart.Api.Migrations
                     b.Navigation("AttributeGroups");
 
                     b.Navigation("Images");
+
+                    b.Navigation("Reviews");
 
                     b.Navigation("TrustItems");
 

@@ -48,12 +48,28 @@ public sealed class StorefrontSettingsTests
         database.Products.Add(product);
         await database.SaveChangesAsync();
 
+        var benefitId = Guid.NewGuid();
+        var usageId = Guid.NewGuid();
+        var reviewId = Guid.NewGuid();
+
         var request = new StorefrontSettingsRequest(
             "Pretty Shop", "Your trust, Your Love", "Subtitle",
             new AdminFlashSaleRequest(false, "", "percentage", 0, null, null),
             true, true, "+15551234567", "Ask us about this product", [],
-            Theme: new StorefrontThemeRequest("#171717", "#d17e8e", "#282326", "#777078", "#fbf8f8", "#ffffff", "#eee5e8", 16, 12),
-            AboutUs: "Thoughtfully selected products for everyday care.");
+            Theme: new StorefrontThemeRequest("#171717", "#d17e8e", "#282326", "#777078", "#fbf8f8", "#ffffff", "#eee5e8", 32, 12),
+            AboutUs: "Thoughtfully selected products for everyday care.",
+            Benefits: [new StorefrontContentItem(benefitId, "Deep hydration", "Leaves hair feeling soft.")],
+            UsageSteps: [new StorefrontContentItem(usageId, "Apply", "Work a small amount through wet hair.")],
+            Reviews: [new AdminProductReviewRequest(reviewId, "Mina", 5, "Lovely", "Feels gentle and smells fresh.", true, 0)],
+            StorefrontTranslations: new Dictionary<string, Dictionary<string, string>>
+            {
+                ["bn"] = new()
+                {
+                    [$"benefit.{benefitId}.title"] = "গভীর আর্দ্রতা",
+                    [$"usage.{usageId}.title"] = "প্রয়োগ করুন",
+                    [$"review.{reviewId}.title"] = "চমৎকার"
+                }
+            });
         var result = await new StorefrontSettingsService(database).SaveAsync(
             request, Guid.NewGuid(), "owner@example.test", CancellationToken.None);
 
@@ -67,8 +83,20 @@ public sealed class StorefrontSettingsTests
         Assert.Equal("PC-1", variant.Sku);
         Assert.Equal(8, variant.StockQuantity);
         Assert.Equal("#d17e8e", result.Settings.Theme.AccentColor);
-        Assert.Equal(16, result.Settings.Theme.ProductTitleFontSizePx);
+        Assert.Equal(32, result.Settings.Theme.ProductTitleFontSizePx);
         Assert.Equal(12, result.Settings.Theme.DetailsFontSizePx);
+        Assert.Single(result.Settings.Benefits);
+        Assert.Single(result.Settings.UsageSteps);
+        Assert.Single(result.Settings.Reviews);
+        product.IsPublished = true;
+        await database.SaveChangesAsync();
+        var storefront = await new StorefrontCatalogService(database).GetPublishedProductAsync("bn", CancellationToken.None);
+        Assert.Equal("PC-1", storefront!.Variants.Single().Sku);
+        Assert.Equal("গভীর আর্দ্রতা", storefront.Benefits.Single().Title);
+        Assert.Equal("প্রয়োগ করুন", storefront.UsageSteps.Single().Title);
+        Assert.Equal("চমৎকার", storefront.Reviews.Single().Title);
+        Assert.Equal(5m, storefront.AverageRating);
+        Assert.Equal(1, storefront.ReviewCount);
         Assert.Contains(database.AdminAuditEvents, item => item.Action == "storefront.settings.update");
     }
 

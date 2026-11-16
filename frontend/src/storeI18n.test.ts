@@ -22,4 +22,14 @@ describe("storefront language support", () => {
       expect(labels.whatsappMessage.length).toBeGreaterThan(0);
     }
   });
+
+  it("provides landing page and review labels in each language", () => {
+    for (const language of storeLanguages) {
+      const labels = storeText(language.code);
+      expect(labels.whyChoose.length).toBeGreaterThan(0);
+      expect(labels.productDetails.length).toBeGreaterThan(0);
+      expect(labels.howToUse.length).toBeGreaterThan(0);
+      expect(labels.reviews.length).toBeGreaterThan(0);
+    }
+  });
 });

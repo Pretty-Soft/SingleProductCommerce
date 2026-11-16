@@ -198,6 +198,11 @@ function Storefront() {
       "--theme-title-size": `${product.theme.productTitleFontSizePx}px`,
       "--theme-details-size": `${product.theme.detailsFontSizePx}px`
     } as CSSProperties : undefined}>
+      {product && <div className="store-assurance-strip">
+        <span><i aria-hidden="true">✓</i> {text.codAvailable}</span>
+        {product.trustItems[0] && <span><i aria-hidden="true">✦</i> {product.trustItems[0].title}</span>}
+        {product.whatsAppContactUrl && <a href={product.whatsAppContactUrl} target="_blank" rel="noopener noreferrer">WhatsApp · {text.whatsapp}</a>}
+      </div>}
       <header className="topbar">
         <a className="brand-logo-link" href="/" aria-label={`${product?.brandName ?? "Pretty Shop"} home`}>
           {product?.brandLogoUrl
@@ -222,12 +227,16 @@ function Storefront() {
       ) : product ? (
         <section id="product" className={`store-product${product.images.length > 0 ? " has-images" : ""}`} aria-labelledby="hero-title">
           <div className="product-copy">
+            {product.storefrontSubtitle && <p className="product-kicker">{product.storefrontSubtitle}</p>}
             <h1 id="hero-title">{product.name}</h1>
-            {product.storefrontSubtitle && <p className="product-subtitle">{product.storefrontSubtitle}</p>}
+            {product.reviewCount > 0 && <a className="product-rating" href="#reviews" aria-label={`${product.averageRating} ${text.rating}, ${product.reviewCount} ${product.reviewCount === 1 ? text.review : text.reviewsPlural}`}>
+              <span className="rating-stars" aria-hidden="true">{renderStars(product.averageRating)}</span>
+              <strong>{product.averageRating.toFixed(1)}</strong><span>({product.reviewCount} {product.reviewCount === 1 ? text.review : text.reviewsPlural})</span>
+            </a>}
             <p className="intro">{product.description}</p>
           </div>
-          {selectedImage && (
-            <div className="product-gallery" aria-label={text.productImages}>
+          <div className={`product-gallery${product.images.length > 1 ? " has-thumbnails" : ""}`} aria-label={text.productImages}>
+            {selectedImage ? <>
               <figure className="product-image-stage">
                 <img src={getMediaUrl(selectedImage.url)} alt={selectedImage.altText} />
               </figure>
@@ -247,8 +256,8 @@ function Storefront() {
                   ))}
                 </div>
               )}
-            </div>
-          )}
+            </> : <div className="product-image-stage product-image-empty" aria-label={text.productImages}><span>{product.name}</span></div>}
+          </div>
           <div className="purchase-panel">
             {flashSaleActive && (
               <div className="flash-sale-banner" aria-live="polite">
@@ -256,6 +265,11 @@ function Storefront() {
                 <span className="flash-sale-timer">{text.ends} {formatCountdown(saleRemainingSeconds)}</span>
               </div>
             )}
+            {selectedVariant && <div className="hero-price-line">
+              {flashSaleActive && selectedVariant.salePrice != null && <del>{formatPrice(selectedVariant.price + selectedOptions.reduce((sum, option) => sum + option.priceAdjustment, 0), selectedVariant.currencyCode)}</del>}
+              <strong>{formatPrice(currentTotal, selectedVariant.currencyCode)}</strong>
+              {flashSaleActive && selectedVariant.salePrice != null && <span className="sale-badge">{product.flashSale.discountType === "percentage" ? `−${product.flashSale.discountValue}%` : text.save}</span>}
+            </div>}
             <p className="eyebrow">{text.choose}</p>
             <div className="variant-options" role="radiogroup" aria-label="Product variants">
               {product.variants.map((variant) => (
@@ -338,16 +352,6 @@ function Storefront() {
             )}
             {shareMessage && <p className="share-message" role="status">{shareMessage}</p>}
           </div>
-          {product.trustItems.length > 0 && (
-            <ul id="store-details" className="store-trust-items" aria-label={text.storeDetails}>
-              {product.trustItems.map((item) => (
-                <li key={item.title}>
-                  <span className="trust-mark" aria-hidden="true">✓</span>
-                  <span><strong>{item.title}</strong>{item.description && <small>{item.description}</small>}</span>
-                </li>
-              ))}
-            </ul>
-          )}
         </section>
       ) : (
         <section className="hero">
@@ -356,6 +360,53 @@ function Storefront() {
           <a className="button store-admin-link" href="/admin">{text.openAdmin}</a>
         </section>
       )}
+
+      {product && product.benefits.length > 0 && <section className="landing-section benefits-section" aria-labelledby="benefits-title">
+        <div className="section-title"><span></span><div><p>{product.brandName}</p><h2 id="benefits-title">{text.whyChoose}</h2></div><span></span></div>
+        <div className="benefit-grid">
+          {product.benefits.map((benefit, index) => <article className="benefit-card" key={benefit.id}>
+            <span className="benefit-icon" aria-hidden="true">{["✦", "◌", "⌁", "◇", "❋", "✓"][index % 6]}</span>
+            <h3>{benefit.title}</h3>
+            {benefit.description && <p>{benefit.description}</p>}
+          </article>)}
+        </div>
+      </section>}
+
+      {product && <section className="landing-info-grid" aria-label={text.productDetails}>
+        <article className="landing-info-card product-details-card">
+          <h2>{text.productDetails}</h2>
+          <dl>
+            <div><dt>{text.shop}</dt><dd>{product.brandName}</dd></div>
+            <div><dt>{text.productDetails}</dt><dd>{product.name}</dd></div>
+            {selectedVariant && <>
+              <div><dt>{text.selectedOption}</dt><dd>{selectedVariant.displayName}</dd></div>
+              <div><dt>SKU</dt><dd>{selectedVariant.sku}</dd></div>
+              <div><dt>{text.stock}</dt><dd>{selectedVariant.isAvailable ? text.stock : text.out}</dd></div>
+            </>}
+            {product.attributeGroups.map(group => <div key={group.id}><dt>{group.name}</dt><dd>{group.options.map(option => option.name).join(", ")}</dd></div>)}
+            <div><dt>{text.productOptions}</dt><dd>{product.variants.map(variant => variant.displayName).join(", ")}</dd></div>
+          </dl>
+        </article>
+        {product.usageSteps.length > 0 && <article className="landing-info-card usage-card">
+          <h2>{text.howToUse}</h2>
+          <ol className="usage-steps">
+            {product.usageSteps.map((step, index) => <li key={step.id}><span className="usage-step-number">{index + 1}</span><div><h3>{step.title}</h3><p>{step.description}</p></div></li>)}
+          </ol>
+        </article>}
+      </section>}
+
+      {product && product.trustItems.length > 0 && <section id="store-details" className="store-trust-ribbon" aria-label={text.storeDetails}>
+        {product.trustItems.map((item, index) => <article key={item.title}><span aria-hidden="true">{["♧", "↗", "✓", "♡"][index % 4]}</span><div><strong>{item.title}</strong>{item.description && <small>{item.description}</small>}</div></article>)}
+      </section>}
+
+      {product && product.reviewCount > 0 && <section id="reviews" className="landing-section reviews-section" aria-labelledby="reviews-title">
+        <div className="section-title"><span></span><div><p>{product.reviewCount} {product.reviewCount === 1 ? text.review : text.reviewsPlural}</p><h2 id="reviews-title">{text.reviews}</h2></div><span></span></div>
+        <div className="review-summary"><strong>{product.averageRating.toFixed(1)}</strong><span className="rating-stars" aria-label={`${product.averageRating} ${text.rating}`}>{renderStars(product.averageRating)}</span><span>{product.reviewCount} {product.reviewCount === 1 ? text.review : text.reviewsPlural}</span></div>
+        <div className="review-grid">{product.reviews.map((review, index) => <article className="review-card" key={`${review.displayName}-${index}`}>
+          <div className="review-card-top"><span className="rating-stars" aria-label={`${review.rating} ${text.rating}`}>{renderStars(review.rating)}</span><strong>{review.displayName}</strong></div>
+          <h3>{review.title}</h3><p>{review.content}</p>
+        </article>)}</div>
+      </section>}
 
       {product?.aboutUs.trim() && (
         <section id="about-us" className="store-about" aria-labelledby="about-us-title">
@@ -459,4 +510,9 @@ function formatCountdown(seconds: number): string {
   const remainingSeconds = seconds % 60;
   const time = [hours, minutes, remainingSeconds].map((value) => String(value).padStart(2, "0")).join(":");
   return days > 0 ? `${days}d ${time}` : time;
+}
+
+function renderStars(rating: number): string {
+  const filled = Math.max(0, Math.min(5, Math.round(rating)));
+  return "★".repeat(filled) + "☆".repeat(5 - filled);
 }

@@ -22,6 +22,8 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
 
     public DbSet<ProductTrustItem> ProductTrustItems => Set<ProductTrustItem>();
 
+    public DbSet<ProductReview> ProductReviews => Set<ProductReview>();
+
     public DbSet<StoreOrder> StoreOrders => Set<StoreOrder>();
 
     public DbSet<StoreOrderLine> StoreOrderLines => Set<StoreOrderLine>();
@@ -64,6 +66,8 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
         products.Property(product => product.BrandName).HasMaxLength(120).HasDefaultValue("OneCart").IsRequired();
         products.Property(product => product.StorefrontHeadline).HasMaxLength(200).IsRequired();
         products.Property(product => product.AboutUs).HasMaxLength(5000).HasDefaultValue("").IsRequired();
+        products.Property(product => product.StorefrontBenefitsJson).HasColumnType(isSqlServer ? "nvarchar(max)" : "jsonb").HasDefaultValue("[]").IsRequired();
+        products.Property(product => product.StorefrontUsageStepsJson).HasColumnType(isSqlServer ? "nvarchar(max)" : "jsonb").HasDefaultValue("[]").IsRequired();
         products.Property(product => product.StorefrontSubtitle).HasMaxLength(500).IsRequired();
         products.Property(product => product.ThemePrimaryColor).HasMaxLength(7).HasDefaultValue("#242020").IsRequired();
         products.Property(product => product.ThemeAccentColor).HasMaxLength(7).HasDefaultValue("#c17b88").IsRequired();
@@ -72,7 +76,7 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
         products.Property(product => product.ThemeBackgroundColor).HasMaxLength(7).HasDefaultValue("#fbf8f8").IsRequired();
         products.Property(product => product.ThemeSurfaceColor).HasMaxLength(7).HasDefaultValue("#ffffff").IsRequired();
         products.Property(product => product.ThemeBorderColor).HasMaxLength(7).HasDefaultValue("#eee5e8").IsRequired();
-        products.Property(product => product.ThemeProductTitleFontSizePx).HasDefaultValue(15).IsRequired();
+        products.Property(product => product.ThemeProductTitleFontSizePx).HasDefaultValue(30).IsRequired();
         products.Property(product => product.ThemeDetailsFontSizePx).HasDefaultValue(13).IsRequired();
         products.Property(product => product.CurrencyCode).HasMaxLength(3).IsRequired();
         products.Property(product => product.FlashSaleLabel).HasMaxLength(100).IsRequired();
@@ -97,6 +101,10 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
         products.HasMany(product => product.TrustItems)
             .WithOne(item => item.Product)
             .HasForeignKey(item => item.ProductId)
+            .OnDelete(DeleteBehavior.Cascade);
+        products.HasMany(product => product.Reviews)
+            .WithOne(review => review.Product)
+            .HasForeignKey(review => review.ProductId)
             .OnDelete(DeleteBehavior.Cascade);
 
         var variants = modelBuilder.Entity<ProductVariant>();
@@ -167,6 +175,22 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
         trustItems.Property(item => item.Title).HasMaxLength(80).IsRequired();
         trustItems.Property(item => item.Description).HasMaxLength(300).IsRequired();
         trustItems.Property(item => item.DisplayOrder).IsRequired();
+
+        var reviews = modelBuilder.Entity<ProductReview>();
+        reviews.ToTable("product_reviews", table =>
+        {
+            table.HasCheckConstraint("ck_product_reviews_rating", isSqlServer ? "[Rating] BETWEEN 1 AND 5" : "\"Rating\" BETWEEN 1 AND 5");
+            table.HasCheckConstraint("ck_product_reviews_display_order_non_negative", isSqlServer ? "[DisplayOrder] >= 0" : "\"DisplayOrder\" >= 0");
+        });
+        reviews.HasKey(review => review.Id);
+        reviews.Property(review => review.DisplayName).HasMaxLength(120).IsRequired();
+        reviews.Property(review => review.Rating).IsRequired();
+        reviews.Property(review => review.Title).HasMaxLength(160).IsRequired();
+        reviews.Property(review => review.Content).HasMaxLength(2000).IsRequired();
+        reviews.Property(review => review.IsPublished).IsRequired();
+        reviews.Property(review => review.DisplayOrder).IsRequired();
+        reviews.Property(review => review.CreatedAtUtc).IsRequired();
+        reviews.HasIndex(review => new { review.ProductId, review.IsPublished, review.DisplayOrder });
 
         var orders = modelBuilder.Entity<StoreOrder>();
         orders.ToTable("store_orders", table =>
