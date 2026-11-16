@@ -36,7 +36,7 @@ After configuring the database, apply migrations by running the published API wi
 
 ## Docker Compose (recommended portable path)
 
-The root `docker-compose.yml` builds the API and storefront, starts PostgreSQL, applies migrations using a one-shot migration container, and serves the site through Caddy. Caddy obtains and renews certificates automatically. The API is not published directly to the host; it trusts forwarded HTTPS only from the Caddy container's fixed private-network address. PostgreSQL is isolated on an internal Docker network.
+The root `docker-compose.yml` builds the API and storefront, starts PostgreSQL, applies migrations using a one-shot migration container, and serves the site through Caddy. Caddy obtains and renews certificates automatically. The API is not published directly to the host; it trusts forwarded HTTPS only from Caddy's fixed address on a dedicated API↔proxy network. The public-facing edge network has dynamically assigned container addresses, so the storefront cannot take the proxy's trusted address. PostgreSQL is isolated on an internal Docker network.
 
 Prerequisites: Docker Engine or Docker Desktop with Compose v2, a DNS name pointed at the host, and inbound TCP ports 80 and 443 available. UDP 443 is optional and enables HTTP/3.
 
@@ -59,7 +59,7 @@ chmod 600 secrets/postgres_password secrets/store_connection secrets/bootstrap_t
 
 The command generates and stores unique database and setup secrets. Set `ONECART_DOMAIN` and `ACME_EMAIL` in `.env` using a text editor, then save the file with operator-only permissions. Compose mounts source secrets into PostgreSQL and a one-shot initializer. The initializer copies the API connection string and setup token to a named volume owned by the API's non-root user; the API and migration containers mount that volume read-only. Passwords are not passed through container environment variables. SMTP variables in `.env` are optional until password-reset mail is required. Protect `.env`, `secrets/`, the Docker daemon account, and Docker volume storage as production secrets.
 
-The example file also sets a private container subnet and fixed API/proxy addresses so the API trusts forwarded HTTPS only from Caddy. Choose a non-overlapping subnet if it conflicts with a Docker, VPN, or host network; keep the Caddy and API addresses inside that subnet and unique.
+The example file assigns a private subnet to the dedicated API↔proxy network and fixes the API and Caddy addresses there, so the API trusts forwarded HTTPS only from Caddy. The storefront network uses Docker-assigned addresses. If `ONECART_PROXY_SUBNET` overlaps a Docker, VPN, or host network, choose a non-overlapping subnet and keep `ONECART_CADDY_IP` and `ONECART_API_IP` inside it and unique.
 
 Validate and start the stack:
 

@@ -30,7 +30,7 @@ Treat first installation and upgrades as explicit workflows. Owner confirmed Doc
 
 ## HTTPS requirement
 
-The API accepts requests only when ASP.NET Core sees an HTTPS scheme. The local IIS Express launch profile binds to HTTPS at `https://localhost:44300`. Production deployments must use a valid TLS certificate. If TLS terminates at a reverse proxy, set `ForwardedHeaders:KnownProxies` to the proxy's IP address so the API can safely recognize the forwarded HTTPS scheme. Forwarded headers from untrusted clients must not be accepted.
+The API accepts requests only when ASP.NET Core sees an HTTPS scheme. The local IIS Express launch profile binds to HTTPS at `https://localhost:44300`. Production deployments must use a valid TLS certificate. If TLS terminates at a reverse proxy, set `ForwardedHeaders:KnownProxies` to the proxy's IP address so the API can safely recognize the forwarded HTTPS scheme. Docker Compose uses a dedicated API↔proxy network with fixed, unique addresses; the storefront uses a separate network so Docker cannot assign the proxy's trusted address to another container. Forwarded headers from untrusted clients must not be accepted.
 
 ## Administrator authentication
 

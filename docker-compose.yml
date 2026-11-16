@@ -67,7 +67,7 @@ services:
       ASPNETCORE_HTTP_PORTS: 8080
       Database__Provider: PostgreSql
       ConnectionStrings__StoreFile: /run/onecart-secrets/store_connection
-      ForwardedHeaders__KnownProxies__0: ${ONECART_CADDY_IP:-172.30.0.2}
+      ForwardedHeaders__KnownProxies__0: ${ONECART_CADDY_IP:-172.31.0.2}
       Cors__AllowedOrigins__0: https://${ONECART_DOMAIN:?Set ONECART_DOMAIN in .env}
       DataProtection__KeyDirectory: /var/onecart/data-protection-keys
       ProductMedia__RootPath: /var/onecart/product-images
@@ -91,7 +91,10 @@ services:
         condition: service_completed_successfully
     networks:
       edge:
-        ipv4_address: ${ONECART_API_IP:-172.30.0.3}
+      proxy_backend:
+        aliases:
+          - api-backend
+        ipv4_address: ${ONECART_API_IP:-172.31.0.3}
       database:
 
   storefront:
@@ -123,14 +126,17 @@ services:
       - api
       - storefront
     networks:
-      edge:
-        ipv4_address: ${ONECART_CADDY_IP:-172.30.0.2}
+      - edge
+      - proxy_backend
 
 networks:
   edge:
+    driver: bridge
+  proxy_backend:
+    internal: true
     ipam:
       config:
-        - subnet: ${ONECART_EDGE_SUBNET:-172.30.0.0/24}
+        - subnet: ${ONECART_PROXY_SUBNET:-172.31.0.0/24}
   database:
     internal: true
 

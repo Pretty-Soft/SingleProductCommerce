@@ -99,7 +99,7 @@ jobs:
     env:
       ONECART_DOMAIN: shop.example.test
       ACME_EMAIL: ci@example.test
-      ONECART_EDGE_SUBNET: 10.254.240.0/24
+      ONECART_PROXY_SUBNET: 10.254.240.0/24
       ONECART_CADDY_IP: 10.254.240.2
       ONECART_API_IP: 10.254.240.3
     steps:

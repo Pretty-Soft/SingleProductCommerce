@@ -4,11 +4,11 @@
 
 {$ONECART_DOMAIN} {
 	handle /api/* {
-		reverse_proxy api:8080
+		reverse_proxy api-backend:8080
 	}
 
 	handle /health {
-		reverse_proxy api:8080
+		reverse_proxy api-backend:8080
 	}
 
 	handle {
