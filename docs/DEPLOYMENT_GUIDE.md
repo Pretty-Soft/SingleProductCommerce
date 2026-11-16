@@ -59,6 +59,8 @@ chmod 600 secrets/postgres_password secrets/store_connection secrets/bootstrap_t
 
 The command generates and stores unique database and setup secrets. Set `ONECART_DOMAIN` and `ACME_EMAIL` in `.env` using a text editor, then save the file with operator-only permissions. Compose mounts source secrets into PostgreSQL and a one-shot initializer. The initializer copies the API connection string and setup token to a named volume owned by the API's non-root user; the API and migration containers mount that volume read-only. Passwords are not passed through container environment variables. SMTP variables in `.env` are optional until password-reset mail is required. Protect `.env`, `secrets/`, the Docker daemon account, and Docker volume storage as production secrets.
 
+The example file also sets a private container subnet and fixed API/proxy addresses so the API trusts forwarded HTTPS only from Caddy. Choose a non-overlapping subnet if it conflicts with a Docker, VPN, or host network; keep the Caddy and API addresses inside that subnet and unique.
+
 Validate and start the stack:
 
 ```sh
