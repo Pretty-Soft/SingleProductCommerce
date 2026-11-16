@@ -123,6 +123,48 @@ jobs:
           EOF
           sudo nginx -t -c "$temporary_config/nginx.conf" -p "$temporary_config/"
 
+  linux-host-install:
+    name: Linux systemd and Nginx fresh-install rehearsal
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: onecart_test
+          POSTGRES_PASSWORD: onecart-ci-only
+          POSTGRES_DB: onecart
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U onecart_test -d onecart"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Publish API and build storefront
+        env:
+          VITE_API_BASE_URL: https://shop.example.test
+        run: |
+          dotnet publish backend/OneCart.Api/OneCart.Api.csproj --configuration Release --runtime linux-x64 --self-contained false --output "$RUNNER_TEMP/onecart-api"
+          cd frontend
+          npm ci
+          npm run build
+      - name: Install Nginx and jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes nginx jq
+      - name: Rehearse systemd install, HTTPS proxy, database migration, and first-admin setup
+        run: bash deploy/linux/ci-host-install-smoke.sh "$RUNNER_TEMP/onecart-api" frontend/dist
+
   windows-iis-packaging:
     name: Windows IIS package validation
     runs-on: windows-latest
