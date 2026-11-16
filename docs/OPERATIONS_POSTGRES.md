@@ -80,7 +80,8 @@ docker compose exec -T db pg_basebackup \
   --pgdata=/tmp/onecart-pitr-base \
   --format=plain \
   --wal-method=stream
-docker compose cp db:/tmp/onecart-pitr-base "$backup_dir/base"
+mkdir -p "$backup_dir/base"
+docker compose cp db:/tmp/onecart-pitr-base/. "$backup_dir/base"
 docker compose exec -T db rm -rf /tmp/onecart-pitr-base
 docker compose stop db
 docker run --rm \

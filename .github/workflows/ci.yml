@@ -200,10 +200,17 @@ jobs:
           printf '%s' "$bootstrap_token" > secrets/bootstrap_token
           unset postgres_password
           chmod 600 secrets/*
+          pitr_dir="$(mktemp -d)"
+          pitr_recovery_container=onecart-smoke-pitr-recovery
+          pitr_recovery_data_volume=onecart-smoke-pitr-recovery-data
+          pitr_recovery_wal_volume=onecart-smoke-pitr-recovery-wal
           compose=(docker compose --project-name onecart-smoke -f docker-compose.yml -f docker-compose.pitr.yml -f docker-compose.smoke.yml)
           cleanup() {
+            docker rm --force "$pitr_recovery_container" >/dev/null 2>&1 || true
+            docker volume rm "$pitr_recovery_data_volume" "$pitr_recovery_wal_volume" >/dev/null 2>&1 || true
             "${compose[@]}" down --volumes --remove-orphans || true
             rm -rf secrets
+            rm -rf "$pitr_dir"
           }
           trap cleanup EXIT
 
@@ -230,3 +237,56 @@ jobs:
           test "$restored_admin_count" = 1
 
           "${compose[@]}" run --rm --no-deps smoke-check health
+
+          "${compose[@]}" exec --no-TTY db psql --username onecart --dbname onecart --command \
+            "CREATE TABLE onecart_pitr_probe (marker text PRIMARY KEY); INSERT INTO onecart_pitr_probe VALUES ('before-base-backup');"
+          base_archived_count="$("${compose[@]}" exec --no-TTY db psql --username onecart --dbname onecart --tuples-only --no-align --command 'SELECT archived_count FROM pg_stat_archiver;')"
+          "${compose[@]}" exec --no-TTY db rm -rf /tmp/onecart-pitr-base
+          "${compose[@]}" exec --no-TTY db pg_basebackup --username=onecart --pgdata=/tmp/onecart-pitr-base --format=plain --wal-method=stream
+          mkdir -p "$pitr_dir/base"
+          "${compose[@]}" cp db:/tmp/onecart-pitr-base/. "$pitr_dir/base"
+          "${compose[@]}" exec --no-TTY db rm -rf /tmp/onecart-pitr-base
+
+          recovery_target_time="$("${compose[@]}" exec --no-TTY db psql --username onecart --dbname onecart --tuples-only --no-align --command "SELECT to_char(clock_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS.US') || '+00';")"
+          recovery_target_time="$(printf '%s' "$recovery_target_time" | tr -d '\r\n')"
+          test -n "$recovery_target_time"
+          "${compose[@]}" exec --no-TTY db psql --username onecart --dbname onecart --command \
+            "INSERT INTO onecart_pitr_probe VALUES ('after-target'); SELECT pg_switch_wal();"
+
+          archived_count="$base_archived_count"
+          for attempt in $(seq 1 20); do
+            archived_count="$("${compose[@]}" exec --no-TTY db psql --username onecart --dbname onecart --tuples-only --no-align --command 'SELECT archived_count FROM pg_stat_archiver;')"
+            if [ "$archived_count" -gt "$base_archived_count" ]; then break; fi
+            sleep 1
+          done
+          test "$archived_count" -gt "$base_archived_count"
+          docker run --rm -v onecart-smoke_postgres-wal-archive:/source:ro -v "$pitr_dir:/backup" \
+            alpine:3.24 sh -ec 'tar -czf /backup/wal-archive.tar.gz -C /source .'
+
+          "${compose[@]}" stop api storefront db
+          docker volume create "$pitr_recovery_data_volume" >/dev/null
+          docker volume create "$pitr_recovery_wal_volume" >/dev/null
+          docker run --rm -v "$pitr_recovery_data_volume:/target" -v "$pitr_dir/base:/source:ro" \
+            alpine:3.24 sh -ec 'cp -a /source/. /target/'
+          docker run --rm -v "$pitr_recovery_wal_volume:/target" -v "$pitr_dir/wal-archive.tar.gz:/backup/wal-archive.tar.gz:ro" \
+            alpine:3.24 sh -ec 'tar -xzf /backup/wal-archive.tar.gz -C /target'
+          cat > "$pitr_dir/recovery-settings.conf" <<EOF
+          restore_command = 'cp /var/lib/postgresql/wal-archive/%f %p'
+          recovery_target_time = '$recovery_target_time'
+          recovery_target_action = 'pause'
+          EOF
+          docker run --rm -v "$pitr_recovery_data_volume:/data" -v "$pitr_dir/recovery-settings.conf:/settings.conf:ro" \
+            alpine:3.24 sh -ec 'touch /data/recovery.signal; cat /settings.conf >> /data/postgresql.auto.conf'
+          docker run --detach --name "$pitr_recovery_container" \
+            -v "$pitr_recovery_data_volume:/var/lib/postgresql/data" \
+            -v "$pitr_recovery_wal_volume:/var/lib/postgresql/wal-archive" \
+            postgres:17-alpine
+
+          recovered_state=
+          for attempt in $(seq 1 30); do
+            recovered_state="$(docker exec "$pitr_recovery_container" psql --username onecart --dbname onecart --tuples-only --no-align \
+              --command "SELECT pg_is_in_recovery() || '|' || COUNT(*)::text FROM onecart_pitr_probe WHERE marker = 'after-target';" 2>/dev/null || true)"
+            if [ "$recovered_state" = 't|0' ]; then break; fi
+            sleep 1
+          done
+          test "$recovered_state" = 't|0'
