@@ -1,0 +1,115 @@
+name: Deployment packages
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+env:
+  PACKAGE_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
+
+jobs:
+  linux-and-docker:
+    name: Linux and Docker deployment archives
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build Linux deployment package
+        env:
+          VITE_API_BASE_URL: https://api.example.test
+        run: |
+          package_root="$RUNNER_TEMP/onecart-linux"
+          mkdir -p "$package_root/api" "$package_root/storefront" "$package_root/deploy/linux" "$package_root/docs"
+          dotnet publish backend/OneCart.Api/OneCart.Api.csproj --configuration Release --output "$package_root/api"
+          cd frontend
+          npm ci
+          npm run build
+          cd ..
+          cp -a frontend/dist/. "$package_root/storefront/"
+          cp deploy/linux/onecart-api.service deploy/linux/nginx-onecart.conf deploy/linux/onecart-api.env.example "$package_root/deploy/linux/"
+          cp README.md "$package_root/"
+          cp docs/DEPLOYMENT_GUIDE.md docs/INSTALLATION_GUIDE.md docs/ADMINISTRATOR_GUIDE.md docs/OPERATIONS_POSTGRES.md "$package_root/docs/"
+          printf 'Replace api.example.test in the storefront build with the production HTTPS API origin before publishing. See docs/DEPLOYMENT_GUIDE.md.\n' > "$package_root/INSTALL-NOTES.txt"
+          archive="onecart-linux-${PACKAGE_VERSION}.tar.gz"
+          tar -czf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" onecart-linux
+          sha256sum "$RUNNER_TEMP/$archive" > "$RUNNER_TEMP/$archive.sha256"
+      - name: Build Docker source package
+        run: |
+          archive="onecart-docker-source-${PACKAGE_VERSION}.zip"
+          git archive --format=zip --prefix=onecart/ HEAD -o "$RUNNER_TEMP/$archive"
+          sha256sum "$RUNNER_TEMP/$archive" > "$RUNNER_TEMP/$archive.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: onecart-linux-and-docker-${{ env.PACKAGE_VERSION }}
+          path: |
+            ${{ runner.temp }}/onecart-linux-*.tar.gz
+            ${{ runner.temp }}/onecart-linux-*.tar.gz.sha256
+            ${{ runner.temp }}/onecart-docker-source-*.zip
+            ${{ runner.temp }}/onecart-docker-source-*.zip.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+  windows-iis:
+    name: Windows IIS deployment archive
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build Windows IIS deployment package
+        shell: pwsh
+        env:
+          VITE_API_BASE_URL: https://api.example.test
+        run: |
+          $packageRoot = Join-Path $env:RUNNER_TEMP 'onecart-iis'
+          $apiOutput = Join-Path $packageRoot 'api'
+          $storeOutput = Join-Path $packageRoot 'storefront'
+          New-Item -ItemType Directory -Force -Path $apiOutput, $storeOutput, (Join-Path $packageRoot 'docs') | Out-Null
+          dotnet publish backend/OneCart.Api/OneCart.Api.csproj --configuration Release --runtime win-x64 --self-contained false --output $apiOutput
+          if ($LASTEXITCODE -ne 0) { throw 'API publish failed.' }
+          Push-Location frontend
+          npm ci
+          if ($LASTEXITCODE -ne 0) { throw 'Frontend dependency installation failed.' }
+          npm run build
+          if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
+          Pop-Location
+          Copy-Item frontend/dist/* $storeOutput -Recurse -Force
+          Copy-Item README.md $packageRoot -Force
+          Copy-Item docs/DEPLOYMENT_GUIDE.md, docs/INSTALLATION_GUIDE.md, docs/ADMINISTRATOR_GUIDE.md, docs/OPERATIONS_POSTGRES.md (Join-Path $packageRoot 'docs') -Force
+          @'
+          Replace api.example.test in the storefront build with the production HTTPS API origin before publishing. Install the .NET 10 ASP.NET Core Hosting Bundle and IIS URL Rewrite. See DEPLOYMENT_GUIDE.md.
+          '@ | Set-Content (Join-Path $packageRoot 'INSTALL-NOTES.txt')
+          $archive = Join-Path $env:RUNNER_TEMP "onecart-iis-$env:PACKAGE_VERSION.zip"
+          Compress-Archive -Path (Join-Path $packageRoot '*') -DestinationPath $archive -Force
+          $hash = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
+          "$hash  $(Split-Path $archive -Leaf)" | Set-Content "${archive}.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: onecart-windows-iis-${{ env.PACKAGE_VERSION }}
+          path: |
+            ${{ runner.temp }}/onecart-iis-*.zip
+            ${{ runner.temp }}/onecart-iis-*.zip.sha256
+          if-no-files-found: error
+          retention-days: 30

@@ -30,6 +30,10 @@ All deployments must set these API configuration values through the host environ
 | `ProductMedia__RootPath` | Persistent directory for product image bytes. |
 | `Email__PasswordResetUrl` | HTTPS storefront password-reset page. |
 
+## Build deployment packages
+
+The GitHub Actions **Deployment packages** workflow runs manually from the Actions tab, automatically on pushes to `main`, or for a pushed `v*` tag. It creates 30-day downloadable artifacts for Linux/systemd, Windows IIS, and Docker source deployment, each with a SHA-256 checksum. The storefront bundles use `https://api.example.test` as a build-time placeholder; rebuild the storefront with the actual public HTTPS API origin before deployment. Replace example hostnames, database credentials, bootstrap tokens, and SMTP settings using the host's protected configuration. These workflow artifacts prepare deployment archives; publishing a public release remains a separate distribution decision.
+
 Configure SMTP with `Email__Smtp__Host`, `Email__Smtp__Port`, `Email__Smtp__Username`, `Email__Smtp__Password`, and `Email__From`. Password reset remains unavailable until a working mail service is configured.
 
 After configuring the database, apply migrations by running the published API with `--migrate`. Create the first System Admin with `--bootstrap-system-admin admin@example.com`; enter the password at its hidden console prompt. Both commands run against the same production environment configuration as the API.
