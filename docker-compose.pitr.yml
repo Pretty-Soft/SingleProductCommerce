@@ -7,12 +7,12 @@ services:
     command:
       - |
         archive_dir=/var/lib/postgresql/wal-archive
-        mkdir -p "$archive_dir"
-        chown postgres:postgres "$archive_dir"
+        mkdir -p "$${archive_dir}"
+        chown postgres:postgres "$${archive_dir}"
         exec /usr/local/bin/docker-entrypoint.sh postgres \
           -c wal_level=replica \
           -c archive_mode=on \
-          -c "archive_command=test ! -f $archive_dir/%f && cp %p $archive_dir/%f"
+          -c "archive_command=test ! -f $${archive_dir}/%f && cp %p $${archive_dir}/%f"
     volumes:
       - postgres-wal-archive:/var/lib/postgresql/wal-archive
 
