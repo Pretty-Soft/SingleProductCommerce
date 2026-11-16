@@ -1,15 +1,25 @@
 services:
   api:
     environment:
-      Cors__AllowedOrigins__0: https://${ONECART_DOMAIN:?Set ONECART_DOMAIN in .env}:8443
+      Cors__AllowedOrigins__0: https://${ONECART_DOMAIN:?Set ONECART_DOMAIN in .env}
 
   storefront:
     build:
       args:
-        VITE_API_BASE_URL: https://${ONECART_DOMAIN:?Set ONECART_DOMAIN in .env}:8443
+        VITE_API_BASE_URL: https://${ONECART_DOMAIN:?Set ONECART_DOMAIN in .env}
 
   proxy:
-    ports:
-      - "127.0.0.1:8443:443"
+    ports: !reset []
     volumes:
       - ./deploy/Caddyfile.smoke:/etc/caddy/Caddyfile:ro
+
+  smoke-check:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.smoke
+    image: onecart-smoke-check:local
+    profiles: ["smoke"]
+    environment:
+      ONECART_DOMAIN: ${ONECART_DOMAIN:?Set ONECART_DOMAIN in .env}
+    networks:
+      - edge

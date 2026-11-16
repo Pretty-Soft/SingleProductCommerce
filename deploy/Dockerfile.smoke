@@ -1,0 +1,7 @@
+FROM alpine:3.24
+
+RUN apk add --no-cache curl jq
+COPY deploy/smoke-test.sh /usr/local/bin/onecart-smoke-test
+RUN chmod 0555 /usr/local/bin/onecart-smoke-test
+
+ENTRYPOINT ["/usr/local/bin/onecart-smoke-test"]

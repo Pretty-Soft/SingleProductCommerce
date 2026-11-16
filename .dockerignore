@@ -5,6 +5,7 @@
 **/node_modules
 **/dist
 **/App_Data
+/secrets
 **/.env
 **/secrets.json
 frontend/frontend-local.log
