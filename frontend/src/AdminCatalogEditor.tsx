@@ -436,7 +436,8 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
   function sectionToggle(sectionId: string, label: string) {
     const expanded = expandedSections[sectionId] ?? false;
     return <button className="catalog-section-toggle" type="button" aria-expanded={expanded} aria-controls={sectionId} onClick={() => toggleSection(sectionId)}>
-      <span aria-hidden="true">{expanded ? "−" : "+"}</span><span className="visually-hidden">{expanded ? "Collapse" : "Expand"} {label}</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d={expanded ? "m6 14 6-6 6 6" : "m6 10 6 6 6-6"} /></svg>
+      <span className="visually-hidden">{expanded ? "Collapse" : "Expand"} {label}</span>
     </button>;
   }
 

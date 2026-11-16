@@ -3194,6 +3194,8 @@ footer {
 .catalog-section .catalog-accordion-heading { background: linear-gradient(110deg, #fff8fb, #fff); border: 0; border-bottom: 1px solid #f4e2e9; margin: -16px -16px 0; min-height: 66px; padding: 12px 16px; }
 .catalog-section:not(.catalog-section-expanded) .catalog-accordion-heading { margin: 0; }
 .catalog-accordion-heading h3 { color: #9e2454; font-size: 0.98rem; margin: 0; }
+.catalog-section-toggle svg { fill: none; height: 19px; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; width: 19px; }
+.visually-hidden { clip: rect(0, 0, 0, 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
 .catalog-section-title-toggle { appearance: none; background: transparent; border: 0; color: inherit; cursor: pointer; font: inherit; padding: 0; text-align: left; }
 .catalog-section-title-toggle:hover { color: #c21d63; text-decoration: underline; text-underline-offset: 3px; }
 .catalog-section-title-toggle:focus-visible { border-radius: 3px; outline: 2px solid #d62a70; outline-offset: 3px; }
