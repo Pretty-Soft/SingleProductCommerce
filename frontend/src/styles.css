@@ -3162,7 +3162,9 @@ footer {
   font-weight: 700;
   min-height: 40px;
   outline: 0;
-  padding: 0 16px 0 0;
+  padding: 0 16px 0 4px;
+  text-align: center;
+  text-align-last: center;
   width: 87px;
 }
 .store-language-picker::after { border-bottom: 1.5px solid var(--theme-muted, #756970); border-right: 1.5px solid var(--theme-muted, #756970); content: ""; height: 6px; pointer-events: none; position: absolute; right: 11px; top: 16px; transform: rotate(45deg); width: 6px; }
