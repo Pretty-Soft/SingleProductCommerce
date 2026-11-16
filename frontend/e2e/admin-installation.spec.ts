@@ -254,12 +254,18 @@ test("adds a second variant, edits its stock, and saves them together", async ({
   await sectionNav.getByRole("button", { name: "Attributes" }).click();
   const attributes = page.locator("#product-attributes");
   await attributes.getByRole("button", { name: "Add attribute group" }).click();
-  await attributes.getByLabel("Name").fill("Package size");
-  await attributes.getByRole("textbox", { name: "Choice" }).fill("Large");
+  await attributes.getByLabel("Name").nth(0).fill("Package size");
+  await attributes.getByRole("textbox", { name: "Choice" }).nth(0).fill("Large");
+  await attributes.getByRole("button", { name: "Add choice" }).nth(0).click();
+  await attributes.getByRole("textbox", { name: "Choice" }).nth(1).fill("Small");
+  await attributes.getByRole("button", { name: "Add attribute group" }).click();
+  await attributes.getByLabel("Name").nth(1).fill("Color");
+  await attributes.getByRole("textbox", { name: "Choice" }).nth(2).fill("Rose");
   await attributes.getByRole("button", { name: "Save section" }).click();
   await expect(page.getByText("Section changes saved.")).toBeVisible();
-  expect(savedCatalog?.attributeGroups).toHaveLength(1);
-  expect(savedCatalog?.attributeGroups[0]).toMatchObject({ name: "Package size", options: [{ name: "Large" }] });
+  expect(savedCatalog?.attributeGroups).toHaveLength(2);
+  expect(savedCatalog?.attributeGroups[0]).toMatchObject({ name: "Package size", options: [{ name: "Large" }, { name: "Small" }] });
+  expect(savedCatalog?.attributeGroups[1]).toMatchObject({ name: "Color", options: [{ name: "Rose" }] });
 
   page.once("dialog", dialog => dialog.accept());
   await page.locator("#product-basics").getByRole("button", { name: "Delete product" }).click();
