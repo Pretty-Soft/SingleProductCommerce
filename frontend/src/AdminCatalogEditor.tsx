@@ -86,6 +86,12 @@ export function sharesVariantEditScope(section: CatalogSectionId, editingSection
     && variantDataSections.includes(editingSection);
 }
 
+export function canAddSectionItem(section: CatalogSectionId, editingSection: CatalogSectionId | null, currentCount: number, maximum: number, busy = false) {
+  return !busy
+    && currentCount < maximum
+    && (editingSection === null || editingSection === section || sharesVariantEditScope(section, editingSection));
+}
+
 const emptyProduct = (): EditableProduct => ({
   id: null,
   name: "",
@@ -284,6 +290,18 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
     setError("");
     setMessage("");
     setEditingSection(section);
+  }
+
+  function prepareSectionAdd(section: CatalogSectionId) {
+    if (busy) return false;
+    if (editingSection && !isSectionEditable(section)) {
+      setError("Save or cancel the current section before adding here.");
+      return false;
+    }
+    setError("");
+    setMessage("");
+    if (!editingSection) setEditingSection(section);
+    return true;
   }
 
   function cancelSectionEdit(section: CatalogSectionId) {
@@ -711,7 +729,9 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
             </div>
             <div className="section-action-stack">
               {sectionActions("variants")}
-              <button className="button button-quiet" type="button" onClick={() => updateProduct("variants", [...product.variants, emptyVariant(product.currencyCode)])} disabled={busy || !isSectionEditable("variants") || product.variants.length >= 100}>
+              <button className="button button-quiet" type="button" onClick={() => {
+                if (prepareSectionAdd("variants")) updateProduct("variants", [...product.variants, emptyVariant(product.currencyCode)]);
+              }} disabled={!canAddSectionItem("variants", editingSection, product.variants.length, 100, busy)}>
                 Add another variant
               </button>
               {sectionToggle("product-variants", "Variants")}
@@ -793,7 +813,9 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
             </div>
             <div className="section-action-stack">
               {sectionActions("attributes")}
-              <button className="button button-quiet" type="button" onClick={() => updateProduct("attributeGroups", [...product.attributeGroups, emptyAttributeGroup(product.attributeGroups.length)])} disabled={busy || !isSectionEditable("attributes") || product.attributeGroups.length >= 30}>
+              <button className="button button-quiet" type="button" onClick={() => {
+                if (prepareSectionAdd("attributes")) updateProduct("attributeGroups", [...product.attributeGroups, emptyAttributeGroup(product.attributeGroups.length)]);
+              }} disabled={!canAddSectionItem("attributes", editingSection, product.attributeGroups.length, 30, busy)}>
                 Add attribute group
               </button>
               {sectionToggle("product-attributes", "Attribute groups")}
