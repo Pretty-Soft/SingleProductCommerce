@@ -526,7 +526,7 @@ function Storefront() {
         </section>
       )}
 
-      <footer className="store-footer">
+      <footer className="store-footer" role="contentinfo">
         <p className="store-copyright">© {new Date().getFullYear()} Pretty Shop</p>
         <nav className="store-footer-links" aria-label={text.storeNavigation}>
           <a className="footer-whatsapp" href="https://wa.me/01872441501?text=Hello%2C%20I%20have%20a%20question%20about%20this%20product." target="_blank" rel="noopener noreferrer">

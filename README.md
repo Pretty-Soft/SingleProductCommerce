@@ -78,10 +78,11 @@ Run the storefront cart tests and production build with:
 ```powershell
 cd frontend
 npm test
+npm run test:e2e
 npm run build
 ```
 
-GitHub Actions runs the API workflow tests, persistence tests, PostgreSQL commerce integration test, storefront tests, production frontend build, Docker Compose validation, and API/storefront container builds for pushes and pull requests. SQL Server integration tests remain a separate opt-in local check because they require a disposable SQL Server instance.
+GitHub Actions runs the API workflow tests, persistence tests, PostgreSQL commerce integration test, storefront unit tests, Chromium storefront checkout/responsive tests, production frontend build, Docker Compose validation, API/storefront container builds, and a clean Docker install/backup restore smoke test for pushes and pull requests. SQL Server integration tests remain a separate opt-in local check because they require a disposable SQL Server instance.
 
 The SQL Server integration test creates and drops a uniquely named disposable database. Run it only with a local/test SQL Server login that has database create/drop permission:
 

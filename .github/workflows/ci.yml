@@ -69,6 +69,9 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm test
+      - name: Install Chromium for browser tests
+        run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
       - run: npm run build
 
   containers:
@@ -89,3 +92,83 @@ jobs:
         run: docker build --file backend/OneCart.Api/Dockerfile --tag onecart-api:ci .
       - name: Build storefront image
         run: docker build --file frontend/Dockerfile --build-arg VITE_API_BASE_URL=https://shop.example.test --tag onecart-storefront:ci .
+
+  deployment-smoke:
+    name: Fresh Docker install and recovery smoke test
+    runs-on: ubuntu-latest
+    env:
+      ONECART_DOMAIN: shop.example.test
+      ACME_EMAIL: ci@example.test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Boot an isolated HTTPS deployment
+        run: |
+          set -euo pipefail
+          mkdir -p secrets
+          chmod 700 secrets
+          postgres_password="$(openssl rand -hex 32)"
+          bootstrap_token="$(openssl rand -hex 32)"
+          printf '%s' "$postgres_password" > secrets/postgres_password
+          printf 'Host=db;Port=5432;Database=onecart;Username=onecart;Password=%s' "$postgres_password" > secrets/store_connection
+          printf '%s' "$bootstrap_token" > secrets/bootstrap_token
+          unset postgres_password
+          chmod 600 secrets/*
+          compose=(docker compose --project-name onecart-smoke -f docker-compose.yml -f docker-compose.smoke.yml)
+          cleanup() {
+            "${compose[@]}" down --volumes --remove-orphans || true
+            rm -rf secrets
+          }
+          trap cleanup EXIT
+
+          "${compose[@]}" up --detach --build
+          origin="https://${ONECART_DOMAIN}:8443"
+          resolve=(--resolve "${ONECART_DOMAIN}:8443:127.0.0.1")
+          health=''
+          for attempt in $(seq 1 60); do
+            if health="$(curl --silent --show-error --fail --insecure "${resolve[@]}" "$origin/health" 2>/dev/null)"; then
+              break
+            fi
+            sleep 2
+          done
+          test "$(printf '%s' "$health" | jq -r .status)" = ok
+
+          install_page="$(curl --silent --show-error --fail --insecure "${resolve[@]}" "$origin/install")"
+          grep -q 'id="root"' <<< "$install_page"
+          available="$(curl --silent --show-error --fail --insecure "${resolve[@]}" "$origin/api/v1/setup/status")"
+          test "$(printf '%s' "$available" | jq -r .available)" = true
+
+          invalid_token_status="$(curl --silent --output /dev/null --write-out '%{http_code}' --insecure "${resolve[@]}" \
+            -H "Origin: $origin" -H 'X-OneCart-Setup-Token: invalid-token' \
+            -H 'Content-Type: application/json' \
+            --data '{"email":"owner@example.test","password":"OneCart-CI-Bootstrap-2026!","confirmPassword":"OneCart-CI-Bootstrap-2026!"}' \
+            "$origin/api/v1/setup/system-admin")"
+          test "$invalid_token_status" = 403
+
+          setup_result="$(curl --silent --show-error --fail --insecure "${resolve[@]}" \
+            -H "Origin: $origin" -H "X-OneCart-Setup-Token: $bootstrap_token" \
+            -H 'Content-Type: application/json' \
+            --data '{"email":"owner@example.test","password":"OneCart-CI-Bootstrap-2026!","confirmPassword":"OneCart-CI-Bootstrap-2026!"}' \
+            "$origin/api/v1/setup/system-admin")"
+          test "$(printf '%s' "$setup_result" | jq -r .role)" = SystemAdmin
+
+          completed="$(curl --silent --show-error --fail --insecure "${resolve[@]}" "$origin/api/v1/setup/status")"
+          test "$(printf '%s' "$completed" | jq -r .available)" = false
+
+          forbidden_status="$(curl --silent --output /dev/null --write-out '%{http_code}' --insecure "${resolve[@]}" \
+            -H 'Origin: https://attacker.example.test' -H "X-OneCart-Setup-Token: $bootstrap_token" \
+            -H 'Content-Type: application/json' \
+            --data '{"email":"second@example.test","password":"OneCart-CI-Bootstrap-2026!","confirmPassword":"OneCart-CI-Bootstrap-2026!"}' \
+            "$origin/api/v1/setup/system-admin")"
+          test "$forbidden_status" = 403
+
+          "${compose[@]}" run --rm migrate
+          dump_file="$(mktemp)"
+          trap 'rm -f "$dump_file"; cleanup' EXIT
+          "${compose[@]}" exec --no-TTY db pg_dump --username onecart --format custom onecart > "$dump_file"
+          "${compose[@]}" exec --no-TTY db createdb --username onecart onecart_restore_check
+          "${compose[@]}" exec --no-TTY db pg_restore --username onecart --dbname onecart_restore_check --no-owner --no-privileges --exit-on-error < "$dump_file"
+          restored_admin_count="$("${compose[@]}" exec --no-TTY db psql --username onecart --dbname onecart_restore_check --tuples-only --no-align --command 'SELECT COUNT(*) FROM "AspNetUsers";')"
+          test "$restored_admin_count" = 1
+
+          health_after="$(curl --silent --show-error --fail --insecure "${resolve[@]}" "$origin/health")"
+          test "$(printf '%s' "$health_after" | jq -r .status)" = ok
