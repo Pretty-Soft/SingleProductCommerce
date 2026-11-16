@@ -49,8 +49,20 @@ const initialAdminProduct = {
   storefrontTranslations: {}
 };
 
-function mockSystemAdminApi(onProductSave: (product: typeof initialAdminProduct) => typeof initialAdminProduct) {
+type StorefrontSettingsPayload = {
+  aboutUs: string;
+  usageSteps: Array<{ title: string; description: string }>;
+  reviews: Array<{ displayName: string; rating: number; title: string; content: string; isPublished: boolean; displayOrder: number }>;
+};
+
+function mockSystemAdminApi(
+  onProductSave: (product: typeof initialAdminProduct) => typeof initialAdminProduct,
+  onUserCreate: (user: { email: string; temporaryPassword: string; roleNames: string[] }) => unknown = () => adminUser,
+  onSettingsSave: (settings: StorefrontSettingsPayload) => void = () => undefined,
+  onOrderStatus: (status: string) => void = () => undefined
+) {
   let authenticated = false;
+  let orderStatus = "Pending";
   return async (route: import("@playwright/test").Route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
@@ -73,17 +85,47 @@ function mockSystemAdminApi(onProductSave: (product: typeof initialAdminProduct)
       await respond({ requiresTwoFactor: false });
     } else if (path === "/api/v1/admin/roles") {
       await respond(["SystemAdmin", "CatalogManager", "OrderManager", "StoreManager"].map((name, index) => ({ id: `role-${index}`, name })));
+    } else if (path === "/api/v1/admin/users" && method === "POST") {
+      await respond(onUserCreate(request.postDataJSON() as { email: string; temporaryPassword: string; roleNames: string[] }), 201);
     } else if (path === "/api/v1/admin/users") {
       await respond([adminUser]);
     } else if (path === "/api/v1/admin/audit") {
       await respond([]);
     } else if (path === "/api/v1/admin/security/mfa-policy") {
       await respond({ required: false });
+    } else if (path === "/api/v1/admin/orders" && method === "GET") {
+      await respond([{
+        id: "00000000-0000-4000-8000-000000000030", orderNumber: "OC-TEST-1001", status: orderStatus,
+        customerName: "Test shopper", phoneNumber: "01800000000", currencyCode: "BDT", total: 1200,
+        createdAtUtc: "2026-01-01T00:00:00Z", itemCount: 1
+      }]);
+    } else if (path === "/api/v1/admin/orders/summary") {
+      await respond([{ currencyCode: "BDT", statuses: [{ status: orderStatus, orderCount: 1, orderTotal: 1200 }] }]);
+    } else if (/^\/api\/v1\/admin\/orders\/[0-9a-f-]+$/.test(path)) {
+      await respond({
+        id: "00000000-0000-4000-8000-000000000030", orderNumber: "OC-TEST-1001", status: orderStatus,
+        customerName: "Test shopper", phoneNumber: "01800000000", currencyCode: "BDT", total: 1200,
+        createdAtUtc: "2026-01-01T00:00:00Z", updatedAtUtc: "2026-01-01T00:00:00Z", itemCount: 1,
+        deliveryAddress: "1 Example Road", lines: [{ productName: "Sample product", sku: "SAMPLE-ONE", variantName: "Single pack", selectedOptions: [], quantity: 1, unitPrice: 1200 }]
+      });
+    } else if (path.endsWith("/status") && path.includes("/api/v1/admin/orders/") && method === "PUT") {
+      orderStatus = (request.postDataJSON() as { status: string }).status;
+      onOrderStatus(orderStatus);
+      await respond({
+        id: "00000000-0000-4000-8000-000000000030", orderNumber: "OC-TEST-1001", status: orderStatus,
+        customerName: "Test shopper", phoneNumber: "01800000000", currencyCode: "BDT", total: 1200,
+        createdAtUtc: "2026-01-01T00:00:00Z", updatedAtUtc: "2026-01-01T00:01:00Z", itemCount: 1,
+        deliveryAddress: "1 Example Road", lines: [{ productName: "Sample product", sku: "SAMPLE-ONE", variantName: "Single pack", selectedOptions: [], quantity: 1, unitPrice: 1200 }]
+      });
     } else if (path === "/api/v1/admin/catalog/product" && method === "GET") {
       await respond(initialAdminProduct);
     } else if (path === "/api/v1/admin/catalog/product" && method === "PUT") {
       const saved = onProductSave(request.postDataJSON() as typeof initialAdminProduct);
       await respond(saved);
+    } else if (path === "/api/v1/admin/storefront/settings" && method === "PUT") {
+      const settings = request.postDataJSON() as StorefrontSettingsPayload;
+      onSettingsSave(settings);
+      await respond({ ...settings, reviews: settings.reviews });
     } else if (path === "/api/v1/admin/storefront/settings") {
       await respond({
         brandName: "Pretty Shop", storefrontHeadline: "Your trust, Your Love", aboutUs: "",
@@ -93,8 +135,6 @@ function mockSystemAdminApi(onProductSave: (product: typeof initialAdminProduct)
         brandLogo: null, productImages: [], trustItems: [], storefrontTranslations: {},
         theme: { primaryColor: "#242020", accentColor: "#c17b88", textColor: "#282326", mutedTextColor: "#777078", backgroundColor: "#fbf8f8", surfaceColor: "#ffffff", borderColor: "#eee5e8", productTitleFontSizePx: 30, detailsFontSizePx: 13 }
       });
-    } else if (path === "/api/v1/admin/orders" || path === "/api/v1/admin/orders/summary") {
-      await respond([]);
     } else if (path === "/api/v1/admin/customers") {
       await respond({ items: [], totalCount: 0, page: 1, pageSize: 25 });
     } else {
@@ -198,4 +238,86 @@ test("adds a second variant, edits its stock, and saves them together", async ({
   await expect(page.getByText("Section changes saved.")).toBeVisible();
   expect(savedVariants).toHaveLength(2);
   expect(savedVariants[1]).toMatchObject({ sku: "SAMPLE-TWO", displayName: "Double pack", price: 2100, stockQuantity: 18, currencyCode: "BDT" });
+});
+
+test("creates a limited Catalog Manager account from the System Admin workspace", async ({ page }) => {
+  let createdUser: { email: string; temporaryPassword: string; roleNames: string[] } | undefined;
+  await page.route(`${apiOrigin}/api/**`, mockSystemAdminApi(
+    (product) => product,
+    (user) => {
+      createdUser = user;
+      return { ...adminUser, id: "00000000-0000-4000-8000-000000000099", email: user.email, roles: user.roleNames, mustChangePassword: true };
+    }
+  ));
+
+  await page.goto("/admin");
+  await page.getByLabel("Email address").fill("owner@example.test");
+  await page.getByLabel("Password").fill("OneCart-Test-Admin-2026!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  await page.getByRole("navigation", { name: "Admin sections" }).getByRole("button", { name: "Accounts & roles", exact: true }).click();
+
+  const accounts = page.locator("#accounts");
+  const createForm = accounts.locator("form.user-form");
+  await createForm.getByLabel("Email address").fill("catalog@example.test");
+  await createForm.getByLabel("Temporary password").fill("Temporary-Admin-2026!");
+  await createForm.getByLabel("CatalogManager").check();
+  await createForm.getByRole("button", { name: "Create user" }).click();
+
+  await expect(page.getByRole("status").last()).toContainText("The user must change this temporary password");
+  expect(createdUser).toEqual({ email: "catalog@example.test", temporaryPassword: "Temporary-Admin-2026!", roleNames: ["CatalogManager"] });
+});
+
+test("saves About Us, multiline usage, and an unpublished admin-managed review", async ({ page }) => {
+  let savedSettings: StorefrontSettingsPayload | undefined;
+  await page.route(`${apiOrigin}/api/**`, mockSystemAdminApi(
+    (product) => product,
+    () => adminUser,
+    (settings) => { savedSettings = settings; }
+  ));
+
+  await page.goto("/admin");
+  await page.getByLabel("Email address").fill("owner@example.test");
+  await page.getByLabel("Password").fill("OneCart-Test-Admin-2026!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("navigation", { name: "Admin sections" }).getByRole("button", { name: "Storefront settings", exact: true }).click();
+  const settings = page.getByRole("heading", { name: "Storefront settings" }).locator("xpath=../../..");
+
+  await settings.getByLabel("About Us", { exact: true }).fill("A neighborhood shop serving local families.");
+  await settings.getByLabel("Instructions", { exact: true }).fill("Use a small amount.\n\nRepeat as needed.");
+  await settings.getByRole("button", { name: "Add review" }).click();
+  await settings.getByLabel("Display name", { exact: true }).fill("Verified customer");
+  await settings.getByLabel("Review title", { exact: true }).fill("A good fit");
+  await settings.getByLabel("Review", { exact: true }).fill("This sample review remains unpublished until an administrator approves it.");
+  await settings.getByRole("button", { name: "Save storefront settings" }).click();
+
+  await expect(settings.getByRole("status")).toContainText("Storefront settings saved.");
+  expect(savedSettings?.aboutUs).toBe("A neighborhood shop serving local families.");
+  expect(savedSettings?.usageSteps).toMatchObject([{ title: "Instructions", description: "Use a small amount.\n\nRepeat as needed." }]);
+  expect(savedSettings?.reviews).toHaveLength(1);
+  expect(savedSettings?.reviews[0]).toMatchObject({ displayName: "Verified customer", rating: 5, title: "A good fit", isPublished: false });
+});
+
+test("moves a Pending COD order into Processing from the admin order workspace", async ({ page }) => {
+  let savedStatus = "";
+  await page.route(`${apiOrigin}/api/**`, mockSystemAdminApi(
+    (product) => product,
+    () => adminUser,
+    () => undefined,
+    (status) => { savedStatus = status; }
+  ));
+
+  await page.goto("/admin");
+  await page.getByLabel("Email address").fill("owner@example.test");
+  await page.getByLabel("Password").fill("OneCart-Test-Admin-2026!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("navigation", { name: "Admin sections" }).getByRole("button", { name: "Orders", exact: true }).click();
+  const orders = page.getByRole("heading", { name: "Orders" }).locator("xpath=../../..");
+  await orders.getByRole("button", { name: /OC-TEST-1001/ }).click();
+  await orders.locator(".order-status-editor select").selectOption("Processing");
+  await orders.getByRole("button", { name: "Save status" }).click();
+
+  await expect(orders.getByText("Order status saved.")).toBeVisible();
+  expect(savedStatus).toBe("Processing");
+  await expect(orders.locator(".order-details .eyebrow")).toHaveText("Processing");
 });
