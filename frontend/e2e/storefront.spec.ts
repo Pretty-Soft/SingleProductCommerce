@@ -14,7 +14,7 @@ function storefrontProduct() {
     slug: "coconut-curls-shampoo",
     description: "A gentle shampoo for soft, defined curls.",
     currencyCode: "BDT",
-    brandName: "Pretty Shop",
+    brandName: "Configured Test Brand",
     storefrontHeadline: "Your trust, Your Love",
     aboutUs: "A small store focused on thoughtful products.",
     benefits: [{ id: "benefit-1", title: "Define curls naturally", description: "Moisturizes and reduces frizz." }],
@@ -98,6 +98,7 @@ test("renders the product landing page and completes a variant COD order", async
   await expect(page.getByText("Winter Sale")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Customer reviews" })).toBeVisible();
   await expect(page.getByRole("img", { name: "Shampoo bottle" })).toBeVisible();
+  await expect(page.getByText(`© ${new Date().getFullYear()} Configured Test Brand`)).toBeVisible();
 
   const addButton = page.getByRole("button", { name: "Add to cart" });
   await expect(addButton).toBeDisabled();

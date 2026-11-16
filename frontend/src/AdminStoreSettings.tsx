@@ -244,7 +244,7 @@ export default function AdminStoreSettings() {
             <section className="theme-preview-section"><strong>Customer reviews</strong><small>{settings.reviews.filter(review => review.isPublished).length ? `${settings.reviews.filter(review => review.isPublished).length} published admin-managed review(s)` : "Admin-managed reviews will appear here when published."}</small></section>
           </div>
           {settings.productImages.length > 0 && <div className="theme-preview-promo"><span>{settings.productImages.length > 1 && productImagePreviews[settings.productImages[settings.productImages.length - 1].id] && <img src={productImagePreviews[settings.productImages[settings.productImages.length - 1].id]} alt="" />}</span><div><small>{settings.brandName}</small><strong>{settings.benefits[0]?.title || "Product promotional message"}</strong><p>{settings.benefits[0]?.description || "The promotional strip uses your uploaded product imagery and configured benefits."}</p></div></div>}
-          <footer className="theme-preview-footer"><span>© {new Date().getFullYear()} Pretty Shop</span><span>{settings.whatsAppEnabled ? settings.whatsAppPhoneNumber || "WhatsApp contact number" : "WhatsApp contact"} · Admin</span></footer>
+          <footer className="theme-preview-footer"><span>© {new Date().getFullYear()} {settings.brandName || "Store name"}</span><span>{settings.whatsAppEnabled ? settings.whatsAppPhoneNumber || "WhatsApp contact number" : "WhatsApp contact"} · Admin</span></footer>
         </div>
       </fieldset>
       <fieldset className="admin-field-wide"><legend>Storefront translations</legend><p className="admin-muted">English is the default and fallback. Blank translations display the English text.</p>

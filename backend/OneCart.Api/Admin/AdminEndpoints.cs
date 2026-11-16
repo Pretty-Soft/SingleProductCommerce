@@ -22,10 +22,12 @@ public static class AdminEndpoints
 
         group.MapPost("/login", LoginAsync)
             .AllowAnonymous()
+            .RequireAdminAuthenticationRateLimit()
             .AddEndpointFilter(ValidateAntiforgeryAsync);
 
         group.MapPost("/two-factor/login", LoginWithAuthenticatorAsync)
             .AllowAnonymous()
+            .RequireAdminAuthenticationRateLimit()
             .AddEndpointFilter(ValidateAntiforgeryAsync);
 
         group.MapPost("/password/forgot", RequestPasswordResetAsync)

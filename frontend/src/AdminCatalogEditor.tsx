@@ -700,9 +700,9 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
               </div>
               <div className="section-action-stack">
                 {sectionActions("trust")}
-                <button className="button button-quiet" type="button" onClick={() => {
+                <button className="button catalog-add-action" type="button" onClick={() => {
                   if (prepareSectionAdd("trust")) updateProduct("trustItems", [...product.trustItems, { id: null, title: "", description: "", isActive: true, displayOrder: product.trustItems.length }]);
-                }} disabled={busy || product.trustItems.length >= 8}>
+                }} disabled={busy || product.trustItems.length >= 8} title={product.trustItems.length >= 8 ? "A maximum of eight store details is allowed." : undefined}>
                   Add detail
                 </button>
                 {sectionToggle("product-trust", "Store details")}
@@ -748,9 +748,9 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
             </div>
             <div className="section-action-stack">
               {sectionActions("variants")}
-              <button className="button button-quiet" type="button" onClick={() => {
+              <button className="button catalog-add-action" type="button" onClick={() => {
                 if (prepareSectionAdd("variants")) updateProduct("variants", [...product.variants, emptyVariant(product.currencyCode)]);
-              }} disabled={!canAddSectionItem(product.variants.length, 100, busy)}>
+              }} disabled={!canAddSectionItem(product.variants.length, 100, busy)} title={product.variants.length >= 100 ? "A maximum of 100 variants is allowed." : undefined}>
                 Add another variant
               </button>
               {sectionToggle("product-variants", "Variants")}
@@ -832,9 +832,9 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
             </div>
             <div className="section-action-stack">
               {sectionActions("attributes")}
-              <button className="button button-quiet" type="button" onClick={() => {
+              <button className="button catalog-add-action" type="button" onClick={() => {
                 if (prepareSectionAdd("attributes")) updateProduct("attributeGroups", [...product.attributeGroups, emptyAttributeGroup(product.attributeGroups.length)]);
-              }} disabled={!canAddSectionItem(product.attributeGroups.length, 30, busy)}>
+              }} disabled={!canAddSectionItem(product.attributeGroups.length, 30, busy)} title={product.attributeGroups.length >= 30 ? "A maximum of 30 attribute groups is allowed." : undefined}>
                 Add attribute group
               </button>
               {sectionToggle("product-attributes", "Attribute groups")}
@@ -862,9 +862,9 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
               </fieldset>
               <div className="section-heading variant-heading">
                 <h4>Choices</h4>
-                <button className="button button-quiet" type="button" onClick={() => {
+                <button className="button catalog-add-action" type="button" onClick={() => {
                   if (prepareSectionAdd("attributes")) updateAttributeGroup(groupIndex, { options: [...group.options, emptyAttributeOption(group.options.length)] });
-                }} disabled={busy || group.options.length >= 100}>
+                }} disabled={busy || group.options.length >= 100} title={group.options.length >= 100 ? "A maximum of 100 choices per attribute is allowed." : undefined}>
                   Add choice
                 </button>
               </div>
