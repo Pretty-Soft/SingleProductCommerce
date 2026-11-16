@@ -64,7 +64,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable onecart-api.service
 sudo systemctl start onecart-api.service
 
-sudo install -d -m 0755 "$certificate_dir"
+install -d -m 0700 "$certificate_dir"
 openssl req -x509 -newkey rsa:2048 -nodes \
   -keyout "$certificate_dir/key.pem" \
   -out "$certificate_dir/fullchain.pem" \
