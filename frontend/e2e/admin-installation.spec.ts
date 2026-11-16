@@ -123,6 +123,8 @@ function mockSystemAdminApi(
     } else if (path === "/api/v1/admin/catalog/product" && method === "PUT") {
       const saved = onProductSave(request.postDataJSON() as typeof initialAdminProduct);
       await respond(saved);
+    } else if (path === "/api/v1/admin/catalog/product" && method === "DELETE") {
+      await route.fulfill({ status: 204, headers: corsHeaders });
     } else if (path === "/api/v1/admin/catalog/product/images" && method === "POST") {
       await respond({ id: "uploaded-image-1", url: "/api/v1/store/product/images/uploaded-image-1", mediaKind: "product", altText: "Uploaded product photo", displayOrder: 1 }, 201);
     } else if (path === "/api/v1/admin/catalog/product/images/uploaded-image-1" && method === "PUT") {
@@ -218,8 +220,10 @@ test("completes the one-time setup form through the configured token header", as
 
 test("adds a second variant, edits its stock, and saves them together", async ({ page }) => {
   let savedVariants: typeof initialAdminProduct.variants = [];
+  let savedCatalog: typeof initialAdminProduct | undefined;
   await page.route(`${apiOrigin}/api/**`, mockSystemAdminApi((product) => {
     savedVariants = product.variants;
+    savedCatalog = product;
     return product;
   }));
 
@@ -234,7 +238,6 @@ test("adds a second variant, edits its stock, and saves them together", async ({
   const sectionNav = page.getByRole("navigation", { name: "Product editor sections" });
   await sectionNav.getByRole("button", { name: "Variants" }).click();
   const variants = page.locator("#product-variants");
-  await variants.getByRole("button", { name: "Edit variants" }).click();
   await variants.getByRole("button", { name: "Add another variant" }).click();
   await variants.getByLabel("SKU").nth(1).fill("SAMPLE-TWO");
   await variants.getByLabel("Display name / options").nth(1).fill("Double pack");
@@ -247,6 +250,20 @@ test("adds a second variant, edits its stock, and saves them together", async ({
   await expect(page.getByText("Section changes saved.")).toBeVisible();
   expect(savedVariants).toHaveLength(2);
   expect(savedVariants[1]).toMatchObject({ sku: "SAMPLE-TWO", displayName: "Double pack", price: 2100, stockQuantity: 18, currencyCode: "BDT" });
+
+  await sectionNav.getByRole("button", { name: "Attributes" }).click();
+  const attributes = page.locator("#product-attributes");
+  await attributes.getByRole("button", { name: "Add attribute group" }).click();
+  await attributes.getByLabel("Name").fill("Package size");
+  await attributes.getByRole("textbox", { name: "Choice" }).fill("Large");
+  await attributes.getByRole("button", { name: "Save section" }).click();
+  await expect(page.getByText("Section changes saved.")).toBeVisible();
+  expect(savedCatalog?.attributeGroups).toHaveLength(1);
+  expect(savedCatalog?.attributeGroups[0]).toMatchObject({ name: "Package size", options: [{ name: "Large" }] });
+
+  page.once("dialog", dialog => dialog.accept());
+  await page.locator("#product-basics").getByRole("button", { name: "Delete product" }).click();
+  await expect(page.getByText("Product deleted. You can now create a new product.")).toBeVisible();
 });
 
 test("creates a limited Catalog Manager account from the System Admin workspace", async ({ page }) => {

@@ -23,7 +23,9 @@ Only a System Admin can create admin accounts, assign roles, view the audit list
 
 ## Catalog and product media
 
-The catalog contains one product with multiple variants and configurable attribute groups/options. Save the product before uploading images or adding translations that depend on saved variant and attribute IDs. Set each variant's SKU, display name, price, stock, and availability. Attribute groups can be required or optional; options may add to the displayed price.
+The catalog contains one product with multiple variants and configurable attribute groups/options. Save the product before uploading images or adding translations that depend on saved variant and attribute IDs. Set each variant's SKU, display name, price, stock, and availability. Attribute groups can be required or optional; options may add to the displayed price. Add, edit, or remove variants, groups, choices, trust details, and image records in their product sections, then save that section to apply the changes. Product image files are uploaded and deleted separately from the product save.
+
+Use **Delete product** in Product information to remove the product and its child catalog data. The operation is permanent and removes its stored image files. A product referenced by an order cannot be deleted; unpublish it and deactivate its variants to preserve order history.
 
 English is the source language and fallback. Catalog Managers can enter Bangla and Spanish text for product names/descriptions, saved variant names, saved attribute group names, and saved option names. Blank fields fall back to English.
 

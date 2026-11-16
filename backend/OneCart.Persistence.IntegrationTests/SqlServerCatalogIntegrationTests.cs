@@ -249,6 +249,10 @@ public sealed class SqlServerCatalogIntegrationTests
                 .Where(variant => variant.Id == standardVariantId)
                 .Select(variant => variant.StockQuantity)
                 .SingleAsync());
+            var blockedProductDelete = await new ProductMediaService(database, new LocalProductImageStorage(mediaRoot))
+                .DeleteProductAsync(Guid.NewGuid(), "integration-test@onecart.local", CancellationToken.None);
+            Assert.Equal(ProductDeleteResult.HasOrderHistory, blockedProductDelete);
+            Assert.NotNull(await new AdminCatalogService(database).GetProductAsync(CancellationToken.None));
             Assert.Equal(6, await database.AdminAuditEvents.AsNoTracking().CountAsync());
         }
         finally

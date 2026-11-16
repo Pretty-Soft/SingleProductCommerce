@@ -86,10 +86,8 @@ export function sharesVariantEditScope(section: CatalogSectionId, editingSection
     && variantDataSections.includes(editingSection);
 }
 
-export function canAddSectionItem(section: CatalogSectionId, editingSection: CatalogSectionId | null, currentCount: number, maximum: number, busy = false) {
-  return !busy
-    && currentCount < maximum
-    && (editingSection === null || editingSection === section || sharesVariantEditScope(section, editingSection));
+export function canAddSectionItem(currentCount: number, maximum: number, busy = false) {
+  return !busy && currentCount < maximum;
 }
 
 const emptyProduct = (): EditableProduct => ({
@@ -278,6 +276,25 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
     }
   }
 
+  async function handleDeleteProduct() {
+    if (!product.id || !window.confirm(`Permanently delete “${product.name || "this product"}” and its variants, images, attributes, reviews, and storefront content? Products referenced by past orders cannot be deleted.`)) return;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await adminRequest<void>("/api/v1/admin/catalog/product", { method: "DELETE" });
+      const blankProduct = emptyProduct();
+      setProduct(blankProduct);
+      setSavedProduct(blankProduct);
+      setEditingSection(null);
+      setMessage("Product deleted. You can now create a new product.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "The product could not be deleted.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function isSectionEditable(section: CatalogSectionId) {
     return !product.id || editingSection === section || sharesVariantEditScope(section, editingSection);
   }
@@ -355,7 +372,7 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
       );
     }
     return (
-      <button className="button button-quiet" type="button" onClick={() => beginSectionEdit(section)} disabled={busy || Boolean(editingSection)}>
+      <button className="button button-quiet" type="button" onClick={() => beginSectionEdit(section)} disabled={busy} title={editingSection && hasUnsavedChanges ? "Save or cancel the current section before editing this section." : undefined}>
         {section === "variants" ? "Edit variants" : section === "pricing" ? "Edit prices" : section === "inventory" ? "Edit inventory" : "Edit"}
       </button>
     );
@@ -524,7 +541,7 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
           <div className={`catalog-basics-section catalog-section ${expandedSectionClass("product-basics")}`} id="product-basics">
           <div className="section-heading catalog-accordion-heading">
             <div><h3>{sectionTitleToggle("product-basics", "Product information")}</h3><p className="admin-muted">Name, description, currency and publication status.</p></div>
-            <div className="section-action-stack">{sectionActions("basics")}{sectionToggle("product-basics", "Product information")}</div>
+            <div className="section-action-stack">{sectionActions("basics")}{product.id && <button className="button button-quiet" type="button" onClick={() => void handleDeleteProduct()} disabled={busy}>Delete product</button>}{sectionToggle("product-basics", "Product information")}</div>
           </div>
           <fieldset id="product-basics-content" className="catalog-form-fields catalog-accordion-content" hidden={!expandedSections["product-basics"]} disabled={busy || !isSectionEditable("basics")}>
           <div className="store-currency-setting">
@@ -600,7 +617,7 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
               <div><h3>{sectionTitleToggle("product-media", "Product images")}</h3><p className="admin-muted">Upload and arrange product photos and gallery thumbnails.</p></div>
               {sectionToggle("product-media", "Product images")}
             </div>
-            <p className="admin-muted">Upload up to eight product images. JPEG, PNG, and WebP are accepted, up to 10 MB each.</p>
+            <p className="admin-muted">{product.images.filter(image => image.mediaKind === "product").length} of 8 product images · JPEG, PNG, and WebP are accepted, up to 10 MB each.</p>
             <div className="image-upload-form">
               <label>
                 Image file
@@ -610,7 +627,7 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
                 Alternative text
                 <input maxLength={200} value={productImageAltText} onChange={(event) => setProductImageAltText(event.target.value)} placeholder="Describe the image" />
               </label>
-              <button className="button button-quiet" type="button" onClick={() => void uploadCatalogImage("product")} disabled={busy || !product.id}>{busy ? "Saving…" : "Save product image"}</button>
+              <button className="button button-quiet" type="button" onClick={() => void uploadCatalogImage("product")} disabled={busy || !product.id || product.images.filter(image => image.mediaKind === "product").length >= 8} title={product.images.filter(image => image.mediaKind === "product").length >= 8 ? "A product can have up to eight images." : undefined}>{busy ? "Saving…" : "Save product image"}</button>
               {!product.id && <p className="admin-muted">Save the product draft before uploading media.</p>}
             </div>
             <div className="admin-media-list">
@@ -683,17 +700,19 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
               </div>
               <div className="section-action-stack">
                 {sectionActions("trust")}
-                <button className="button button-quiet" type="button" onClick={() => updateProduct("trustItems", [...product.trustItems, { id: null, title: "", description: "", isActive: true, displayOrder: product.trustItems.length }])} disabled={busy || !isSectionEditable("trust") || product.trustItems.length >= 8}>
+                <button className="button button-quiet" type="button" onClick={() => {
+                  if (prepareSectionAdd("trust")) updateProduct("trustItems", [...product.trustItems, { id: null, title: "", description: "", isActive: true, displayOrder: product.trustItems.length }]);
+                }} disabled={busy || product.trustItems.length >= 8}>
                   Add detail
                 </button>
                 {sectionToggle("product-trust", "Store details")}
               </div>
             </div>
-            <fieldset className="catalog-form-fields" disabled={busy || !isSectionEditable("trust")}>
+            <fieldset className="catalog-form-fields">
             {product.trustItems.map((item, index) => (
               <fieldset className="variant-card" key={item.id ?? `trust-${index}`}>
                 <legend>Store detail {index + 1}</legend>
-                <div className="catalog-fields">
+                <fieldset className="catalog-fields" disabled={busy || !isSectionEditable("trust")}>
                   <label>
                     Title
                     <input maxLength={80} required value={item.title} onChange={(event) => updateTrustItem(index, { title: event.target.value })} placeholder="e.g. Free shipping" />
@@ -710,12 +729,12 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
                     Display order
                     <input type="number" min="0" step="1" value={item.displayOrder} onChange={(event) => updateTrustItem(index, { displayOrder: Number(event.target.value) })} />
                   </label>
-                </div>
+                </fieldset>
                 <button className="button button-quiet" type="button" onClick={() => {
                   if (confirmChildRemoval(`Delete store detail “${item.title || `Store detail ${index + 1}`}”?`)) {
-                    updateProduct("trustItems", product.trustItems.filter((_, itemIndex) => itemIndex !== index).map((entry, order) => ({ ...entry, displayOrder: order })));
+                    if (prepareSectionAdd("trust")) updateProduct("trustItems", product.trustItems.filter((_, itemIndex) => itemIndex !== index).map((entry, order) => ({ ...entry, displayOrder: order })));
                   }
-                }} disabled={busy || !isSectionEditable("trust")}>Delete detail</button>
+                }} disabled={busy}>Delete detail</button>
               </fieldset>
             ))}
             </fieldset>
@@ -731,18 +750,18 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
               {sectionActions("variants")}
               <button className="button button-quiet" type="button" onClick={() => {
                 if (prepareSectionAdd("variants")) updateProduct("variants", [...product.variants, emptyVariant(product.currencyCode)]);
-              }} disabled={!canAddSectionItem("variants", editingSection, product.variants.length, 100, busy)}>
+              }} disabled={!canAddSectionItem(product.variants.length, 100, busy)}>
                 Add another variant
               </button>
               {sectionToggle("product-variants", "Variants")}
             </div>
           </div>
 
-          <fieldset className="catalog-form-fields" disabled={busy || !isSectionEditable("variants")}>
+          <fieldset className="catalog-form-fields">
           {product.variants.map((variant, index) => (
             <fieldset className="variant-card" key={variant.id ?? `new-${index}`}>
               <legend>Variant {index + 1}</legend>
-              <div className="catalog-fields">
+              <fieldset className="catalog-fields" disabled={busy || !isSectionEditable("variants")}>
                 <label>
                   SKU
                   <input maxLength={64} required value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} />
@@ -755,18 +774,18 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
                   Regular price ({product.currencyCode || "currency"})
                   <input type="number" min="0" step="0.0001" required value={variant.price} onChange={(event) => updateVariant(index, { price: Number(event.target.value) })} />
                 </label>
-              </div>
-              {variant.id && <div className="admin-form-grid">{LANGUAGES.map(language => <label key={language.code}>{language.label} display name<input maxLength={200} value={product.catalogTranslations[language.code]?.[`variant.${variant.id}.name`] ?? ""} onChange={event => setProduct(current => ({ ...current, catalogTranslations: { ...current.catalogTranslations, [language.code]: { ...current.catalogTranslations[language.code], [`variant.${variant.id}.name`]: event.target.value } } }))} /></label>)}</div>}
+              </fieldset>
+              {variant.id && <fieldset className="admin-form-grid" disabled={busy || !isSectionEditable("variants")}>{LANGUAGES.map(language => <label key={language.code}>{language.label} display name<input maxLength={200} value={product.catalogTranslations[language.code]?.[`variant.${variant.id}.name`] ?? ""} onChange={event => setProduct(current => ({ ...current, catalogTranslations: { ...current.catalogTranslations, [language.code]: { ...current.catalogTranslations[language.code], [`variant.${variant.id}.name`]: event.target.value } } }))} /></label>)}</fieldset>}
               <div className="variant-actions">
                 <label className="role-option">
-                  <input type="checkbox" checked={variant.isActive} onChange={(event) => updateVariant(index, { isActive: event.target.checked })} />
+                  <input type="checkbox" disabled={busy || !isSectionEditable("variants")} checked={variant.isActive} onChange={(event) => updateVariant(index, { isActive: event.target.checked })} />
                   <span>Available on storefront</span>
                 </label>
                 <button className="button button-quiet" type="button" onClick={() => {
                   if (confirmChildRemoval(`Delete variant “${variant.displayName || variant.sku || `Variant ${index + 1}`}”?`)) {
-                    updateProduct("variants", product.variants.filter((_, itemIndex) => itemIndex !== index));
+                    if (prepareSectionAdd("variants")) updateProduct("variants", product.variants.filter((_, itemIndex) => itemIndex !== index));
                   }
-                }} disabled={busy || !isSectionEditable("variants") || product.variants.length === 1}>
+                }} disabled={busy || product.variants.length === 1}>
                   Delete variant
                 </button>
               </div>
@@ -815,18 +834,18 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
               {sectionActions("attributes")}
               <button className="button button-quiet" type="button" onClick={() => {
                 if (prepareSectionAdd("attributes")) updateProduct("attributeGroups", [...product.attributeGroups, emptyAttributeGroup(product.attributeGroups.length)]);
-              }} disabled={!canAddSectionItem("attributes", editingSection, product.attributeGroups.length, 30, busy)}>
+              }} disabled={!canAddSectionItem(product.attributeGroups.length, 30, busy)}>
                 Add attribute group
               </button>
               {sectionToggle("product-attributes", "Attribute groups")}
             </div>
           </div>
 
-          <fieldset className="catalog-form-fields" disabled={busy || !isSectionEditable("attributes")}>
+          <fieldset className="catalog-form-fields">
           {product.attributeGroups.map((group, groupIndex) => (
             <fieldset className="variant-card" key={group.id ?? `attribute-${groupIndex}`}>
               <legend>Attribute {groupIndex + 1}</legend>
-              <div className="catalog-fields">
+              <fieldset className="catalog-fields" disabled={busy || !isSectionEditable("attributes")}>
                 <label>
                   Name
                   <input maxLength={100} required value={group.name} onChange={(event) => updateAttributeGroup(groupIndex, { name: event.target.value })} placeholder="e.g. Processor" />
@@ -840,15 +859,18 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
                   <input type="checkbox" checked={group.allowMultiple} onChange={(event) => updateAttributeGroup(groupIndex, { allowMultiple: event.target.checked })} />
                   <span>Allow multiple choices (add-ons)</span>
                 </label>
-              </div>
+              </fieldset>
               <div className="section-heading variant-heading">
                 <h4>Choices</h4>
-                <button className="button button-quiet" type="button" onClick={() => updateAttributeGroup(groupIndex, { options: [...group.options, emptyAttributeOption(group.options.length)] })} disabled={busy || group.options.length >= 100}>
+                <button className="button button-quiet" type="button" onClick={() => {
+                  if (prepareSectionAdd("attributes")) updateAttributeGroup(groupIndex, { options: [...group.options, emptyAttributeOption(group.options.length)] });
+                }} disabled={busy || group.options.length >= 100}>
                   Add choice
                 </button>
               </div>
               {group.options.map((option, optionIndex) => (
-                <div className="catalog-fields attribute-option" key={option.id ?? `choice-${groupIndex}-${optionIndex}`}>
+                <div className="attribute-option-row" key={option.id ?? `choice-${groupIndex}-${optionIndex}`}>
+                  <fieldset className="catalog-fields attribute-option" disabled={busy || !isSectionEditable("attributes")}>
                   <label>
                     Choice
                     <input maxLength={150} required value={option.name} onChange={(event) => updateAttributeOption(groupIndex, optionIndex, { name: event.target.value })} placeholder="e.g. 16 GB RAM" />
@@ -862,20 +884,21 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
                     <input type="checkbox" checked={option.isActive} onChange={(event) => updateAttributeOption(groupIndex, optionIndex, { isActive: event.target.checked })} />
                     <span>Available</span>
                   </label>
+                  </fieldset>
                   <button className="button button-quiet" type="button" onClick={() => {
                     if (confirmChildRemoval(`Delete choice “${option.name || `Choice ${optionIndex + 1}`}” from “${group.name || `Attribute ${groupIndex + 1}`}”?`)) {
-                      updateAttributeGroup(groupIndex, { options: group.options.filter((_, itemIndex) => itemIndex !== optionIndex).map((item, order) => ({ ...item, displayOrder: order })) });
+                      if (prepareSectionAdd("attributes")) updateAttributeGroup(groupIndex, { options: group.options.filter((_, itemIndex) => itemIndex !== optionIndex).map((item, order) => ({ ...item, displayOrder: order })) });
                     }
-                  }} disabled={busy || !isSectionEditable("attributes") || group.options.length === 1}>
+                  }} disabled={busy || group.options.length === 1}>
                     Delete choice
                   </button>
                 </div>
               ))}
               <button className="button button-quiet" type="button" onClick={() => {
                 if (confirmChildRemoval(`Delete attribute group “${group.name || `Attribute ${groupIndex + 1}`}” and all ${group.options.length} of its choices?`)) {
-                  updateProduct("attributeGroups", product.attributeGroups.filter((_, itemIndex) => itemIndex !== groupIndex).map((item, order) => ({ ...item, displayOrder: order })));
+                  if (prepareSectionAdd("attributes")) updateProduct("attributeGroups", product.attributeGroups.filter((_, itemIndex) => itemIndex !== groupIndex).map((item, order) => ({ ...item, displayOrder: order })));
                 }
-              }} disabled={busy || !isSectionEditable("attributes")}>
+              }} disabled={busy}>
                 Delete attribute group
               </button>
             </fieldset>

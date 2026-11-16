@@ -1186,9 +1186,13 @@ footer {
 }
 
 .catalog-fields {
+  border: 0;
   display: grid;
   gap: 16px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+  min-width: 0;
+  padding: 0;
 }
 
 .catalog-toolbar {
@@ -1299,6 +1303,13 @@ footer {
   align-items: end;
 }
 
+.attribute-option-row {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .variant-actions {
   align-items: center;
   display: flex;
@@ -1364,10 +1375,14 @@ footer {
 }
 
 .admin-form-grid {
+  border: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
   align-items: end;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
 }
 
 .admin-field-wide {
@@ -1853,6 +1868,10 @@ footer {
   }
 
   .catalog-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .attribute-option-row {
     grid-template-columns: minmax(0, 1fr);
   }
 

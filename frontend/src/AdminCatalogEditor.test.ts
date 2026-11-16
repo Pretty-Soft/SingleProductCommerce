@@ -17,14 +17,13 @@ describe("catalog variant edit scope", () => {
 
 describe("catalog child add actions", () => {
   it("allows add actions to start their section edit when none is active", () => {
-    expect(canAddSectionItem("variants", null, 1, 100)).toBe(true);
-    expect(canAddSectionItem("attributes", null, 0, 30)).toBe(true);
+    expect(canAddSectionItem(1, 100)).toBe(true);
+    expect(canAddSectionItem(0, 30)).toBe(true);
   });
 
-  it("keeps section limits and concurrent edits enforced", () => {
-    expect(canAddSectionItem("variants", "basics", 1, 100)).toBe(false);
-    expect(canAddSectionItem("attributes", "inventory", 0, 30)).toBe(false);
-    expect(canAddSectionItem("variants", null, 100, 100)).toBe(false);
-    expect(canAddSectionItem("attributes", null, 0, 30, true)).toBe(false);
+  it("keeps hard capacity and busy-state limits enforced", () => {
+    expect(canAddSectionItem(100, 100)).toBe(false);
+    expect(canAddSectionItem(30, 30)).toBe(false);
+    expect(canAddSectionItem(0, 30, true)).toBe(false);
   });
 });

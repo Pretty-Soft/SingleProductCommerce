@@ -10,6 +10,50 @@ public sealed class ProductMediaService(StoreDbContext database, IProductImageSt
     public const int MaximumImageBytes = 10 * 1024 * 1024;
     private const int MaximumProductImages = 8;
 
+    public async Task<ProductDeleteResult> DeleteProductAsync(
+        Guid actorId,
+        string actorEmail,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await database.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable, cancellationToken);
+        var product = await database.Products
+            .Include(candidate => candidate.Variants)
+            .Include(candidate => candidate.Images)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (product is null) return ProductDeleteResult.NotFound;
+
+        var variantIds = product.Variants.Select(variant => variant.Id).ToArray();
+        if (variantIds.Length > 0 && await database.StoreOrderLines
+            .AnyAsync(line => variantIds.Contains(line.VariantId), cancellationToken))
+        {
+            return ProductDeleteResult.HasOrderHistory;
+        }
+
+        var mediaKeys = product.Images.Select(image => image.StorageKey).ToArray();
+        database.AdminAuditEvents.Add(new AdminAuditEvent
+        {
+            Id = Guid.NewGuid(),
+            ActorUserId = actorId,
+            ActorEmail = actorEmail,
+            Action = "catalog.product.delete",
+            TargetId = product.Id,
+            Target = "product",
+            Details = JsonSerializer.Serialize(new { product.Name, product.Slug, VariantCount = product.Variants.Count, ImageCount = product.Images.Count }),
+            CreatedAtUtc = DateTimeOffset.UtcNow
+        });
+        database.Products.Remove(product);
+        await database.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        foreach (var mediaKey in mediaKeys)
+        {
+            await storage.DeleteAsync(mediaKey, CancellationToken.None);
+        }
+
+        return ProductDeleteResult.Deleted;
+    }
+
     public async Task<ProductMediaOperationResult> UploadAsync(
         Stream source,
         long declaredLength,
@@ -225,6 +269,13 @@ public sealed class ProductMediaService(StoreDbContext database, IProductImageSt
             CreatedAtUtc = DateTimeOffset.UtcNow
         });
     }
+}
+
+public enum ProductDeleteResult
+{
+    Deleted,
+    NotFound,
+    HasOrderHistory
 }
 
 public sealed record ProductImageFile(Stream Content, string ContentType);

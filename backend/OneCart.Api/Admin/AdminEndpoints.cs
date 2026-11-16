@@ -101,6 +101,11 @@ public static class AdminEndpoints
             .AddEndpointFilter(ValidateAntiforgeryAsync)
             .AddEndpointFilter(RequireChangedPasswordAsync);
 
+        group.MapDelete("/catalog/product", DeleteAdminProductAsync)
+            .RequireAuthorization(policy => policy.RequireRole(AdminRoles.CatalogAccess))
+            .AddEndpointFilter(ValidateAntiforgeryAsync)
+            .AddEndpointFilter(RequireChangedPasswordAsync);
+
         group.MapPost("/catalog/product/images", UploadProductImageAsync)
             .RequireAuthorization(policy => policy.RequireRole(AdminRoles.MediaAccess))
             .WithMetadata(new RequestSizeLimitAttribute(ProductMediaService.MaximumImageBytes + 128 * 1024))
@@ -487,6 +492,32 @@ public static class AdminEndpoints
     {
         var product = await catalog.GetProductAsync(cancellationToken);
         return product is null ? Results.NotFound() : Results.Ok(product);
+    }
+
+    private static async Task<IResult> DeleteAdminProductAsync(
+        ProductMediaService media,
+        UserManager<AdminUser> userManager,
+        HttpContext context)
+    {
+        if (!Guid.TryParse(userManager.GetUserId(context.User), out var actorId)) return Results.Unauthorized();
+        try
+        {
+            var result = await media.DeleteProductAsync(
+                actorId,
+                userManager.GetUserName(context.User) ?? string.Empty,
+                context.RequestAborted);
+            return result switch
+            {
+                ProductDeleteResult.Deleted => Results.NoContent(),
+                ProductDeleteResult.NotFound => Results.NotFound(),
+                ProductDeleteResult.HasOrderHistory => Results.Conflict(new { error = "This product has order history and cannot be permanently deleted. Unpublish it and deactivate its variants to preserve past orders." }),
+                _ => Results.Problem("The product could not be deleted.")
+            };
+        }
+        catch (DbUpdateException)
+        {
+            return Results.Conflict(new { error = "This product is referenced by an order and cannot be deleted. Unpublish it and deactivate its variants to preserve past orders." });
+        }
     }
 
     private static async Task<IResult> SaveAdminProductAsync(

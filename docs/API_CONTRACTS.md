@@ -71,6 +71,7 @@ Any first-sign-in temporary password change is required before using protected a
 | --- | --- | --- |
 | `GET /admin/catalog/product` | SystemAdmin, CatalogManager | Read product setup and catalog translations. |
 | `PUT /admin/catalog/product` | SystemAdmin, CatalogManager | Save product, variants, attributes, and catalog translations. |
+| `DELETE /admin/catalog/product` | SystemAdmin, CatalogManager | Permanently delete the product and child catalog data when no order references its variants; returns 409 when order history must be preserved. |
 | `POST /admin/catalog/product/images` | SystemAdmin, CatalogManager, StoreManager | Upload product image or brand logo, subject to media-kind authorization. |
 | `GET|PUT|DELETE /admin/catalog/product/images/{imageId}` | SystemAdmin, CatalogManager, StoreManager | Preview, update metadata, or delete authorized media. |
 | `GET|PUT /admin/storefront/settings` | SystemAdmin, StoreManager | Read/save storefront copy, branding, promotion, contact, trust items, and storefront translations. |
