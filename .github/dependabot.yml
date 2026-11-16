@@ -1,0 +1,35 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: nuget
+    directories:
+      - /backend/OneCart.Api
+      - /backend/OneCart.Api.Tests
+      - /backend/OneCart.Persistence
+      - /backend/OneCart.Persistence.Tests
+      - /backend/OneCart.Persistence.IntegrationTests
+      - /backend/OneCart.SqlServer.Migrations
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: docker
+    directories:
+      - /
+      - /backend/OneCart.Api
+      - /frontend
+      - /deploy
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
