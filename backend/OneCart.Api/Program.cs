@@ -138,23 +138,7 @@ builder.Services.AddCors(options => options.AddPolicy("AdminUi", policy =>
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedProto;
-    options.ForwardLimit = 1;
-
-    var knownProxies = builder.Configuration
-        .GetSection("ForwardedHeaders:KnownProxies")
-        .Get<string[]>() ?? [];
-
-    foreach (var proxy in knownProxies)
-    {
-        if (!IPAddress.TryParse(proxy, out var address))
-        {
-            throw new InvalidOperationException(
-                $"'{proxy}' is not a valid IP address in ForwardedHeaders:KnownProxies.");
-        }
-
-        options.KnownProxies.Add(address);
-    }
+    ForwardedProxyConfiguration.Configure(options, builder.Configuration);
 });
 
 var app = builder.Build();
