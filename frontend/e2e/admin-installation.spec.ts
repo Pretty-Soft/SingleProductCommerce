@@ -321,3 +321,96 @@ test("moves a Pending COD order into Processing from the admin order workspace",
   expect(savedStatus).toBe("Processing");
   await expect(orders.locator(".order-details .eyebrow")).toHaveText("Processing");
 });
+
+test("requires an authenticator code after password sign-in when MFA is enrolled", async ({ page }) => {
+  let authenticated = false;
+  let submittedCode = "";
+  const mfaUser = { ...adminUser, twoFactorEnabled: true };
+  await page.route(`${apiOrigin}/api/**`, async route => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    const respond = (body: unknown, status = 200) => route.fulfill({
+      status, headers: corsHeaders, contentType: "application/json", body: JSON.stringify(body)
+    });
+    if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: corsHeaders });
+    if (path === "/api/v1/admin/csrf") return respond({ requestToken: "csrf-test-token" });
+    if (path === "/api/v1/admin/me") return authenticated ? respond(mfaUser) : respond({ title: "Unauthorized" }, 401);
+    if (path === "/api/v1/admin/login" && request.method() === "POST") return respond({ requiresTwoFactor: true });
+    if (path === "/api/v1/admin/two-factor/login" && request.method() === "POST") {
+      submittedCode = (request.postDataJSON() as { code: string }).code;
+      authenticated = true;
+      return respond({});
+    }
+    if (path === "/api/v1/admin/roles") return respond(["SystemAdmin", "CatalogManager", "OrderManager", "StoreManager"].map((name, index) => ({ id: `role-${index}`, name })));
+    if (path === "/api/v1/admin/users") return respond([mfaUser]);
+    if (path === "/api/v1/admin/audit") return respond([]);
+    if (path === "/api/v1/admin/security/mfa-policy") return respond({ required: false });
+    return respond({ title: "Not found" }, 404);
+  });
+
+  await page.goto("/admin");
+  await page.getByLabel("Email address").fill("owner@example.test");
+  await page.getByLabel("Password").fill("OneCart-Test-Admin-2026!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByRole("heading", { name: "Authenticator verification" })).toBeVisible();
+  await expect(page.getByLabel("Email address")).toHaveCount(0);
+  await page.getByLabel("Authenticator code").fill("123456");
+  await page.getByRole("button", { name: "Verify and sign in" }).click();
+  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  expect(submittedCode).toBe("123456");
+});
+
+test("sends generic password recovery requests for the entered administrator email", async ({ page }) => {
+  let requestedEmail = "";
+  await page.route(`${apiOrigin}/api/**`, async route => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    const respond = (body: unknown, status = 200) => route.fulfill({
+      status, headers: corsHeaders, contentType: "application/json", body: JSON.stringify(body)
+    });
+    if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: corsHeaders });
+    if (path === "/api/v1/admin/csrf") return respond({ requestToken: "csrf-test-token" });
+    if (path === "/api/v1/admin/me") return respond({ title: "Unauthorized" }, 401);
+    if (path === "/api/v1/admin/password/forgot" && request.method() === "POST") {
+      requestedEmail = (request.postDataJSON() as { email: string }).email;
+      return respond({});
+    }
+    return respond({ title: "Not found" }, 404);
+  });
+
+  await page.goto("/admin");
+  await page.getByLabel("Email address").fill("owner@example.test");
+  await page.getByRole("button", { name: "Forgot password? Send reset link" }).click();
+  await expect(page.locator(".login-card .login-feedback[role='status']")).toContainText("If that administrator account exists, a reset link will be sent.");
+  expect(requestedEmail).toBe("owner@example.test");
+});
+
+test("validates and submits the password reset form without exposing token data in UI", async ({ page }) => {
+  let resetRequest: { email: string | null; token: string | null; newPassword: string } | undefined;
+  await page.route(`${apiOrigin}/api/**`, async route => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    const respond = (body: unknown, status = 200) => route.fulfill({
+      status, headers: corsHeaders, contentType: "application/json", body: JSON.stringify(body)
+    });
+    if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: corsHeaders });
+    if (path === "/api/v1/admin/csrf") return respond({ requestToken: "csrf-test-token" });
+    if (path === "/api/v1/admin/password/reset" && request.method() === "POST") {
+      resetRequest = request.postDataJSON() as { email: string | null; token: string | null; newPassword: string };
+      return respond({});
+    }
+    return respond({ title: "Not found" }, 404);
+  });
+
+  await page.goto("/admin/reset-password?email=owner%40example.test&token=one-time-reset-token");
+  await page.getByLabel("New password").fill("New-Admin-Password-2026!");
+  await page.getByLabel("Confirm password").fill("Different-Password-2026!");
+  await page.getByRole("button", { name: "Reset password" }).click();
+  await expect(page.getByRole("alert")).toContainText("The passwords do not match.");
+  expect(resetRequest).toBeUndefined();
+
+  await page.getByLabel("Confirm password").fill("New-Admin-Password-2026!");
+  await page.getByRole("button", { name: "Reset password" }).click();
+  await expect(page.getByRole("status")).toContainText("Password reset.");
+  expect(resetRequest).toEqual({ email: "owner@example.test", token: "one-time-reset-token", newPassword: "New-Admin-Password-2026!" });
+});
