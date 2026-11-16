@@ -280,6 +280,10 @@ export default function AdminApp() {
               <p>ONECART ADMIN</p>
               <strong>{visibleMenuItems.find((item) => item.id === activeSection)?.label ?? "Overview"}</strong>
             </div>
+            <a className="admin-public-store" href="/" aria-label="Open public store" title="Public Store">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" /></svg>
+              <span>Public Store</span><span className="admin-public-store-arrow" aria-hidden="true">↗</span>
+            </a>
           </>
         ) : (
           <a className="brand" href="/" aria-label="OneCart storefront">

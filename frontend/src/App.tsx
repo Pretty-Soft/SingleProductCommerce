@@ -71,6 +71,7 @@ function Storefront() {
 
   const selectedVariant = product?.variants.find((variant) => variant.id === selectedVariantId);
   const selectedImage = product?.images.find((image) => image.id === selectedImageId) ?? product?.images[0];
+  const selectedImageIndex = product && selectedImage ? product.images.findIndex(image => image.id === selectedImage.id) : -1;
   const selectedOptions = product?.attributeGroups.flatMap((group) => {
     const selected = new Set(selectedAttributeOptions[group.id] ?? []);
     return group.options.filter((option) => selected.has(option.id));
@@ -89,6 +90,7 @@ function Storefront() {
     && estimatedServerNow >= flashSaleStartMs
     && estimatedServerNow < flashSaleEndMs;
   const saleRemainingSeconds = flashSaleActive ? Math.max(0, Math.floor((flashSaleEndMs - estimatedServerNow) / 1000)) : 0;
+  const saleCountdownParts = [Math.min(99, Math.floor(saleRemainingSeconds / 3600)), Math.floor((saleRemainingSeconds % 3600) / 60), saleRemainingSeconds % 60];
   const selectedBasePrice = flashSaleActive && selectedVariant?.salePrice != null
     ? selectedVariant.salePrice
     : selectedVariant?.price ?? 0;
@@ -109,6 +111,12 @@ function Storefront() {
         : [optionId];
       return { ...current, [groupId]: next };
     });
+  }
+
+  function moveImage(offset: number) {
+    if (!product || product.images.length < 2) return;
+    const next = (selectedImageIndex + offset + product.images.length) % product.images.length;
+    setSelectedImageId(product.images[next].id);
   }
 
   async function addToCart() {
@@ -199,24 +207,21 @@ function Storefront() {
       "--theme-details-size": `${product.theme.detailsFontSizePx}px`
     } as CSSProperties : undefined}>
       {product && <div className="store-assurance-strip">
-        <span><i aria-hidden="true">✓</i> {text.codAvailable}</span>
-        {product.trustItems[0] && <span><i aria-hidden="true">✦</i> {product.trustItems[0].title}</span>}
-        {product.whatsAppContactUrl && <a href={product.whatsAppContactUrl} target="_blank" rel="noopener noreferrer">WhatsApp · {text.whatsapp}</a>}
+        <span><i aria-hidden="true">✓</i> {product.trustItems[0]?.title ?? text.authentic}</span>
+        {product.trustItems[0]?.description && <span className="topbar-trust-description">{product.trustItems[0].description}</span>}
+        {product.whatsAppContactUrl && <a href={product.whatsAppContactUrl} target="_blank" rel="noopener noreferrer"><svg className="whatsapp-topbar-icon" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3a12 12 0 0 0-10.3 18.2L4 28l7-1.8A12 12 0 1 0 16 3Z" /><path d="M12 10c-.7 0-1.2.4-1.5 1-.4.8-.5 1.7-.1 2.7.6 1.8 2.7 4.5 5.4 5.8 1.2.6 2.4.7 3.4.3.7-.3 1.1-.9 1.1-1.6 0-.3-.2-.5-.5-.7l-2-.9c-.3-.1-.5-.1-.7.2l-.8 1c-.2.2-.4.2-.7.1-1.4-.6-2.5-1.6-3.3-2.9-.2-.3-.1-.5.1-.7l.6-.7c.2-.2.2-.5.1-.7l-.9-2c-.1-.4-.4-.9-.8-.9Z" /></svg> WhatsApp: {getWhatsAppNumber(product.whatsAppContactUrl) || text.whatsappMessage}</a>}
       </div>}
       <header className="topbar">
         <a className="brand-logo-link" href="/" aria-label={`${product?.brandName ?? "Pretty Shop"} home`}>
           {product?.brandLogoUrl
             ? <img className="brand-logo" src={getMediaUrl(product.brandLogoUrl)} alt="" />
             : <span className="brand-mark">{(product?.brandName ?? "Pretty Shop").slice(0, 1).toUpperCase()}</span>}
+          <span className="brand-logo-copy"><strong>{product?.brandName ?? "Pretty Shop"}</strong><small>{product?.storefrontHeadline ?? "Your trust, Your Love"}</small></span>
         </a>
-        <div className="store-brand-heading">
-          <strong className="brand-name">{product?.brandName ?? "Pretty Shop"}</strong>
-          <span className="brand-headline">{product?.storefrontHeadline ?? "Your trust, Your Love"}</span>
-        </div>
         <div className="store-header-actions">
           <label className="store-language-picker"><span className="visually-hidden">Language</span><select value={language} onChange={event => setLanguage(event.target.value as StoreLanguage)} aria-label="Language">{storeLanguages.map(item => <option key={item.code} value={item.code}>{item.label}</option>)}</select></label>
-          {product && <button className="cart-toggle" type="button" onClick={() => setCartOpen((open) => !open)} aria-expanded={cartOpen}>{text.cart} <span>{cartItemCount}</span></button>}
-          <a className="status" href="/admin">{text.admin}</a>
+          {product?.aboutUs.trim() && <a className="header-about-link" href="#about-us">{text.aboutUs}</a>}
+          {product && <button className="cart-toggle" type="button" onClick={() => setCartOpen((open) => !open)} aria-expanded={cartOpen} aria-label={`${text.shoppingCart}, ${cartItemCount}`}><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 4h3l3.2 16.1h15.3l3.1-11.6H8M12 26a1.5 1.5 0 1 0 0 .1M23 26a1.5 1.5 0 1 0 0 .1" /></svg><span>{cartItemCount}</span></button>}
         </div>
       </header>
 
@@ -234,11 +239,17 @@ function Storefront() {
               <strong>{product.averageRating.toFixed(1)}</strong><span>({product.reviewCount} {product.reviewCount === 1 ? text.review : text.reviewsPlural})</span>
             </a>}
             <p className="intro">{product.description}</p>
+            {product.benefits.length > 0 && <ul className="hero-benefits" aria-label={text.whyChoose}>{product.benefits.slice(0, 4).map(benefit => <li key={benefit.id}><span aria-hidden="true">✓</span>{benefit.title}</li>)}</ul>}
           </div>
           <div className={`product-gallery${product.images.length > 1 ? " has-thumbnails" : ""}`} aria-label={text.productImages}>
             {selectedImage ? <>
               <figure className="product-image-stage">
                 <img src={getMediaUrl(selectedImage.url)} alt={selectedImage.altText} />
+                {product.images.length > 1 && <>
+                  <button type="button" className="gallery-arrow gallery-arrow-previous" onClick={() => moveImage(-1)} aria-label={text.previousImage}>‹</button>
+                  <button type="button" className="gallery-arrow gallery-arrow-next" onClick={() => moveImage(1)} aria-label={text.nextImage}>›</button>
+                  <span className="gallery-counter">{selectedImageIndex + 1} / {product.images.length}</span>
+                </>}
               </figure>
               {product.images.length > 1 && (
                 <div className="product-thumbnails" aria-label={text.chooseImage}>
@@ -256,19 +267,22 @@ function Storefront() {
                   ))}
                 </div>
               )}
+              {product.images.length > 1 && <div className="gallery-dots" aria-label={text.chooseImage}>{product.images.map((image, index) => <button key={image.id} type="button" className={selectedImage.id === image.id ? "active" : ""} aria-label={`${text.chooseImage} ${index + 1}`} aria-current={selectedImage.id === image.id ? "true" : undefined} onClick={() => setSelectedImageId(image.id)} />)}</div>}
             </> : <div className="product-image-stage product-image-empty" aria-label={text.productImages}><span>{product.name}</span></div>}
           </div>
           <div className="purchase-panel">
             {flashSaleActive && (
               <div className="flash-sale-banner" aria-live="polite">
-                <span className="flash-sale-label">{product.flashSale.label || text.flash}</span>
-                <span className="flash-sale-timer">{text.ends} {formatCountdown(saleRemainingSeconds)}</span>
+                <strong className="flash-sale-label"><span aria-hidden="true">ϟ</span>{product.flashSale.label || text.flash}</strong>
+                <span className="flash-sale-timer-label">{text.ends}</span>
+                <span className="flash-sale-timer">{saleCountdownParts.map((part, index) => <span className="countdown-cell" key={index}><strong>{String(part).padStart(2, "0")}</strong><small>{[text.hours, text.minutes, text.seconds][index]}</small></span>)}</span>
               </div>
             )}
             {selectedVariant && <div className="hero-price-line">
               {flashSaleActive && selectedVariant.salePrice != null && <del>{formatPrice(selectedVariant.price + selectedOptions.reduce((sum, option) => sum + option.priceAdjustment, 0), selectedVariant.currencyCode)}</del>}
               <strong>{formatPrice(currentTotal, selectedVariant.currencyCode)}</strong>
               {flashSaleActive && selectedVariant.salePrice != null && <span className="sale-badge">{product.flashSale.discountType === "percentage" ? `−${product.flashSale.discountValue}%` : text.save}</span>}
+              {flashSaleActive && selectedVariant.salePrice != null && <small className="you-save">{text.save}: {formatPrice(selectedVariant.price - selectedVariant.salePrice, selectedVariant.currencyCode)}</small>}
             </div>}
             <p className="eyebrow">{text.choose}</p>
             <div className="variant-options" role="radiogroup" aria-label="Product variants">
@@ -336,8 +350,14 @@ function Storefront() {
               </p>
             )}
             <button type="button" disabled={!selectedVariant?.isAvailable || !requiredAttributesSelected || checkoutBusy} onClick={() => void addToCart()}>
-              {text.add}
+              <svg className="add-to-cart-icon" viewBox="0 0 32 32" aria-hidden="true"><path d="M3 4h3l3.2 16.1h15.3l3.1-11.6H8M12 26a1.5 1.5 0 1 0 0 .1M23 26a1.5 1.5 0 1 0 0 .1" /></svg>{text.add}
             </button>
+            <div className="purchase-assurances" aria-label={text.storeDetails}>
+              <div><span aria-hidden="true"><AssuranceIcon kind="shield" /></span><strong>{text.authentic}</strong></div>
+              <div><span aria-hidden="true"><AssuranceIcon kind="delivery" /></span><strong>{text.fastDelivery}</strong></div>
+              <div><span aria-hidden="true"><AssuranceIcon kind="return" /></span><strong>{text.easyReturn}</strong></div>
+              <div><span aria-hidden="true"><AssuranceIcon kind="support" /></span><strong>{text.customerSupport}</strong></div>
+            </div>
             <p className="note">{!requiredAttributesSelected ? text.chooseRequired : !selectedVariant?.isAvailable ? text.soldOut : `${text.cod} ${text.availableAfter}`}</p>
             {(product.socialSharingEnabled || product.whatsAppContactUrl) && (
               <div className="product-contact-actions">
@@ -361,51 +381,68 @@ function Storefront() {
         </section>
       )}
 
-      {product && product.benefits.length > 0 && <section className="landing-section benefits-section" aria-labelledby="benefits-title">
-        <div className="section-title"><span></span><div><p>{product.brandName}</p><h2 id="benefits-title">{text.whyChoose}</h2></div><span></span></div>
-        <div className="benefit-grid">
-          {product.benefits.map((benefit, index) => <article className="benefit-card" key={benefit.id}>
-            <span className="benefit-icon" aria-hidden="true">{["✦", "◌", "⌁", "◇", "❋", "✓"][index % 6]}</span>
-            <h3>{benefit.title}</h3>
-            {benefit.description && <p>{benefit.description}</p>}
-          </article>)}
-        </div>
-      </section>}
+      {product && <nav className="product-section-tabs" aria-label={text.productSections}>
+        <a className="active" href="#product-details"><span aria-hidden="true">▤</span>{text.productDetails}</a>
+        {product.usageSteps.length > 0 && <a href="#how-to-use"><span aria-hidden="true">▷</span>{text.howToUse}</a>}
+        <a href="#reviews"><span aria-hidden="true">☆</span>{text.reviews} ({product.reviewCount})</a>
+        <a href="#shipping-returns"><span aria-hidden="true">⇢</span>{text.shippingReturns}</a>
+      </nav>}
 
       {product && <section className="landing-info-grid" aria-label={text.productDetails}>
-        <article className="landing-info-card product-details-card">
+        <article id="product-details" className="landing-info-card product-details-card">
           <h2>{text.productDetails}</h2>
           <dl>
-            <div><dt>{text.shop}</dt><dd>{product.brandName}</dd></div>
+            <div><dt>{text.brand}</dt><dd>{product.brandName}</dd></div>
             <div><dt>{text.productDetails}</dt><dd>{product.name}</dd></div>
             {selectedVariant && <>
               <div><dt>{text.selectedOption}</dt><dd>{selectedVariant.displayName}</dd></div>
               <div><dt>SKU</dt><dd>{selectedVariant.sku}</dd></div>
               <div><dt>{text.stock}</dt><dd>{selectedVariant.isAvailable ? text.stock : text.out}</dd></div>
             </>}
-            {product.attributeGroups.map(group => <div key={group.id}><dt>{group.name}</dt><dd>{group.options.map(option => option.name).join(", ")}</dd></div>)}
+            {product.attributeGroups.map(group => {
+              const selectedIds = new Set(selectedAttributeOptions[group.id] ?? []);
+              const selectedNames = group.options.filter(option => selectedIds.has(option.id)).map(option => option.name);
+              return selectedNames.length > 0 ? <div key={group.id}><dt>{group.name}</dt><dd>{selectedNames.join(", ")}</dd></div> : null;
+            })}
             <div><dt>{text.productOptions}</dt><dd>{product.variants.map(variant => variant.displayName).join(", ")}</dd></div>
           </dl>
         </article>
-        {product.usageSteps.length > 0 && <article className="landing-info-card usage-card">
-          <h2>{text.howToUse}</h2>
-          <ol className="usage-steps">
-            {product.usageSteps.map((step, index) => <li key={step.id}><span className="usage-step-number">{index + 1}</span><div><h3>{step.title}</h3><p>{step.description}</p></div></li>)}
-          </ol>
+        {product.benefits.length > 0 && <article className="landing-info-card product-benefits-card">
+          <h2>{text.keyBenefits}</h2>
+          <div className="benefit-grid">
+            {product.benefits.map((benefit, index) => <article className="benefit-card" key={benefit.id}>
+              <span className="benefit-icon" aria-hidden="true">{["✦", "◌", "⌁", "◇", "❋", "✓"][index % 6]}</span>
+              <h3>{benefit.title}</h3>
+              {benefit.description && <p>{benefit.description}</p>}
+            </article>)}
+          </div>
         </article>}
       </section>}
 
-      {product && product.trustItems.length > 0 && <section id="store-details" className="store-trust-ribbon" aria-label={text.storeDetails}>
-        {product.trustItems.map((item, index) => <article key={item.title}><span aria-hidden="true">{["♧", "↗", "✓", "♡"][index % 4]}</span><div><strong>{item.title}</strong>{item.description && <small>{item.description}</small>}</div></article>)}
+      {product && product.usageSteps.length > 0 && <section id="how-to-use" className="landing-info-card usage-card" aria-labelledby="how-to-use-title">
+        <h2 id="how-to-use-title">{text.howToUse}</h2>
+        <div className="usage-text">{product.usageSteps.map(step => step.description).filter(Boolean).join("\n\n")}</div>
       </section>}
 
-      {product && product.reviewCount > 0 && <section id="reviews" className="landing-section reviews-section" aria-labelledby="reviews-title">
+      {product && <section id="shipping-returns" className="shipping-returns-section" aria-labelledby="shipping-returns-title">
+        <h2 id="shipping-returns-title">{text.shippingReturns}</h2>
+        {product.trustItems.length > 0
+          ? <div className="shipping-return-grid">{product.trustItems.map((item, index) => <article key={`${item.title}-${index}`}><span aria-hidden="true">{["✓", "⇢", "↻", "♡"][index % 4]}</span><div><strong>{item.title}</strong>{item.description && <p>{item.description}</p>}</div></article>)}</div>
+          : <div className="shipping-return-grid"><article><span aria-hidden="true">✓</span><div><strong>{text.codAvailable}</strong></div></article><article><span aria-hidden="true">↻</span><div><strong>{text.easyReturn}</strong></div></article><article><span aria-hidden="true">♡</span><div><strong>{text.customerSupport}</strong></div></article></div>}
+      </section>}
+
+      {product && <section id="reviews" className="landing-section reviews-section" aria-labelledby="reviews-title">
         <div className="section-title"><span></span><div><p>{product.reviewCount} {product.reviewCount === 1 ? text.review : text.reviewsPlural}</p><h2 id="reviews-title">{text.reviews}</h2></div><span></span></div>
-        <div className="review-summary"><strong>{product.averageRating.toFixed(1)}</strong><span className="rating-stars" aria-label={`${product.averageRating} ${text.rating}`}>{renderStars(product.averageRating)}</span><span>{product.reviewCount} {product.reviewCount === 1 ? text.review : text.reviewsPlural}</span></div>
+        {product.reviewCount > 0 ? <><div className="review-summary"><strong>{product.averageRating.toFixed(1)}</strong><span className="rating-stars" aria-label={`${product.averageRating} ${text.rating}`}>{renderStars(product.averageRating)}</span><span>{product.reviewCount} {product.reviewCount === 1 ? text.review : text.reviewsPlural}</span></div>
         <div className="review-grid">{product.reviews.map((review, index) => <article className="review-card" key={`${review.displayName}-${index}`}>
           <div className="review-card-top"><span className="rating-stars" aria-label={`${review.rating} ${text.rating}`}>{renderStars(review.rating)}</span><strong>{review.displayName}</strong></div>
           <h3>{review.title}</h3><p>{review.content}</p>
-        </article>)}</div>
+        </article>)}</div></> : <p className="no-reviews-message">{text.noReviews}</p>}
+      </section>}
+
+      {product && product.images.length > 0 && <section className="product-promo-banner" aria-label={product.benefits[0]?.title ?? product.name}>
+        <img src={getMediaUrl(product.images[product.images.length - 1].url)} alt="" />
+        <div><p>{product.brandName}</p><h2>{product.benefits[0]?.title ?? product.name}</h2><span>{product.benefits[0]?.description ?? product.storefrontSubtitle}</span></div>
       </section>}
 
       {product?.aboutUs.trim() && (
@@ -479,17 +516,16 @@ function Storefront() {
       )}
 
       <footer className="store-footer">
+        <p className="store-copyright">© {new Date().getFullYear()} Pretty Shop</p>
         <nav className="store-footer-links" aria-label={text.storeNavigation}>
-          {product?.aboutUs.trim() && <a href="#about-us">{text.aboutUs}</a>}
-          {product?.whatsAppContactUrl && <a className="footer-whatsapp" href={product.whatsAppContactUrl} target="_blank" rel="noopener noreferrer">
+          <a className="footer-whatsapp" href="https://wa.me/01872441501?text=Hello%2C%20I%20have%20a%20question%20about%20this%20product." target="_blank" rel="noopener noreferrer">
             <svg className="whatsapp-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
               <path fill="currentColor" d="M16.04 3A12.9 12.9 0 0 0 4.93 22.47L3.2 28.8l6.49-1.7A12.9 12.9 0 1 0 16.04 3Zm0 23.47c-1.92 0-3.8-.51-5.44-1.47l-.39-.23-3.85 1.01 1.03-3.75-.25-.4a10.57 10.57 0 1 1 8.9 4.84Zm5.8-7.92c-.32-.16-1.9-.94-2.2-1.05-.3-.11-.52-.16-.74.16-.22.32-.84 1.05-1.03 1.27-.19.21-.38.24-.7.08-.32-.16-1.36-.5-2.59-1.59-.96-.86-1.61-1.92-1.8-2.24-.19-.32-.02-.49.14-.65.14-.14.32-.38.48-.56.16-.19.21-.32.32-.54.11-.21.05-.4-.03-.56-.08-.16-.73-1.76-1-2.41-.27-.63-.54-.55-.73-.56h-.62c-.21 0-.56.08-.86.4-.3.32-1.13 1.1-1.13 2.68s1.16 3.11 1.32 3.32c.16.22 2.28 3.48 5.51 4.88.77.33 1.37.53 1.84.68.77.24 1.47.21 2.03.13.62-.09 1.9-.78 2.17-1.54.27-.75.27-1.4.19-1.54-.08-.13-.29-.21-.62-.37Z" />
             </svg>
-            <span>{text.whatsappMessage}</span>
-          </a>}
-          <a className="footer-admin" href="/admin">{text.admin}</a>
+            <span>01872441501</span>
+          </a>
+          <a className="footer-admin" href="/admin">অ্যাডমিন</a>
         </nav>
-        <p className="store-copyright">© {new Date().getFullYear()} {product?.brandName ?? "Pretty Shop"}</p>
       </footer>
     </main>
   );
@@ -503,16 +539,28 @@ function formatPrice(amount: number, currencyCode: string): string {
   }
 }
 
-function formatCountdown(seconds: number): string {
-  const days = Math.floor(seconds / 86_400);
-  const hours = Math.floor((seconds % 86_400) / 3_600);
-  const minutes = Math.floor((seconds % 3_600) / 60);
-  const remainingSeconds = seconds % 60;
-  const time = [hours, minutes, remainingSeconds].map((value) => String(value).padStart(2, "0")).join(":");
-  return days > 0 ? `${days}d ${time}` : time;
+function getWhatsAppNumber(value: string): string {
+  try {
+    const url = new URL(value);
+    const queryNumber = url.searchParams.get("phone");
+    const pathNumber = url.hostname.endsWith("wa.me") ? url.pathname.split("/").filter(Boolean)[0] : "";
+    return (queryNumber || pathNumber).replace(/[^\d+]/g, "");
+  } catch {
+    return "";
+  }
 }
 
 function renderStars(rating: number): string {
   const filled = Math.max(0, Math.min(5, Math.round(rating)));
   return "★".repeat(filled) + "☆".repeat(5 - filled);
+}
+
+function AssuranceIcon({ kind }: { kind: "shield" | "delivery" | "return" | "support" }) {
+  const common = { fill: "none", stroke: "currentColor", strokeLinecap: "round" as const, strokeLinejoin: "round" as const, strokeWidth: 1.8 };
+  return <svg viewBox="0 0 32 32" aria-hidden="true" {...common}>
+    {kind === "shield" && <><path d="M16 3 27 7v8c0 7-4.7 11.4-11 14-6.3-2.6-11-7-11-14V7l11-4Z" /><path d="m10.5 16 3.5 3.5 7-7" /></>}
+    {kind === "delivery" && <><path d="M3 8h16v14H3zM19 13h5l5 5v4H19z" /><circle cx="9" cy="24" r="2.5" /><circle cx="24" cy="24" r="2.5" /><path d="M22 13v5h7" /></>}
+    {kind === "return" && <><path d="M7 9h18l2 18H5L7 9Z" /><path d="M11 9a5 5 0 0 1 10 0M11 17l-3 3 3 3M8 20h9a4 4 0 0 0 4-4" /></>}
+    {kind === "support" && <><path d="M4 17v-2a12 12 0 0 1 24 0v2" /><path d="M4 17h5v9H7a3 3 0 0 1-3-3v-6ZM28 17h-5v9h2a3 3 0 0 0 3-3v-6ZM23 27a8 8 0 0 1-7 3h-2" /></>}
+  </svg>;
 }

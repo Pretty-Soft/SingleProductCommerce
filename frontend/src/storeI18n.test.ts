@@ -30,6 +30,15 @@ describe("storefront language support", () => {
       expect(labels.productDetails.length).toBeGreaterThan(0);
       expect(labels.howToUse.length).toBeGreaterThan(0);
       expect(labels.reviews.length).toBeGreaterThan(0);
+      expect(labels.authentic.length).toBeGreaterThan(0);
+      expect(labels.fastDelivery.length).toBeGreaterThan(0);
+      expect(labels.easyReturn.length).toBeGreaterThan(0);
+      expect(labels.originalProduct.length).toBeGreaterThan(0);
+      expect(labels.trustedByThousands.length).toBeGreaterThan(0);
+      expect(labels.customerSupport.length).toBeGreaterThan(0);
+      expect(labels.productSections.length).toBeGreaterThan(0);
+      expect(labels.keyBenefits.length).toBeGreaterThan(0);
+      expect(labels.shippingReturns.length).toBeGreaterThan(0);
     }
   });
 });

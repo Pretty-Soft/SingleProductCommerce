@@ -43,6 +43,34 @@ export interface StorefrontTheme {
   detailsFontSizePx: number;
 }
 
+const previousThemeDefaults: Record<keyof Pick<StorefrontTheme, "primaryColor" | "accentColor" | "textColor" | "mutedTextColor" | "backgroundColor" | "surfaceColor" | "borderColor">, string> = {
+  primaryColor: "#242020",
+  accentColor: "#c17b88",
+  textColor: "#282326",
+  mutedTextColor: "#777078",
+  backgroundColor: "#fbf8f8",
+  surfaceColor: "#ffffff",
+  borderColor: "#eee5e8"
+};
+
+const rosyThemeDefaults: typeof previousThemeDefaults = {
+  primaryColor: "#171316",
+  accentColor: "#e8437a",
+  textColor: "#211b1e",
+  mutedTextColor: "#756970",
+  backgroundColor: "#ffffff",
+  surfaceColor: "#ffffff",
+  borderColor: "#f1dce4"
+};
+
+export function withRosyDefaultPalette<T extends StorefrontTheme>(theme: T): T {
+  const updated = { ...theme };
+  for (const key of Object.keys(previousThemeDefaults) as Array<keyof typeof previousThemeDefaults>) {
+    if (updated[key].toLowerCase() === previousThemeDefaults[key]) updated[key] = rosyThemeDefaults[key] as T[typeof key];
+  }
+  return updated;
+}
+
 export interface CartPriceQuote {
   token: string;
   currencyCode: string;
@@ -113,7 +141,9 @@ export async function getPublishedProduct(language = "en"): Promise<StorefrontPr
   const response = await fetch(`${apiBase}/api/v1/store/product?language=${encodeURIComponent(language)}`, { credentials: "omit" });
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`The catalog could not be loaded (${response.status}).`);
-  return (await response.json()) as StorefrontProduct;
+  const product = (await response.json()) as StorefrontProduct;
+  product.theme = withRosyDefaultPalette(product.theme);
+  return product;
 }
 
 export async function quoteCartSelection(variantId: string, attributeOptionIds: string[]): Promise<CartPriceQuote> {

@@ -1,5 +1,6 @@
 import { CSSProperties, FormEvent, useEffect, useState } from "react";
 import { adminRequest, loadAdminImagePreview } from "./adminApi";
+import { withRosyDefaultPalette } from "./storeApi";
 
 interface TrustItem { id: string | null; title: string; description: string; isActive: boolean; displayOrder: number }
 interface Settings {
@@ -26,10 +27,11 @@ const emptySettings: Settings = {
   brandName: "Pretty Shop", storefrontHeadline: "", aboutUs: "", benefits: [], usageSteps: [], reviews: [], storefrontSubtitle: "",
   flashSale: { enabled: false, label: "", discountType: "percentage", discountValue: 10, startsAtUtc: null, endsAtUtc: null },
   socialSharingEnabled: true, whatsAppEnabled: false, whatsAppPhoneNumber: "", whatsAppPrefillMessage: "Hello, I have a question about this product.", brandLogo: null, productImages: [], trustItems: [], storefrontTranslations: {},
-  theme: { primaryColor: "#242020", accentColor: "#c17b88", textColor: "#282326", mutedTextColor: "#777078", backgroundColor: "#fbf8f8", surfaceColor: "#ffffff", borderColor: "#eee5e8", productTitleFontSizePx: 30, detailsFontSizePx: 13 }
+  theme: { primaryColor: "#171316", accentColor: "#e8437a", textColor: "#211b1e", mutedTextColor: "#756970", backgroundColor: "#ffffff", surfaceColor: "#ffffff", borderColor: "#f1dce4", productTitleFontSizePx: 30, detailsFontSizePx: 13 }
 };
 
 const translationLanguages = [{ code: "bn", label: "Bangla" }, { code: "es", label: "Spanish" }] as const;
+const emptyUsageId = "00000000-0000-4000-8000-000000000001";
 
 function toLocal(value: string | null) {
   if (!value) return "";
@@ -54,7 +56,7 @@ export default function AdminStoreSettings() {
     void adminRequest<Settings>("/api/v1/admin/storefront/settings")
       .then(async value => {
         if (!active) return;
-        setSettings(value);
+        setSettings({ ...value, theme: withRosyDefaultPalette(value.theme) });
         if (value.brandLogo) {
           const preview = await loadAdminImagePreview(value.brandLogo.id).catch(() => "");
           if (preview) imageUrls.push(preview);
@@ -132,7 +134,7 @@ export default function AdminStoreSettings() {
     try {
       await adminRequest("/api/v1/admin/storefront/settings", {
         method: "PUT",
-        body: JSON.stringify({ ...settings, flashSale: { ...settings.flashSale,
+        body: JSON.stringify({ ...settings, usageSteps: settings.usageSteps.filter(item => item.description.trim()), flashSale: { ...settings.flashSale,
           startsAtUtc: settings.flashSale.startsAtUtc ? new Date(settings.flashSale.startsAtUtc).toISOString() : null,
           endsAtUtc: settings.flashSale.endsAtUtc ? new Date(settings.flashSale.endsAtUtc).toISOString() : null } })
       });
@@ -160,21 +162,22 @@ export default function AdminStoreSettings() {
         </div>)}
         <button className="button button-quiet" type="button" disabled={settings.benefits.length >= 6} onClick={() => addContent("benefits")}>Add benefit</button>
       </fieldset>
-      <fieldset className="admin-field-wide"><legend>How to use</legend><p className="admin-muted">Add clear product-specific steps. The storefront hides this section until steps are configured.</p>
-        {settings.usageSteps.map((item, index) => <div className="admin-form-grid" key={item.id}>
-          <label>Step {index + 1}<input maxLength={120} required value={item.title} onChange={event => updateContent("usageSteps", item.id, { title: event.target.value })} placeholder="Short step heading" /></label>
-          <label className="admin-field-wide">Instructions<textarea maxLength={1000} required rows={2} value={item.description} onChange={event => updateContent("usageSteps", item.id, { description: event.target.value })} /></label>
-          {translationLanguages.flatMap(language => [
-            <label key={`${language.code}-title`}>{language.label} step<input maxLength={120} value={settings.storefrontTranslations[language.code]?.[`usage.${item.id}.title`] ?? ""} onChange={event => updateTranslation(language.code, `usage.${item.id}.title`, event.target.value)} /></label>,
-            <label key={`${language.code}-description`}>{language.label} instructions<textarea maxLength={1000} rows={2} value={settings.storefrontTranslations[language.code]?.[`usage.${item.id}.description`] ?? ""} onChange={event => updateTranslation(language.code, `usage.${item.id}.description`, event.target.value)} /></label>
-          ])}
-          <button className="button button-quiet" type="button" onClick={() => setSettings(current => ({ ...current, usageSteps: current.usageSteps.filter(value => value.id !== item.id) }))}>Remove step</button>
-        </div>)}
-        <button className="button button-quiet" type="button" disabled={settings.usageSteps.length >= 8} onClick={() => addContent("usageSteps")}>Add usage step</button>
+      <fieldset className="admin-field-wide"><legend>How to use</legend><p className="admin-muted">Enter product-specific instructions as plain text. Use line breaks to separate steps or notes; this content appears as a text section on the storefront.</p>
+        <label className="admin-field-wide">Instructions<textarea maxLength={1000} rows={7} value={settings.usageSteps.map(item => item.description).filter(Boolean).join("\n\n")} onChange={event => {
+          const current = settings.usageSteps;
+          const first = current[0] ?? { id: emptyUsageId, title: "Instructions", description: "" };
+          setSettings(value => ({ ...value, usageSteps: [{ ...first, title: "Instructions", description: event.target.value }] }));
+        }} placeholder="Enter clear instructions for using this product…" /></label>
+        {translationLanguages.map(language => {
+          const itemId = settings.usageSteps[0]?.id ?? emptyUsageId;
+          const key = `usage.${itemId}.description`;
+          return <label className="admin-field-wide" key={language.code}>{language.label} instructions<textarea maxLength={1000} rows={5} value={settings.storefrontTranslations[language.code]?.[key] ?? ""} onChange={event => updateTranslation(language.code, key, event.target.value)} /></label>;
+        })}
       </fieldset>
       <label className="admin-field-wide">Subtitle<input maxLength={500} value={settings.storefrontSubtitle} onChange={event => setSettings(current => ({ ...current, storefrontSubtitle: event.target.value }))} /></label>
       <fieldset className="admin-field-wide"><legend>Storefront theme</legend>
         <p className="admin-muted">Use these controls to change storefront colors and text sizes. Custom CSS is not supported.</p>
+        <button className="button button-quiet" type="button" onClick={() => setSettings(current => ({ ...current, theme: { ...current.theme, primaryColor: "#171316", accentColor: "#e8437a", textColor: "#211b1e", mutedTextColor: "#756970", backgroundColor: "#ffffff", surfaceColor: "#ffffff", borderColor: "#f1dce4" } }))}>Apply white, black & rosy palette</button>
         <div className="admin-form-grid">
           {([ ["primaryColor", "Primary color"], ["accentColor", "Accent color"], ["textColor", "Text color"], ["mutedTextColor", "Muted text"], ["backgroundColor", "Page background"], ["surfaceColor", "Card background"], ["borderColor", "Borders"] ] as const).map(([key, label]) => <label key={key}>{label}<input type="color" value={settings.theme[key]} onChange={event => updateTheme(key, event.target.value)} /></label>)}
           <label>Product heading size<select value={settings.theme.productTitleFontSizePx} onChange={event => updateTheme("productTitleFontSizePx", Number(event.target.value))}>{[26, 28, 30, 32, 36, 40, 42].map(size => <option key={size} value={size}>{size}px</option>)}</select></label>
@@ -191,44 +194,57 @@ export default function AdminStoreSettings() {
           "--theme-surface": settings.theme.surfaceColor,
           "--theme-border": settings.theme.borderColor
         } as CSSProperties}>
+          <div className="theme-preview-trustbar">
+            <span>{settings.trustItems.find(item => item.isActive)?.title || "Your trusted store"}</span>
+            {settings.trustItems.find(item => item.isActive)?.description && <span>{settings.trustItems.find(item => item.isActive)?.description}</span>}
+            {settings.whatsAppEnabled && <span>WhatsApp · {settings.whatsAppPhoneNumber || "Add a contact number"}</span>}
+          </div>
           <div className="theme-preview-header">
             {logoPreview
               ? <img className="theme-preview-logo" src={logoPreview} alt="" />
               : <span className="theme-preview-logo-fallback">{(settings.brandName || "S").slice(0, 1).toUpperCase()}</span>}
             <div className="theme-preview-brand">
-              <strong style={{ color: settings.theme.primaryColor, fontSize: `${Math.min(settings.theme.productTitleFontSizePx, 16)}px`, borderBottom: `2px solid ${settings.theme.accentColor}` }}>{settings.brandName || "Store name"}</strong>
-              <span style={{ color: settings.theme.mutedTextColor, fontSize: `${settings.theme.detailsFontSizePx}px` }}>{settings.storefrontHeadline || "Storefront headline preview"}</span>
+              <strong style={{ color: settings.theme.accentColor, fontSize: `${Math.min(settings.theme.productTitleFontSizePx, 24)}px` }}>{settings.brandName || "Store name"}</strong>
+              <span style={{ color: settings.theme.textColor, fontSize: `${Math.min(settings.theme.detailsFontSizePx, 14)}px` }}>{settings.storefrontHeadline || "Storefront headline preview"}</span>
             </div>
-            <button className="theme-preview-cart" type="button"><span>Cart</span><b>0</b></button>
+            <div className="theme-preview-header-actions"><span>About Us</span><button className="theme-preview-cart" type="button" aria-label="Cart preview"><b>0</b></button></div>
           </div>
-          <div className="theme-preview-product">
-            <div className="theme-preview-image-zone" style={{ background: settings.theme.surfaceColor, borderColor: settings.theme.borderColor }}>
-              {settings.productImages[0] && productImagePreviews[settings.productImages[0].id]
-                ? <img src={productImagePreviews[settings.productImages[0].id]} alt="" />
-                : <span>Product image area</span>}
-            </div>
-            <div className="theme-preview-card" style={{ background: settings.theme.surfaceColor, borderColor: settings.theme.borderColor }}>
-              <strong style={{ fontSize: `${settings.theme.productTitleFontSizePx}px` }}>{settings.brandName || "Preview card"}</strong>
-              <p style={{ color: settings.theme.mutedTextColor, fontSize: `${settings.theme.detailsFontSizePx}px` }}>{settings.aboutUs || settings.storefrontSubtitle || "Storefront details preview"}</p>
-              <button className="theme-preview-button" type="button" style={{ background: settings.theme.primaryColor }}>Preview button</button>
-            </div>
-          </div>
-          <div className="theme-preview-sections">
-            <section className="theme-preview-section">
-              <strong>Why choose this product?</strong>
-              <div className="theme-preview-benefits">
-                {(settings.benefits.length ? settings.benefits.slice(0, 4) : [{ id: "benefit-preview", title: "Benefit preview", description: "Configured product benefits appear here." }]).map(item => <div key={item.id}><b>{item.title}</b><small>{item.description || "Product benefit"}</small></div>)}
+          <div className="theme-preview-hero">
+            <div className="theme-preview-gallery">
+              <div className="theme-preview-image-zone" style={{ background: settings.theme.surfaceColor, borderColor: settings.theme.borderColor }}>
+                {settings.productImages[0] && productImagePreviews[settings.productImages[0].id]
+                  ? <img src={productImagePreviews[settings.productImages[0].id]} alt="" />
+                  : <span>Uploaded product image preview</span>}
               </div>
-            </section>
-            <div className="theme-preview-section-grid">
-              <section className="theme-preview-section"><strong>Product details</strong><small>Product, SKU, variants, and configured attributes</small></section>
-              <section className="theme-preview-section"><strong>How to use</strong><small>{settings.usageSteps[0]?.description || "Configured usage steps appear here."}</small></section>
+              {settings.productImages.length > 1 && <div className="theme-preview-thumbnails">{settings.productImages.slice(0, 4).map(image => productImagePreviews[image.id] ? <img key={image.id} src={productImagePreviews[image.id]} alt="" /> : <span key={image.id} />)}</div>}
             </div>
-            <div className="theme-preview-section-grid">
-              <section className="theme-preview-section"><strong>Trust highlights</strong><small>{settings.trustItems[0]?.title || "Configured store service details appear here."}</small></section>
-              <section className="theme-preview-section"><strong>Reviews</strong><small>{settings.reviews.length ? `${settings.reviews.filter(review => review.isPublished).length} published admin reviews` : "Admin-managed ratings appear here."}</small></section>
+            <div className="theme-preview-product-copy">
+              {settings.storefrontSubtitle && <span className="theme-preview-kicker">{settings.storefrontSubtitle}</span>}
+              <strong className="theme-preview-product-title" style={{ color: settings.theme.primaryColor, fontSize: `${settings.theme.productTitleFontSizePx}px` }}>Product name preview</strong>
+              <p className="theme-preview-description" style={{ color: settings.theme.mutedTextColor, fontSize: `${settings.theme.detailsFontSizePx}px` }}>The product name and description come from Product Catalog.</p>
+              <div className="theme-preview-rating"><span>★★★★★</span><small>{settings.reviews.filter(review => review.isPublished).length} published reviews</small></div>
+              <ul className="theme-preview-hero-benefits">{(settings.benefits.length ? settings.benefits.slice(0, 4) : [{ id: "benefit-placeholder", title: "Configured product benefits preview here." }]).map(item => <li key={item.id}><b>✓</b>{item.title}</li>)}</ul>
+              {settings.flashSale.enabled && <div className="theme-preview-sale"><strong>ϟ {settings.flashSale.label || "Flash sale"}</strong><span>Sale countdown preview · 00:00:00</span></div>}
+              <div className="theme-preview-price"><strong>Price and discount preview</strong><small>Actual prices are shown from the saved catalog variants.</small></div>
+              <div className="theme-preview-variants"><span>Variant preview</span><span>Option pricing comes from Product Catalog</span></div>
+              <button className="theme-preview-button" type="button" style={{ background: `linear-gradient(100deg, ${settings.theme.accentColor}, ${settings.theme.primaryColor})` }}>Add to cart</button>
+              <div className="theme-preview-assurances"><span>100% Authentic</span><span>Fast Delivery</span><span>Easy Return</span><span>Customer Support</span></div>
             </div>
           </div>
+          <nav className="theme-preview-tabs" aria-label="Preview product section navigation"><span>Product Details</span><span>How to Use</span><span>Reviews</span><span>Shipping &amp; Returns</span></nav>
+          <div className="theme-preview-sections">
+            <div className="theme-preview-section-grid">
+              <section className="theme-preview-section"><strong>Product details</strong><small>Product name, SKU, attributes, and variant details appear from Product Catalog.</small></section>
+              <section className="theme-preview-section"><strong>Key benefits</strong><div className="theme-preview-benefits">{(settings.benefits.length ? settings.benefits.slice(0, 4) : [{ id: "benefit-preview", title: "Product benefits preview here.", description: "Add benefits above to preview your content." }]).map(item => <div key={item.id}><b>{item.title}</b><small>{item.description || "Product benefit"}</small></div>)}</div></section>
+            </div>
+            <div className="theme-preview-section-grid">
+              <section className="theme-preview-section"><strong>How to use</strong><small className="theme-preview-usage">{settings.usageSteps.map(item => item.description).filter(Boolean).join("\n\n") || "Add multiline usage instructions above to preview them here."}</small></section>
+              <section className="theme-preview-section"><strong>Shipping &amp; returns</strong><small>{settings.trustItems.filter(item => item.isActive).map(item => item.title).join(" · ") || "Configured shipping and service details appear here."}</small></section>
+            </div>
+            <section className="theme-preview-section"><strong>Customer reviews</strong><small>{settings.reviews.filter(review => review.isPublished).length ? `${settings.reviews.filter(review => review.isPublished).length} published admin-managed review(s)` : "Admin-managed reviews will appear here when published."}</small></section>
+          </div>
+          {settings.productImages.length > 0 && <div className="theme-preview-promo"><span>{settings.productImages.length > 1 && productImagePreviews[settings.productImages[settings.productImages.length - 1].id] && <img src={productImagePreviews[settings.productImages[settings.productImages.length - 1].id]} alt="" />}</span><div><small>{settings.brandName}</small><strong>{settings.benefits[0]?.title || "Product promotional message"}</strong><p>{settings.benefits[0]?.description || "The promotional strip uses your uploaded product imagery and configured benefits."}</p></div></div>}
+          <footer className="theme-preview-footer"><span>© {new Date().getFullYear()} Pretty Shop</span><span>{settings.whatsAppEnabled ? settings.whatsAppPhoneNumber || "WhatsApp contact number" : "WhatsApp contact"} · Admin</span></footer>
         </div>
       </fieldset>
       <fieldset className="admin-field-wide"><legend>Storefront translations</legend><p className="admin-muted">English is the default and fallback. Blank translations display the English text.</p>
