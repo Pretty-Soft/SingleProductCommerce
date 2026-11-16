@@ -13,7 +13,7 @@ OneCart Commerce is a commercial, single-product commerce platform. The current 
 - `docs/ARCHITECTURE.md`: current architecture and implementation boundaries.
 - `docs/ADMINISTRATOR_GUIDE.md`: admin roles and workflows.
 - `docs/API_CONTRACTS.md`: versioned public and admin API route summary.
-- `docs/INSTALLATION_GUIDE.md`: current manual local setup and production-readiness boundary.
+- `docs/INSTALLATION_GUIDE.md`: local setup, first-run web installer, and production-readiness boundary.
 - `docs/DEPLOYMENT_GUIDE.md`: deployment for Docker Compose, Linux/systemd/Nginx, and Windows IIS.
 - `docs/CUSTOMIZATION_GUIDE.md`: admin-configurable content and safe source changes.
 - `docs/ROADMAP.md`: proposed implementation sequence and decision gates.
@@ -37,10 +37,14 @@ dotnet tool restore
 dotnet ef database update --project backend/OneCart.Api
 ```
 
-Create the requested first System Admin account. The bootstrap command applies pending migrations, seeds the built-in roles, and prompts for the password without displaying or storing it in the repository:
+Leave `Database:Provider` unset to use PostgreSQL. The Visual Studio launch profiles no longer override the provider; SQL Server can be selected for local evaluation by setting `Database:Provider` to `SqlServer` in user-secrets.
+
+Configure the one-time local installer token in user-secrets:
 
 ```powershell
-dotnet run --project backend/OneCart.Api -- --bootstrap-system-admin zs.islam93@gmail.com
+$setupToken = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+dotnet user-secrets set --project backend/OneCart.Api "Setup:BootstrapToken" $setupToken
+$setupToken = $null
 ```
 
 Create and trust the local ASP.NET Core development certificate once:
@@ -66,6 +70,8 @@ Backend (HTTPS only):
 dotnet run --project backend/OneCart.Api
 ```
 
+In Development, the API applies pending migrations at startup. Run the storefront in a second terminal, then open `http://127.0.0.1:5175/install` and enter the setup token to create the first System Admin. The setup page is disabled once that account exists. For headless local setup, the one-time `--bootstrap-system-admin` command remains available and prompts for the password.
+
 Run the focused persistence and validation tests with:
 
 ```powershell
@@ -82,17 +88,17 @@ npm run test:e2e
 npm run build
 ```
 
-GitHub Actions runs the API workflow tests, persistence tests, PostgreSQL commerce integration test, storefront unit tests, Chromium storefront checkout/responsive tests, production frontend build, Docker Compose validation, API/storefront container builds, and a clean Docker install/backup restore smoke test for pushes and pull requests. SQL Server integration tests remain a separate opt-in local check because they require a disposable SQL Server instance.
+GitHub Actions runs API and persistence tests, PostgreSQL commerce and full database/media/Data Protection-key recovery integration tests, storefront unit and Chromium browser tests, the production frontend build, Linux and Windows package/configuration checks, container builds, and a clean Docker HTTPS install/backup-restore smoke test for pushes and pull requests. SQL Server integration tests remain a separate opt-in local check because they require a disposable SQL Server instance.
 
 The SQL Server integration test creates and drops a uniquely named disposable database. Run it only with a local/test SQL Server login that has database create/drop permission:
 
 ```powershell
-$env:ONECART_SQLSERVER_TEST_CONNECTION = "Server=localhost\SQLEXPRESS;Trusted_Connection=True;Encrypt=True;TrustServerCertificate=True"
-dotnet test backend/OneCart.Persistence.IntegrationTests/OneCart.Persistence.IntegrationTests.csproj
+$env:ONECART_SQLSERVER_TEST_CONNECTION = "Server=localhost\SQLEXPRESS;User ID=YOUR_LOGIN;Password=YOUR_PASSWORD;Encrypt=False;TrustServerCertificate=True"
+dotnet test backend/OneCart.Persistence.IntegrationTests/OneCart.Persistence.IntegrationTests.csproj --filter FullyQualifiedName~SqlServerCatalogIntegrationTests
 Remove-Item Env:\ONECART_SQLSERVER_TEST_CONNECTION
 ```
 
-The API listens at `https://localhost:44300` in the Visual Studio IIS Express profile. Plain HTTP API requests are rejected. The production API base URL must also use `https://` with a certificate trusted by clients. When TLS terminates at a reverse proxy, configure only that proxy's IP under `ForwardedHeaders:KnownProxies`; do not trust forwarded headers from arbitrary clients.
+The API listens at `https://localhost:44300` in the Visual Studio IIS Express and `OneCart.Api` profiles. Plain HTTP API requests are rejected. The production API base URL must also use `https://` with a certificate trusted by clients. When TLS terminates at a reverse proxy, configure only that proxy's IP under `ForwardedHeaders:KnownProxies`; do not trust forwarded headers from arbitrary clients.
 
 Development stores ASP.NET Core Data Protection keys under `backend/OneCart.Api/App_Data/data-protection-keys` by default; this directory is Git-ignored, and Windows protects generated keys with DPAPI. For production, set `DataProtection:KeyDirectory` to a persistent, access-controlled directory available to every API instance. Protect the key material at rest using the platform's supported mechanism and keep the directory outside source control.
 
@@ -110,13 +116,13 @@ Store currency is selected by the administrator across the product and its varia
 
 ## Experimental SQL Server development path
 
-SQL Server is an experimental local development option and is not yet a supported release provider. A focused local integration test covers migration and catalog round-trip behavior; installation, broader transaction behavior, backup/restore, and deployment coverage still need verification. PostgreSQL remains the default when `Database:Provider` is unset.
+SQL Server is an experimental local development option and is not yet a supported release provider. An opt-in local integration test covers migrations, multiple variant edits, pricing and stock updates, catalog/media operations, and COD inventory behavior. Installation, broader transaction behavior, backup/restore, and deployment coverage still need verification. PostgreSQL remains the default when `Database:Provider` is unset.
 
 For a local SQL Server instance, configure the provider and connection string in local user secrets. This example uses Windows authentication and trusts the local server certificate; hosted environments need a valid database certificate and a least-privilege login:
 
 ```powershell
 dotnet user-secrets set --project backend/OneCart.Api "Database:Provider" "SqlServer"
-dotnet user-secrets set --project backend/OneCart.Api "ConnectionStrings:Store" "Server=localhost\SQLEXPRESS;Database=OneCart;Trusted_Connection=True;Encrypt=True;TrustServerCertificate=True"
+dotnet user-secrets set --project backend/OneCart.Api "ConnectionStrings:Store" "Server=localhost\SQLEXPRESS;Database=OneCart;User ID=YOUR_LOGIN;Password=YOUR_PASSWORD;Encrypt=False;TrustServerCertificate=True"
 dotnet ef database update --project backend/OneCart.SqlServer.Migrations --startup-project backend/OneCart.Api --context OneCart.Api.Data.StoreDbContext
 dotnet run --project backend/OneCart.Api -- --bootstrap-system-admin zs.islam93@gmail.com
 ```

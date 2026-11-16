@@ -9,7 +9,7 @@ This guide covers local development and the first-run web installer. For support
 - PostgreSQL, configured for local connections
 - Git, if cloning the repository
 
-PostgreSQL is the default and first-release provider. SQL Server has an experimental local path and is not a supported release provider. The Visual Studio Development launch profiles select SQL Server; configure `ConnectionStrings:Store` in .NET user-secrets for your local instance. The normal provider default in code remains PostgreSQL.
+PostgreSQL is the default and first-release provider. SQL Server has an experimental local path and is not a supported release provider. The Visual Studio Development launch profiles do not override the provider, so the application uses PostgreSQL unless `Database:Provider` is set in user-secrets.
 
 For a local SQL Server instance, configure the provider and connection string in user-secrets. Keep the password out of launch settings and source control:
 
@@ -26,7 +26,7 @@ Create an empty database and configure its connection string in .NET user secret
 dotnet user-secrets set --project backend/OneCart.Api "ConnectionStrings:Store" "Host=localhost;Port=5432;Database=onecart;Username=postgres;Password=YOUR_LOCAL_PASSWORD"
 ```
 
-For the normal local PostgreSQL setup, leave `Database:Provider` unset; PostgreSQL is the application default. The checked-in Visual Studio launch profiles select the experimental SQL Server provider for the owner's existing local workflow. Select PostgreSQL explicitly in user secrets with `dotnet user-secrets set --project backend/OneCart.Api "Database:Provider" "PostgreSql"` when using those profiles.
+For the normal local PostgreSQL setup, leave `Database:Provider` unset; PostgreSQL is the application default. To evaluate SQL Server locally, set `Database:Provider` to `SqlServer` and configure its connection string instead.
 
 Restore the local .NET tool manifest and apply pending EF Core migrations:
 

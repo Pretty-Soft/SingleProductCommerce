@@ -106,7 +106,7 @@ public sealed class AdminCatalogService(StoreDbContext database)
                     Id = Guid.NewGuid(),
                     Product = product
                 };
-                product.Variants.Add(variant);
+                database.ProductVariants.Add(variant);
             }
 
             variant.Sku = requestedVariant.Sku.Trim().ToUpperInvariant();
@@ -136,7 +136,7 @@ public sealed class AdminCatalogService(StoreDbContext database)
             else
             {
                 group = new ProductAttributeGroup { Id = Guid.NewGuid(), Product = product };
-                product.AttributeGroups.Add(group);
+                database.ProductAttributeGroups.Add(group);
             }
 
             group.Name = requestedGroup.Name.Trim();
@@ -157,7 +157,7 @@ public sealed class AdminCatalogService(StoreDbContext database)
                 else
                 {
                     option = new ProductAttributeOption { Id = Guid.NewGuid(), AttributeGroup = group };
-                    group.Options.Add(option);
+                    database.ProductAttributeOptions.Add(option);
                 }
 
                 option.Name = requestedOption.Name.Trim();
@@ -192,7 +192,7 @@ public sealed class AdminCatalogService(StoreDbContext database)
             else
             {
                 item = new ProductTrustItem { Id = Guid.NewGuid(), Product = product };
-                product.TrustItems.Add(item);
+                database.ProductTrustItems.Add(item);
             }
 
             item.Title = requestedItem.Title.Trim();
