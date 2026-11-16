@@ -54,6 +54,95 @@ The default Compose project prefix in the volume names above is the deployment d
 
 To restore, first stop the deployment and restore the dump into the configured database using `pg_restore --clean --if-exists --no-owner --no-privileges --exit-on-error` only after confirming that the target is the intended recovery database. Extract the matching media and key archives back into their existing named volumes while the API is stopped, preserving ownership for UID 1654 (the API container user). Start the deployment and verify health, admin sign-in, and existing product images. A production recovery should be rehearsed against an isolated deployment before relying on these steps.
 
+## Optional Docker point-in-time recovery (PITR)
+
+The default Compose configuration does not archive PostgreSQL WAL. To enable continuous WAL archiving, add the opt-in overlay to every Compose command used for the deployment:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.pitr.yml up --detach
+```
+
+The overlay sets `wal_level=replica`, enables `archive_mode`, and copies completed WAL segments into the persistent `postgres-wal-archive` volume. It does not define a base-backup schedule, retention policy, off-site copy, or disk limit. The archive volume grows continuously. Monitor its capacity and define and rehearse retention with the operator before using PITR in production; deleting WAL needed by the latest usable base backup makes recovery incomplete. Preserve this volume alongside each base backup.
+
+For a consistent application recovery set, stop the API and storefront while taking a base backup and copying product media and Data Protection keys. Run PostgreSQL's physical base-backup tool from the database container, then copy the generated directory to protected backup storage:
+
+```sh
+set -eu
+backup_dir="${HOME}/onecart-backups/pitr-$(date -u +%Y%m%d-%H%M%S)"
+mkdir -p "$backup_dir"
+chmod 700 "$backup_dir"
+trap 'docker compose up --detach db api storefront >/dev/null' EXIT
+
+docker compose stop api storefront
+docker compose exec -T db rm -rf /tmp/onecart-pitr-base
+docker compose exec -T db pg_basebackup \
+  --username=onecart \
+  --pgdata=/tmp/onecart-pitr-base \
+  --format=plain \
+  --wal-method=stream
+docker compose cp db:/tmp/onecart-pitr-base "$backup_dir/base"
+docker compose exec -T db rm -rf /tmp/onecart-pitr-base
+docker compose stop db
+docker run --rm \
+  -v "${COMPOSE_PROJECT_NAME:-onecart}_postgres-wal-archive:/source:ro" \
+  -v "$backup_dir:/backup" \
+  alpine:3.24 sh -ec 'tar -czf /backup/wal-archive.tar.gz -C /source .'
+docker compose up --detach db api storefront
+trap - EXIT
+```
+
+Use the actual Compose project name when mounting the archive volume; if `COMPOSE_PROJECT_NAME` is not set, Compose normally derives it from the deployment directory. Copy the matching media and Data Protection-key directories using the paired-backup procedure above. Encrypt and transfer the whole recovery set to storage separate from the host. `pg_basebackup` uses the `onecart` database role configured as the PostgreSQL bootstrap superuser in the supplied Compose file; deployments using a restricted role must grant PostgreSQL's replication permissions instead of broadening unrelated application roles.
+
+To recover to a target time, use a separate recovery host or isolated Compose project and a copy of the chosen base backup. Restore the matching WAL archive into a separate recovery volume; never mount or modify the protected source backup. In the copied PostgreSQL data directory, create an empty `recovery.signal` file and append these settings to `postgresql.auto.conf`, replacing the timestamp with the chosen UTC target:
+
+```conf
+restore_command = 'cp /var/lib/postgresql/wal-archive/%f %p'
+recovery_target_time = '2026-11-16 12:00:00+00'
+recovery_target_action = 'pause'
+```
+
+For a Docker rehearsal on Linux, the following example copies the backup into new volumes and starts a separate PostgreSQL container bound only to loopback port 15432. Set `target_time` to the intended UTC recovery point and `backup_dir` to the recovery set created above:
+
+```sh
+set -eu
+recovery_name=onecart-pitr-check
+recovery_data_volume="${recovery_name}-data"
+recovery_wal_volume="${recovery_name}-wal"
+target_time='2026-11-16 12:00:00+00'
+
+docker volume create "$recovery_data_volume"
+docker volume create "$recovery_wal_volume"
+docker run --rm \
+  -v "$recovery_data_volume:/target" \
+  -v "$backup_dir/base:/source:ro" \
+  alpine:3.24 sh -ec 'cp -a /source/. /target/'
+docker run --rm \
+  -v "$recovery_wal_volume:/target" \
+  -v "$backup_dir/wal-archive.tar.gz:/backup/wal-archive.tar.gz:ro" \
+  alpine:3.24 sh -ec 'tar -xzf /backup/wal-archive.tar.gz -C /target'
+
+cat > "$backup_dir/recovery-settings.conf" <<EOF
+restore_command = 'cp /var/lib/postgresql/wal-archive/%f %p'
+recovery_target_time = '$target_time'
+recovery_target_action = 'pause'
+EOF
+docker run --rm \
+  -v "$recovery_data_volume:/data" \
+  -v "$backup_dir/recovery-settings.conf:/settings.conf:ro" \
+  alpine:3.24 sh -ec 'touch /data/recovery.signal; cat /settings.conf >> /data/postgresql.auto.conf'
+
+docker run --detach --name "$recovery_name" \
+  --publish 127.0.0.1:15432:5432 \
+  -v "$recovery_data_volume:/var/lib/postgresql/data" \
+  -v "$recovery_wal_volume:/var/lib/postgresql/wal-archive" \
+  postgres:17-alpine
+docker logs "$recovery_name"
+```
+
+Wait for the recovery log to report that the target was reached and replay is paused. Connect an isolated API to `Host=127.0.0.1;Port=15432` using the store credentials captured with that base backup. Verify expected orders, inventory, administrator sign-in, product images, and protected sessions. Keep this isolated database unpromoted until validation is complete; if it is the intended recovery point, promote it with `SELECT pg_promote()` and follow the host's cutover procedure. Never perform a PITR restore over the live database. After a rehearsal, remove only the temporary recovery container and its two recovery volumes; retain the original encrypted backup set.
+
+PostgreSQL WAL replays database changes only; it cannot rewind product-image files or Data Protection keys. The application must remain stopped while the matching media and key snapshot is made. Without filesystem snapshots coordinated with the target time, a database-only PITR may reference images that were deleted later or may not match key material. A live recovery rehearsal must validate the complete database/media/key set before this is treated as a supported recovery procedure.
+
 ## Verify a backup by restoring to a separate database
 
 Restore into a new, empty database first. Do not point the verification restore at the live store database.
@@ -81,4 +170,4 @@ dropdb --host localhost --port 5432 --username postgres $restoreDatabase
 
 ## Recovery scope
 
-This procedure documents a logical backup and an isolated restore check. It does not provide point-in-time recovery, automated schedules, off-site retention, or a production high-availability design. Those require an approved hosting topology and an operator-selected retention policy.
+The regular backup procedure documents a logical backup and an isolated restore check. The optional Docker overlay adds WAL archiving and the steps for a physical base backup and isolated target-time recovery. Automated schedules, retention, off-site storage, coordinated media/key snapshots, and a production recovery rehearsal remain operator and release work; no retention period is assumed here.

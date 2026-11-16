@@ -1,0 +1,20 @@
+services:
+  db:
+    # Opt in with: docker compose -f docker-compose.yml -f docker-compose.pitr.yml up -d
+    # The archive volume is intentionally unbounded; operators must monitor capacity
+    # and define a tested retention policy before enabling this overlay in production.
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        archive_dir=/var/lib/postgresql/wal-archive
+        mkdir -p "$archive_dir"
+        chown postgres:postgres "$archive_dir"
+        exec /usr/local/bin/docker-entrypoint.sh postgres \
+          -c wal_level=replica \
+          -c archive_mode=on \
+          -c "archive_command=test ! -f $archive_dir/%f && cp %p $archive_dir/%f"
+    volumes:
+      - postgres-wal-archive:/var/lib/postgresql/wal-archive
+
+volumes:
+  postgres-wal-archive:

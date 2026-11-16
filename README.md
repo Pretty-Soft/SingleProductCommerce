@@ -118,7 +118,7 @@ Store currency is selected by the administrator across the product and its varia
 
 SQL Server is an experimental local development option and is not yet a supported release provider. An opt-in local integration test covers migrations, multiple variant edits, pricing and stock updates, catalog/media operations, and COD inventory behavior. Installation, broader transaction behavior, backup/restore, and deployment coverage still need verification. PostgreSQL remains the default when `Database:Provider` is unset.
 
-For a local SQL Server instance, configure the provider and connection string in local user secrets. This example uses Windows authentication and trusts the local server certificate; hosted environments need a valid database certificate and a least-privilege login:
+For a local SQL Server instance, configure the provider and SQL Server-authenticated connection string in local user secrets. This local example does not require certificate encryption; hosted environments need an encrypted connection with a valid database certificate and a least-privilege login:
 
 ```powershell
 dotnet user-secrets set --project backend/OneCart.Api "Database:Provider" "SqlServer"

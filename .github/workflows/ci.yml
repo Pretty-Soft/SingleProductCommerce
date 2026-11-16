@@ -171,6 +171,7 @@ jobs:
           printf 'ci-only-not-a-secret' > secrets/postgres_password
           printf 'Host=db;Port=5432;Database=onecart;Username=onecart;Password=ci-only-not-a-secret' > secrets/store_connection
           docker compose config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.pitr.yml config --quiet
       - name: Build API image
         run: docker build --file backend/OneCart.Api/Dockerfile --tag onecart-api:ci .
       - name: Build storefront image
@@ -199,7 +200,7 @@ jobs:
           printf '%s' "$bootstrap_token" > secrets/bootstrap_token
           unset postgres_password
           chmod 600 secrets/*
-          compose=(docker compose --project-name onecart-smoke -f docker-compose.yml -f docker-compose.smoke.yml)
+          compose=(docker compose --project-name onecart-smoke -f docker-compose.yml -f docker-compose.pitr.yml -f docker-compose.smoke.yml)
           cleanup() {
             "${compose[@]}" down --volumes --remove-orphans || true
             rm -rf secrets
@@ -210,6 +211,16 @@ jobs:
           "${compose[@]}" run --build --rm --no-deps -e "ONECART_BOOTSTRAP_TOKEN=$bootstrap_token" smoke-check
 
           "${compose[@]}" run --rm migrate
+          "${compose[@]}" exec --no-TTY db psql --username onecart --dbname onecart --command 'SELECT pg_switch_wal();'
+          archived_count=0
+          for attempt in $(seq 1 20); do
+            archived_count="$("${compose[@]}" exec --no-TTY db psql --username onecart --dbname onecart --tuples-only --no-align --command 'SELECT archived_count FROM pg_stat_archiver;')"
+            if [ "$archived_count" -gt 0 ]; then break; fi
+            sleep 1
+          done
+          test "$archived_count" -gt 0
+          docker run --rm -v onecart-smoke_postgres-wal-archive:/archive:ro alpine:3.24 sh -ec 'find /archive -type f | grep -q .'
+
           dump_file="$(mktemp)"
           trap 'rm -f "$dump_file"; cleanup' EXIT
           "${compose[@]}" exec --no-TTY db pg_dump --username onecart --format custom onecart > "$dump_file"

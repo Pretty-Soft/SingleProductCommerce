@@ -84,6 +84,8 @@ Open `https://ONECART_DOMAIN` in a browser, replacing the name with the configur
 
 Uploaded media, data-protection keys, database files, Caddy certificates, and runtime secret copies are in named volumes. Back up PostgreSQL data with the `product-media` and `data-protection-keys` volumes together; also preserve `caddy-data` for certificate continuity. The `runtime-secrets` volume is regenerated from `secrets/`; keep the source secret files in a separate encrypted backup. See [PostgreSQL backup and restore](OPERATIONS_POSTGRES.md).
 
+Docker operators who need PostgreSQL point-in-time recovery can opt in to WAL archiving with the overlay documented in the [PostgreSQL recovery runbook](OPERATIONS_POSTGRES.md#optional-docker-point-in-time-recovery-pitr). The default Compose file leaves it disabled; the archive needs capacity monitoring and an operator-defined retention policy.
+
 For upgrades, take a verified backup first, update the deployment source or image version, then run `docker compose up --build --detach`. Compose runs the migration container before starting the API. Do not scale the API service above one replica until migrations use a separately coordinated deployment process.
 
 ## Linux systemd and Nginx
@@ -139,4 +141,4 @@ For both API and storefront sites, configure the IIS **Physical Path**, enable a
 
 Check `GET /health` over the public HTTPS URL after deployment. Check `GET /api/v1/store/product` after publishing a product in the administrator area. Configure SMTP and test administrator password reset. Confirm an uploaded product image survives an API restart. Before accepting orders, complete a backup and isolated restore rehearsal, verify Data Protection keys survive a restart, and review the firewall, TLS renewal, log retention, and access to backups.
 
-For incidents, inspect API and reverse-proxy logs first, verify database reachability and disk space, and restore database and media/key files from the same backup point. The current runbooks cover PostgreSQL logical backup and restore; point-in-time recovery and high availability require a separate operator design.
+For incidents, inspect API and reverse-proxy logs first, verify database reachability and disk space, and restore database and media/key files from the same backup point. The PostgreSQL runbook covers logical backup and restore plus an opt-in Docker WAL archive for point-in-time recovery. A live target-time restore, retention policy, coordinated media/key snapshots, and high availability still require operator planning and rehearsal.
