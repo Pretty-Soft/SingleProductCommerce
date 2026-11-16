@@ -63,6 +63,8 @@ Trust a local HTTPS development certificate once:
 dotnet dev-certs https --trust
 ```
 
+The development certificate is stored in the current Windows user's certificate store. Run this command and the API under the same Windows account: a certificate trusted in a different account is not automatically trusted by that user's browser, and its private key is unavailable to an API process running there. Check it with `dotnet dev-certs https --check --trust` from the account that runs Visual Studio or the API.
+
 Run the API from the repository root in a terminal:
 
 ```powershell
