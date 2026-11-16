@@ -78,6 +78,14 @@ interface EditableAttributeOption {
 
 type CatalogSectionId = "basics" | "trust" | "variants" | "pricing" | "inventory" | "attributes" | "promotions" | "contact";
 
+const variantDataSections: CatalogSectionId[] = ["variants", "pricing", "inventory"];
+
+export function sharesVariantEditScope(section: CatalogSectionId, editingSection: CatalogSectionId | null) {
+  return editingSection !== null
+    && variantDataSections.includes(section)
+    && variantDataSections.includes(editingSection);
+}
+
 const emptyProduct = (): EditableProduct => ({
   id: null,
   name: "",
@@ -239,6 +247,10 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
     }));
   }
 
+  function confirmChildRemoval(message: string) {
+    return window.confirm(`${message}\n\nThis change is staged until you save this section.`);
+  }
+
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -261,7 +273,7 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
   }
 
   function isSectionEditable(section: CatalogSectionId) {
-    return !product.id || editingSection === section;
+    return !product.id || editingSection === section || sharesVariantEditScope(section, editingSection);
   }
 
   function beginSectionEdit(section: CatalogSectionId) {
@@ -320,13 +332,13 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
       return (
         <div className="section-edit-actions">
           <button className="button button-quiet" type="button" onClick={() => cancelSectionEdit(section)} disabled={busy}>Cancel</button>
-          <button className="button" type="button" onClick={() => void saveSection(section)} disabled={busy || !hasUnsavedChanges}>{busy ? "Saving…" : "Save section"}</button>
+          <button className="button" type="button" onClick={() => void saveSection(section)} disabled={busy || !hasUnsavedChanges}>{busy ? "Saving…" : variantDataSections.includes(section) ? "Save variant data" : "Save section"}</button>
         </div>
       );
     }
     return (
       <button className="button button-quiet" type="button" onClick={() => beginSectionEdit(section)} disabled={busy || Boolean(editingSection)}>
-        Edit
+        {section === "variants" ? "Edit variants" : section === "pricing" ? "Edit prices" : section === "inventory" ? "Edit inventory" : "Edit"}
       </button>
     );
   }
@@ -649,7 +661,7 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
             <div className="section-heading catalog-accordion-heading">
               <div>
                 <h3>{sectionTitleToggle("product-trust", "Trust and service details")}</h3>
-                <p className="admin-muted">Add short store promises shown below the product.</p>
+              <p className="admin-muted">Add, edit, or delete product level promises shown below the product. Changes apply when you save this section.</p>
               </div>
               <div className="section-action-stack">
                 {sectionActions("trust")}
@@ -681,7 +693,11 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
                     <input type="number" min="0" step="1" value={item.displayOrder} onChange={(event) => updateTrustItem(index, { displayOrder: Number(event.target.value) })} />
                   </label>
                 </div>
-                <button className="button button-quiet" type="button" onClick={() => updateProduct("trustItems", product.trustItems.filter((_, itemIndex) => itemIndex !== index).map((entry, order) => ({ ...entry, displayOrder: order })))} disabled={busy}>Remove detail</button>
+                <button className="button button-quiet" type="button" onClick={() => {
+                  if (confirmChildRemoval(`Delete store detail “${item.title || `Store detail ${index + 1}`}”?`)) {
+                    updateProduct("trustItems", product.trustItems.filter((_, itemIndex) => itemIndex !== index).map((entry, order) => ({ ...entry, displayOrder: order })));
+                  }
+                }} disabled={busy || !isSectionEditable("trust")}>Delete detail</button>
               </fieldset>
             ))}
             </fieldset>
@@ -691,7 +707,7 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
           <div className="section-heading variant-heading catalog-accordion-heading">
             <div>
               <h3>{sectionTitleToggle("product-variants", "Variants")}</h3>
-              <p className="admin-muted">{product.variants.length} of 100 variants added. Manage each option’s SKU, display name, and storefront availability here.</p>
+              <p className="admin-muted">{product.variants.length} of 100 variants · {product.variants.filter(variant => variant.isActive).length} active on the storefront · {product.variants.filter(variant => !variant.isActive).length} inactive and hidden. Edit variant details, prices, and inventory together, then save once. Variants used by existing orders cannot be deleted, so deactivate them instead.</p>
             </div>
             <div className="section-action-stack">
               {sectionActions("variants")}
@@ -715,6 +731,10 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
                   Display name / options
                   <input maxLength={200} required value={variant.displayName} onChange={(event) => updateVariant(index, { displayName: event.target.value })} />
                 </label>
+                <label>
+                  Regular price ({product.currencyCode || "currency"})
+                  <input type="number" min="0" step="0.0001" required value={variant.price} onChange={(event) => updateVariant(index, { price: Number(event.target.value) })} />
+                </label>
               </div>
               {variant.id && <div className="admin-form-grid">{LANGUAGES.map(language => <label key={language.code}>{language.label} display name<input maxLength={200} value={product.catalogTranslations[language.code]?.[`variant.${variant.id}.name`] ?? ""} onChange={event => setProduct(current => ({ ...current, catalogTranslations: { ...current.catalogTranslations, [language.code]: { ...current.catalogTranslations[language.code], [`variant.${variant.id}.name`]: event.target.value } } }))} /></label>)}</div>}
               <div className="variant-actions">
@@ -722,8 +742,12 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
                   <input type="checkbox" checked={variant.isActive} onChange={(event) => updateVariant(index, { isActive: event.target.checked })} />
                   <span>Available on storefront</span>
                 </label>
-                <button className="button button-quiet" type="button" onClick={() => updateProduct("variants", product.variants.filter((_, itemIndex) => itemIndex !== index))} disabled={busy || product.variants.length === 1}>
-                  Remove
+                <button className="button button-quiet" type="button" onClick={() => {
+                  if (confirmChildRemoval(`Delete variant “${variant.displayName || variant.sku || `Variant ${index + 1}`}”?`)) {
+                    updateProduct("variants", product.variants.filter((_, itemIndex) => itemIndex !== index));
+                  }
+                }} disabled={busy || !isSectionEditable("variants") || product.variants.length === 1}>
+                  Delete variant
                 </button>
               </div>
             </fieldset>
@@ -733,7 +757,7 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
 
           <section className={`catalog-settings catalog-section ${expandedSectionClass("product-prices")}`} id="product-prices">
             <div className="section-heading catalog-accordion-heading">
-              <div><h3>{sectionTitleToggle("product-prices", "Prices")}</h3><p className="admin-muted">Set the regular price for each variant in {product.currencyCode || "the store currency"}.</p></div>
+              <div><h3>{sectionTitleToggle("product-prices", "Prices")}</h3><p className="admin-muted">Set prices for each variant in {product.currencyCode || "the store currency"}. Prices save together with variant and inventory edits.</p></div>
               <div className="section-action-stack">{sectionActions("pricing")}{sectionToggle("product-prices", "Prices")}</div>
             </div>
             <fieldset className="catalog-form-fields" disabled={busy || !isSectionEditable("pricing")}>
@@ -748,7 +772,7 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
 
           <section className={`catalog-settings catalog-section ${expandedSectionClass("product-inventory")}`} id="product-inventory">
             <div className="section-heading catalog-accordion-heading">
-              <div><h3>{sectionTitleToggle("product-inventory", "Inventory")}</h3><p className="admin-muted">Track available stock separately for each variant.</p></div>
+              <div><h3>{sectionTitleToggle("product-inventory", "Inventory")}</h3><p className="admin-muted">Set stock separately for each variant. Newly added variants appear here immediately; save once to store their details, prices, and inventory together.</p></div>
               <div className="section-action-stack">{sectionActions("inventory")}{sectionToggle("product-inventory", "Inventory")}</div>
             </div>
             <fieldset className="catalog-form-fields" disabled={busy || !isSectionEditable("inventory")}>
@@ -765,7 +789,7 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
           <div className="section-heading variant-heading catalog-accordion-heading">
             <div>
               <h3>{sectionTitleToggle("product-attributes", "Attribute groups")}</h3>
-              <p className="admin-muted">{product.attributeGroups.length} of 30 groups added. Add multiple groups and choices for required selections or optional add-ons.</p>
+              <p className="admin-muted">{product.attributeGroups.length} of 30 groups. Attribute groups belong to this product, and choices belong to their group. Add, edit, or delete them here, then save this section to apply.</p>
             </div>
             <div className="section-action-stack">
               {sectionActions("attributes")}
@@ -816,13 +840,21 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
                     <input type="checkbox" checked={option.isActive} onChange={(event) => updateAttributeOption(groupIndex, optionIndex, { isActive: event.target.checked })} />
                     <span>Available</span>
                   </label>
-                  <button className="button button-quiet" type="button" onClick={() => updateAttributeGroup(groupIndex, { options: group.options.filter((_, itemIndex) => itemIndex !== optionIndex).map((item, order) => ({ ...item, displayOrder: order })) })} disabled={busy || group.options.length === 1}>
-                    Remove choice
+                  <button className="button button-quiet" type="button" onClick={() => {
+                    if (confirmChildRemoval(`Delete choice “${option.name || `Choice ${optionIndex + 1}`}” from “${group.name || `Attribute ${groupIndex + 1}`}”?`)) {
+                      updateAttributeGroup(groupIndex, { options: group.options.filter((_, itemIndex) => itemIndex !== optionIndex).map((item, order) => ({ ...item, displayOrder: order })) });
+                    }
+                  }} disabled={busy || !isSectionEditable("attributes") || group.options.length === 1}>
+                    Delete choice
                   </button>
                 </div>
               ))}
-              <button className="button button-quiet" type="button" onClick={() => updateProduct("attributeGroups", product.attributeGroups.filter((_, itemIndex) => itemIndex !== groupIndex).map((item, order) => ({ ...item, displayOrder: order })))} disabled={busy}>
-                Remove attribute
+              <button className="button button-quiet" type="button" onClick={() => {
+                if (confirmChildRemoval(`Delete attribute group “${group.name || `Attribute ${groupIndex + 1}`}” and all ${group.options.length} of its choices?`)) {
+                  updateProduct("attributeGroups", product.attributeGroups.filter((_, itemIndex) => itemIndex !== groupIndex).map((item, order) => ({ ...item, displayOrder: order })));
+                }
+              }} disabled={busy || !isSectionEditable("attributes")}>
+                Delete attribute group
               </button>
             </fieldset>
           ))}

@@ -90,7 +90,7 @@ dotnet test backend/OneCart.Persistence.IntegrationTests/OneCart.Persistence.Int
 Remove-Item Env:\ONECART_SQLSERVER_TEST_CONNECTION
 ```
 
-The API listens at `https://localhost:7241`. Plain HTTP API requests are rejected. The production API base URL must also use `https://` with a certificate trusted by clients. When TLS terminates at a reverse proxy, configure only that proxy's IP under `ForwardedHeaders:KnownProxies`; do not trust forwarded headers from arbitrary clients.
+The API listens at `https://localhost:44300` in the Visual Studio IIS Express profile. Plain HTTP API requests are rejected. The production API base URL must also use `https://` with a certificate trusted by clients. When TLS terminates at a reverse proxy, configure only that proxy's IP under `ForwardedHeaders:KnownProxies`; do not trust forwarded headers from arbitrary clients.
 
 Development stores ASP.NET Core Data Protection keys under `backend/OneCart.Api/App_Data/data-protection-keys` by default; this directory is Git-ignored, and Windows protects generated keys with DPAPI. For production, set `DataProtection:KeyDirectory` to a persistent, access-controlled directory available to every API instance. Protect the key material at rest using the platform's supported mechanism and keep the directory outside source control.
 

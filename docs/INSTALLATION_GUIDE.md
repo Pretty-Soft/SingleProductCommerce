@@ -68,7 +68,7 @@ npm ci
 npm run dev
 ```
 
-The API URL is `https://localhost:7241`. Vite normally serves the storefront at `http://127.0.0.1:5173`; if that port is occupied, it may select `http://127.0.0.1:5174`. Development CORS explicitly allows those two ports on `localhost` and `127.0.0.1`. The API rejects plain HTTP requests. Set `VITE_API_BASE_URL` only to an HTTPS API URL. Stop a running API process before rebuilding the same configuration in Visual Studio; a running .NET process may hold its output assemblies open. Alternatively, use separate Debug and Release outputs for concurrent runs.
+The Visual Studio IIS Express API URL is `https://localhost:44300`; this port uses the IIS Express development certificate binding. Vite serves the storefront at `http://127.0.0.1:5175`, avoiding the port used by the owner's other local project. Development CORS allows this storefront origin on `localhost` and `127.0.0.1`. The API rejects plain HTTP requests. Set `VITE_API_BASE_URL` only to an HTTPS API URL. Stop a running API process before rebuilding the same configuration in Visual Studio; a running .NET process may hold its output assemblies open. Alternatively, use separate Debug and Release outputs for concurrent runs.
 
 ## Local files and operational settings
 

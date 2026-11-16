@@ -16,7 +16,7 @@
         "Database__Provider": "SqlServer"
       },
       "dotnetRunMessages": true,
-      "applicationUrl": "https://localhost:7241"
+      "applicationUrl": "https://localhost:44300"
     }
   },
   "$schema": "https://json.schemastore.org/launchsettings.json",
@@ -25,7 +25,7 @@
     "anonymousAuthentication": true,
     "iisExpress": {
       "applicationUrl": "http://localhost:5165",
-      "sslPort": 7241
+      "sslPort": 44300
     }
   }
 }

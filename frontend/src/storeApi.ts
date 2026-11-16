@@ -1,4 +1,4 @@
-const configuredApiBase = import.meta.env.VITE_API_BASE_URL ?? "https://localhost:7241";
+const configuredApiBase = import.meta.env.VITE_API_BASE_URL ?? "https://localhost:44300";
 const apiBase = configuredApiBase.replace(/\/$/, "");
 
 if (new URL(apiBase).protocol !== "https:") {

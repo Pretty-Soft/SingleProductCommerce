@@ -531,7 +531,7 @@ function Storefront() {
             </svg>
             <span className="footer-contact-copy"><small>WhatsApp</small><strong>01872441501</strong></span>
           </a>
-          <a className="footer-admin" href="/admin"><span aria-hidden="true">↗</span> অ্যাডমিন</a>
+          <a className="footer-admin" href="/admin"><span aria-hidden="true">↗</span> Admin</a>
         </nav>
       </footer>
     </main>

@@ -1,6 +1,6 @@
 # API contracts
 
-The API base is HTTPS-only. The default local API URL is `https://localhost:7241`; production uses the deployment's trusted HTTPS URL. The frontend must set `VITE_API_BASE_URL` to an HTTPS URL. Do not send credentials or admin cookies to an untrusted origin.
+The API base is HTTPS-only. The default local IIS Express API URL is `https://localhost:44300`; production uses the deployment's trusted HTTPS URL. The frontend must set `VITE_API_BASE_URL` to an HTTPS URL. Do not send credentials or admin cookies to an untrusted origin.
 
 All routes below are prefixed with `/api/v1`. JSON field names use camel case. The service returns standard HTTP status codes; validation failures use a `ValidationProblemDetails` response with an `errors` object. Signed cart quote tokens are opaque and must be returned unchanged during checkout.
 
