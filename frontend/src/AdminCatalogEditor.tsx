@@ -76,7 +76,7 @@ interface EditableAttributeOption {
   displayOrder: number;
 }
 
-type CatalogSectionId = "basics" | "trust" | "variants" | "attributes" | "promotions" | "contact";
+type CatalogSectionId = "basics" | "trust" | "variants" | "pricing" | "inventory" | "attributes" | "promotions" | "contact";
 
 const emptyProduct = (): EditableProduct => ({
   id: null,
@@ -133,6 +133,9 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
   const [product, setProduct] = useState<EditableProduct>(emptyProduct);
   const [savedProduct, setSavedProduct] = useState<EditableProduct | null>(null);
   const [editingSection, setEditingSection] = useState<CatalogSectionId | null>(null);
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    "product-basics": true
+  });
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -277,6 +280,8 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
       basics: ["currencyCode", "brandName", "storefrontHeadline", "storefrontSubtitle", "name", "slug", "description", "isPublished"],
       trust: ["trustItems"],
       variants: ["variants"],
+      pricing: ["variants"],
+      inventory: ["variants"],
       attributes: ["attributeGroups"],
       promotions: ["flashSale"],
       contact: ["socialSharingEnabled", "whatsAppEnabled", "whatsAppPhoneNumber", "whatsAppPrefillMessage"]
@@ -424,7 +429,19 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
   }
 
   function goToSection(sectionId: string) {
-    document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setExpandedSections(current => ({ ...current, [sectionId]: true }));
+    window.requestAnimationFrame(() => document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+
+  function sectionToggle(sectionId: string, label: string) {
+    const expanded = expandedSections[sectionId] ?? false;
+    return <button className="catalog-section-toggle" type="button" aria-expanded={expanded} aria-controls={sectionId} onClick={() => setExpandedSections(current => ({ ...current, [sectionId]: !(current[sectionId] ?? false) }))}>
+      <span aria-hidden="true">{expanded ? "−" : "+"}</span><span className="visually-hidden">{expanded ? "Collapse" : "Expand"} {label}</span>
+    </button>;
+  }
+
+  function expandedSectionClass(sectionId: string) {
+    return expandedSections[sectionId] ? "catalog-section-expanded" : "";
   }
 
   return (
@@ -451,11 +468,13 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
           {error && <p className="admin-error catalog-feedback" role="alert">{error}</p>}
           <nav className="catalog-section-nav" aria-label="Product editor sections">
             {[
-              ["product-basics", "Basics"],
+              ["product-basics", "Product info"],
+              ["product-prices", "Prices"],
+              ["product-inventory", "Inventory"],
+              ["product-variants", "Variants"],
               ["product-media", "Product images"],
               ["product-logo", "Brand logo"],
               ["product-trust", "Store details"],
-              ["product-variants", "Variants"],
               ["product-attributes", "Attributes"],
               ["product-promotions", "Flash sale"],
               ["product-contact", "Sharing & contact"]
@@ -463,12 +482,12 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
               <button type="button" key={sectionId} onClick={() => goToSection(sectionId)}>{label}</button>
             ))}
           </nav>
-          <div className="catalog-basics-section catalog-section" id="product-basics">
-          <div className="section-heading">
-            <div><h3>Product basics</h3><p className="admin-muted">Name, description, currency and publication status.</p></div>
-            {sectionActions("basics")}
+          <div className={`catalog-basics-section catalog-section ${expandedSectionClass("product-basics")}`} id="product-basics">
+          <div className="section-heading catalog-accordion-heading">
+            <div><h3>Product information</h3><p className="admin-muted">Name, description, currency and publication status.</p></div>
+            <div className="section-action-stack">{sectionActions("basics")}{sectionToggle("product-basics", "Product information")}</div>
           </div>
-          <fieldset className="catalog-form-fields" disabled={busy || !isSectionEditable("basics")}>
+          <fieldset id="product-basics-content" className="catalog-form-fields catalog-accordion-content" hidden={!expandedSections["product-basics"]} disabled={busy || !isSectionEditable("basics")}>
           <div className="store-currency-setting">
             <label>
               Store currency
@@ -537,8 +556,11 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
           </fieldset>
           </div>
 
-          <section className="catalog-settings catalog-section" id="product-media">
-            <h3>Product images</h3>
+          <section className={`catalog-settings catalog-section ${expandedSectionClass("product-media")}`} id="product-media">
+            <div className="section-heading catalog-accordion-heading">
+              <div><h3>Product images</h3><p className="admin-muted">Upload and arrange product photos and gallery thumbnails.</p></div>
+              {sectionToggle("product-media", "Product images")}
+            </div>
             <p className="admin-muted">Upload up to eight product images. JPEG, PNG, and WebP are accepted, up to 10 MB each.</p>
             <div className="image-upload-form">
               <label>
@@ -576,8 +598,11 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
             </div>
           </section>
 
-          {canManageStoreSettings && <section className="catalog-settings catalog-section" id="product-logo">
-            <h3>Brand logo</h3>
+          {canManageStoreSettings && <section className={`catalog-settings catalog-section ${expandedSectionClass("product-logo")}`} id="product-logo">
+            <div className="section-heading catalog-accordion-heading">
+              <div><h3>Brand logo</h3><p className="admin-muted">Manage the shop identity image separately from product photos.</p></div>
+              {sectionToggle("product-logo", "Brand logo")}
+            </div>
             <p className="admin-muted">Upload or replace the logo shown in the storefront header. This is managed separately from product images.</p>
             <div className="image-upload-form">
               <label>
@@ -611,8 +636,8 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
             </div>
           </section>}
 
-          {canManageStoreSettings && <section className="catalog-settings catalog-section" id="product-trust">
-            <div className="section-heading">
+          {canManageStoreSettings && <section className={`catalog-settings catalog-section ${expandedSectionClass("product-trust")}`} id="product-trust">
+            <div className="section-heading catalog-accordion-heading">
               <div>
                 <h3>Trust and service details</h3>
                 <p className="admin-muted">Add short store promises shown below the product.</p>
@@ -622,6 +647,7 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
                 <button className="button button-quiet" type="button" onClick={() => updateProduct("trustItems", [...product.trustItems, { id: null, title: "", description: "", isActive: true, displayOrder: product.trustItems.length }])} disabled={busy || !isSectionEditable("trust") || product.trustItems.length >= 8}>
                   Add detail
                 </button>
+                {sectionToggle("product-trust", "Store details")}
               </div>
             </div>
             <fieldset className="catalog-form-fields" disabled={busy || !isSectionEditable("trust")}>
@@ -652,17 +678,18 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
             </fieldset>
           </section>}
 
-          <section className="catalog-settings catalog-section" id="product-variants">
-          <div className="section-heading variant-heading">
+          <section className={`catalog-settings catalog-section ${expandedSectionClass("product-variants")}`} id="product-variants">
+          <div className="section-heading variant-heading catalog-accordion-heading">
             <div>
               <h3>Variants</h3>
-              <p className="admin-muted">{product.variants.length} of 100 variants added. Add multiple options; each one has its own SKU, display name, price, and stock count.</p>
+              <p className="admin-muted">{product.variants.length} of 100 variants added. Manage each option’s SKU, display name, and storefront availability here.</p>
             </div>
             <div className="section-action-stack">
               {sectionActions("variants")}
               <button className="button button-quiet" type="button" onClick={() => updateProduct("variants", [...product.variants, emptyVariant(product.currencyCode)])} disabled={busy || !isSectionEditable("variants") || product.variants.length >= 100}>
                 Add another variant
               </button>
+              {sectionToggle("product-variants", "Variants")}
             </div>
           </div>
 
@@ -678,14 +705,6 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
                 <label>
                   Display name / options
                   <input maxLength={200} required value={variant.displayName} onChange={(event) => updateVariant(index, { displayName: event.target.value })} />
-                </label>
-                <label>
-                  Price
-                  <input type="number" min="0" step="0.0001" required value={variant.price} onChange={(event) => updateVariant(index, { price: Number(event.target.value) })} />
-                </label>
-                <label>
-                  Stock quantity
-                  <input type="number" min="0" step="1" required value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: Number(event.target.value) })} />
                 </label>
               </div>
               {variant.id && <div className="admin-form-grid">{LANGUAGES.map(language => <label key={language.code}>{language.label} display name<input maxLength={200} value={product.catalogTranslations[language.code]?.[`variant.${variant.id}.name`] ?? ""} onChange={event => setProduct(current => ({ ...current, catalogTranslations: { ...current.catalogTranslations, [language.code]: { ...current.catalogTranslations[language.code], [`variant.${variant.id}.name`]: event.target.value } } }))} /></label>)}</div>}
@@ -703,8 +722,38 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
           </fieldset>
           </section>
 
-          <section className="catalog-settings catalog-section" id="product-attributes">
-          <div className="section-heading variant-heading">
+          <section className={`catalog-settings catalog-section ${expandedSectionClass("product-prices")}`} id="product-prices">
+            <div className="section-heading catalog-accordion-heading">
+              <div><h3>Prices</h3><p className="admin-muted">Set the regular price for each variant in {product.currencyCode || "the store currency"}.</p></div>
+              <div className="section-action-stack">{sectionActions("pricing")}{sectionToggle("product-prices", "Prices")}</div>
+            </div>
+            <fieldset className="catalog-form-fields" disabled={busy || !isSectionEditable("pricing")}>
+              {product.variants.map((variant, index) => <fieldset className="variant-card catalog-price-row" key={variant.id ?? `price-${index}`}>
+                <legend>{variant.displayName || `Variant ${index + 1}`}</legend>
+                <label>Regular price ({product.currencyCode || "currency"})
+                  <input type="number" min="0" step="0.0001" required value={variant.price} onChange={event => updateVariant(index, { price: Number(event.target.value) })} />
+                </label>
+              </fieldset>)}
+            </fieldset>
+          </section>
+
+          <section className={`catalog-settings catalog-section ${expandedSectionClass("product-inventory")}`} id="product-inventory">
+            <div className="section-heading catalog-accordion-heading">
+              <div><h3>Inventory</h3><p className="admin-muted">Track available stock separately for each variant.</p></div>
+              <div className="section-action-stack">{sectionActions("inventory")}{sectionToggle("product-inventory", "Inventory")}</div>
+            </div>
+            <fieldset className="catalog-form-fields" disabled={busy || !isSectionEditable("inventory")}>
+              {product.variants.map((variant, index) => <fieldset className="variant-card catalog-inventory-row" key={variant.id ?? `inventory-${index}`}>
+                <legend>{variant.displayName || `Variant ${index + 1}`}{variant.sku ? ` · ${variant.sku}` : ""}</legend>
+                <label>Stock quantity
+                  <input type="number" min="0" step="1" required value={variant.stockQuantity} onChange={event => updateVariant(index, { stockQuantity: Number(event.target.value) })} />
+                </label>
+              </fieldset>)}
+            </fieldset>
+          </section>
+
+          <section className={`catalog-settings catalog-section ${expandedSectionClass("product-attributes")}`} id="product-attributes">
+          <div className="section-heading variant-heading catalog-accordion-heading">
             <div>
               <h3>Attribute groups</h3>
               <p className="admin-muted">{product.attributeGroups.length} of 30 groups added. Add multiple groups and choices for required selections or optional add-ons.</p>
@@ -714,6 +763,7 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
               <button className="button button-quiet" type="button" onClick={() => updateProduct("attributeGroups", [...product.attributeGroups, emptyAttributeGroup(product.attributeGroups.length)])} disabled={busy || !isSectionEditable("attributes") || product.attributeGroups.length >= 30}>
                 Add attribute group
               </button>
+              {sectionToggle("product-attributes", "Attribute groups")}
             </div>
           </div>
 
@@ -770,10 +820,10 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
           </fieldset>
           </section>
 
-          {canManageStoreSettings && <section className="catalog-settings catalog-section" id="product-promotions">
-            <div className="section-heading">
+          {canManageStoreSettings && <section className={`catalog-settings catalog-section ${expandedSectionClass("product-promotions")}`} id="product-promotions">
+            <div className="section-heading catalog-accordion-heading">
               <div><h3>Flash sale</h3><p className="admin-muted">Schedule a discount for a chosen time window.</p></div>
-              {sectionActions("promotions")}
+              <div className="section-action-stack">{sectionActions("promotions")}{sectionToggle("product-promotions", "Flash sale")}</div>
             </div>
             <fieldset className="catalog-form-fields" disabled={busy || !isSectionEditable("promotions")}>
             <label className="role-option">
@@ -810,10 +860,10 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
             </fieldset>
           </section>}
 
-          {canManageStoreSettings && <section className="catalog-settings catalog-section" id="product-contact">
-            <div className="section-heading">
+          {canManageStoreSettings && <section className={`catalog-settings catalog-section ${expandedSectionClass("product-contact")}`} id="product-contact">
+            <div className="section-heading catalog-accordion-heading">
               <div><h3>Sharing and contact</h3><p className="admin-muted">Configure product sharing and WhatsApp contact.</p></div>
-              {sectionActions("contact")}
+              <div className="section-action-stack">{sectionActions("contact")}{sectionToggle("product-contact", "Sharing and contact")}</div>
             </div>
             <fieldset className="catalog-form-fields" disabled={busy || !isSectionEditable("contact")}>
             <label className="role-option">

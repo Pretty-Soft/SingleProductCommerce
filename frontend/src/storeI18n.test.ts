@@ -23,6 +23,14 @@ describe("storefront language support", () => {
     }
   });
 
+  it("labels variant and attribute selections in each language", () => {
+    for (const language of storeLanguages) {
+      const labels = storeText(language.code);
+      expect(labels.variants.length).toBeGreaterThan(0);
+      expect(labels.attributes.length).toBeGreaterThan(0);
+    }
+  });
+
   it("provides landing page and review labels in each language", () => {
     for (const language of storeLanguages) {
       const labels = storeText(language.code);

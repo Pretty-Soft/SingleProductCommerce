@@ -62,6 +62,8 @@ The project should be developed with human review and release quality in mind. C
 ### Administration
 
 - Provide an administrator area for managing orders, customers, inventory, product content, store settings, and sales information.
+- Organize the product editor into clear, expandable panels inspired by nopCommerce’s product-entry workflow. Keep panels focused on this single-product system (product information, images, pricing and variants, attributes, inventory, promotions, and storefront settings); do not add unrelated product types or marketplace features. Preserve multi-entry variant and attribute-group editing with section-scoped save/cancel behavior.
+- Make the storefront variant choices and configurable attribute groups explicit and easy to find in the purchase area. Show each group’s configured choices and any price adjustments.
 - Organize the administrator workspace with a persistent left navigation on desktop and a mobile menu on smaller screens, grouped around the implemented Overview, Catalog, Orders, Accounts/Roles, and Audit sections.
 - Include authentication and role-based authorization appropriate to the actions available.
 - Use built-in email/password administrator accounts. Only a System Admin may create administrator accounts and assign roles; public registration is disabled.

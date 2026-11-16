@@ -290,7 +290,7 @@ function Storefront() {
               {flashSaleActive && selectedVariant.salePrice != null && <span className="sale-badge">{product.flashSale.discountType === "percentage" ? `−${product.flashSale.discountValue}%` : text.save}</span>}
               {flashSaleActive && selectedVariant.salePrice != null && <small className="you-save">{text.save}: {formatPrice(selectedVariant.price - selectedVariant.salePrice, selectedVariant.currencyCode)}</small>}
             </div>}
-            <p className="eyebrow">{text.choose}</p>
+            <div className="purchase-choice-heading"><h2>{text.variants}</h2><p>{text.choose}</p></div>
             <div className="variant-options" role="radiogroup" aria-label="Product variants">
               {product.variants.map((variant) => (
                 <label className={`store-variant${selectedVariantId === variant.id ? " selected" : ""}`} key={variant.id}>
@@ -316,6 +316,7 @@ function Storefront() {
                 </label>
               ))}
             </div>
+            {product.attributeGroups.length > 0 && <h3 className="store-attribute-heading">{text.attributes}</h3>}
             {product.attributeGroups.map((group) => (
               <fieldset className="store-attribute" key={group.id}>
                 <legend>{group.name}{group.isRequired ? " *" : " (optional)"}</legend>
