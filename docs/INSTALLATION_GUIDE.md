@@ -1,6 +1,6 @@
 # Installation and local setup
 
-This is the manual local-development setup. For supported production deployment targets, use the [deployment guide](DEPLOYMENT_GUIDE.md). A guided web installer is still in progress; the current first-install path uses explicit migration and System Admin bootstrap commands.
+This guide covers local development and the first-run web installer. For supported production deployment targets, use the [deployment guide](DEPLOYMENT_GUIDE.md). The installer creates the first System Admin only; product and storefront setup is completed afterward in the admin panel.
 
 ## Requirements
 
@@ -26,6 +26,8 @@ Create an empty database and configure its connection string in .NET user secret
 dotnet user-secrets set --project backend/OneCart.Api "ConnectionStrings:Store" "Host=localhost;Port=5432;Database=onecart;Username=postgres;Password=YOUR_LOCAL_PASSWORD"
 ```
 
+For the normal local PostgreSQL setup, leave `Database:Provider` unset; PostgreSQL is the application default. The checked-in Visual Studio launch profiles select the experimental SQL Server provider for the owner's existing local workflow. Select PostgreSQL explicitly in user secrets with `dotnet user-secrets set --project backend/OneCart.Api "Database:Provider" "PostgreSql"` when using those profiles.
+
 Restore the local .NET tool manifest and apply pending EF Core migrations:
 
 ```powershell
@@ -33,7 +35,17 @@ dotnet tool restore
 dotnet ef database update --project backend/OneCart.Api
 ```
 
-Create the first System Admin only when the database does not already have one. The command migrates the database, seeds built-in roles, and prompts for a password without placing it in command history:
+To use the guided local installer, configure a one-time token of at least 32 bytes in user secrets. Generate one in PowerShell and save it without printing the value:
+
+```powershell
+$setupToken = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+dotnet user-secrets set --project backend/OneCart.Api "Setup:BootstrapToken" $setupToken
+$setupToken = $null
+```
+
+In Development, API startup applies pending migrations. Start the API and storefront as described below, open `http://127.0.0.1:5175/install`, enter the configured token, and create the first System Admin. Development CORS allows the local storefront origin; in production, the installer requires the exact configured HTTPS storefront origin. The setup endpoint is rate-limited and becomes unavailable after the first System Admin is created.
+
+The command-line bootstrap remains available for local recovery or headless setup. Use it only when no System Admin exists; it migrates the database, seeds built-in roles, and prompts for a password without placing it in command history:
 
 ```powershell
 dotnet run --project backend/OneCart.Api -- --bootstrap-system-admin admin@example.com

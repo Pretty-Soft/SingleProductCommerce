@@ -493,7 +493,8 @@ public static class AdminEndpoints
         AdminProductRequest request,
         AdminCatalogService catalog,
         UserManager<AdminUser> userManager,
-        HttpContext context)
+        HttpContext context,
+        ILogger<AdminEndpointsMarker> logger)
     {
         if (!context.User.IsInRole(AdminRoles.SystemAdmin))
         {
@@ -507,11 +508,28 @@ public static class AdminEndpoints
             return Results.Unauthorized();
         }
 
-        var result = await catalog.SaveProductAsync(
-            request,
-            actorId,
-            userManager.GetUserName(context.User) ?? string.Empty,
-            context.RequestAborted);
+        AdminCatalogSaveResult result;
+        try
+        {
+            result = await catalog.SaveProductAsync(
+                request,
+                actorId,
+                userManager.GetUserName(context.User) ?? string.Empty,
+                context.RequestAborted);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            var entityTypes = string.Join(", ", exception.Entries
+                .Select(entry => entry.Metadata.ClrType.Name)
+                .Distinct(StringComparer.Ordinal));
+            logger.LogWarning(exception,
+                "Catalog save conflicted with a database change. Affected entity types: {EntityTypes}",
+                string.IsNullOrEmpty(entityTypes) ? "unknown" : entityTypes);
+            return Results.Conflict(new
+            {
+                error = "This product changed while you were editing it. Reload the product, review your changes, and save again."
+            });
+        }
         return result.Errors is not null
             ? Results.ValidationProblem(result.Errors)
             : Results.Ok(result.Product);

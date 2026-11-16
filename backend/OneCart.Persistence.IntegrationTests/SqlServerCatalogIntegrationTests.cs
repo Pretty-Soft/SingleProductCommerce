@@ -45,6 +45,14 @@ public sealed class SqlServerCatalogIntegrationTests
                     19.95m,
                     "USD",
                     7,
+                    true),
+                 new AdminProductVariantRequest(
+                    null,
+                    $"IT-{Guid.NewGuid():N}",
+                    "Deluxe",
+                    29.95m,
+                    "USD",
+                    4,
                     true)],
                 [new AdminProductAttributeGroupRequest(
                     null,
@@ -83,20 +91,51 @@ public sealed class SqlServerCatalogIntegrationTests
             Assert.Null(saved.Errors);
             Assert.NotNull(saved.Product);
 
+            // Exercise the admin's normal edit path: update existing variant prices and stock,
+            // add a new variant in the same save, then read all variants back from SQL Server.
+            var existingVariants = saved.Product.Variants;
+            var variantUpdate = request with
+            {
+                Variants =
+                [
+                    new AdminProductVariantRequest(existingVariants[0].Id, existingVariants[0].Sku,
+                        "Standard", 21.50m, "USD", 11, true),
+                    new AdminProductVariantRequest(existingVariants[1].Id, existingVariants[1].Sku,
+                        "Deluxe", 31.50m, "USD", 6, true),
+                    new AdminProductVariantRequest(null, $"IT-{Guid.NewGuid():N}",
+                        "Premium", 39.95m, "USD", 2, true)
+                ]
+            };
+            var updated = await writeService.SaveProductAsync(
+                variantUpdate,
+                Guid.NewGuid(),
+                "integration-test@onecart.local",
+                CancellationToken.None);
+            Assert.Null(updated.Errors);
+            Assert.Equal(3, updated.Product?.Variants.Count);
+            Assert.Equal(21.50m, updated.Product!.Variants.Single(variant => variant.DisplayName == "Standard").Price);
+            Assert.Equal(11, updated.Product.Variants.Single(variant => variant.DisplayName == "Standard").StockQuantity);
+            Assert.Equal(31.50m, updated.Product.Variants.Single(variant => variant.DisplayName == "Deluxe").Price);
+            Assert.Equal(6, updated.Product.Variants.Single(variant => variant.DisplayName == "Deluxe").StockQuantity);
+
             var readService = new StorefrontCatalogService(database);
             var published = await readService.GetPublishedProductAsync(CancellationToken.None);
 
             Assert.NotNull(published);
             Assert.Equal("sql-server-integration-product", published.Slug);
-            Assert.Single(published.Variants);
-            Assert.Equal(19.95m, published.Variants[0].Price);
-            Assert.True(published.Variants[0].IsAvailable);
+            Assert.Equal(3, published.Variants.Count);
+            Assert.Equal(21.50m, published.Variants.Single(variant => variant.DisplayName == "Standard").Price);
+            Assert.Equal(11, await database.ProductVariants.AsNoTracking()
+                .Where(variant => variant.DisplayName == "Standard")
+                .Select(variant => variant.StockQuantity)
+                .SingleAsync());
+            Assert.True(published.Variants.Single(variant => variant.DisplayName == "Standard").IsAvailable);
             Assert.Single(published.AttributeGroups);
             Assert.Equal("Memory", published.AttributeGroups[0].Name);
             Assert.Equal(25m, published.AttributeGroups[0].Options[0].PriceAdjustment);
             Assert.True(published.FlashSale.Enabled);
             Assert.Equal("Integration sale", published.FlashSale.Label);
-            Assert.Equal(17.955m, published.Variants[0].SalePrice);
+            Assert.Equal(19.35m, published.Variants.Single(variant => variant.DisplayName == "Standard").SalePrice);
             Assert.True(published.SocialSharingEnabled);
             Assert.Contains("https://wa.me/8801712345678?text=", published.WhatsAppContactUrl);
             Assert.Equal("Integration Brand", published.BrandName);
@@ -130,7 +169,7 @@ public sealed class SqlServerCatalogIntegrationTests
             var quoteService = new CartQuoteService(database, protector);
             var productOption = published.AttributeGroups[0].Options[0];
             var quote = await quoteService.CreateAsync(
-                new CartQuoteRequest(published.Variants[0].Id, [productOption.Id]),
+                new CartQuoteRequest(published.Variants.Single(variant => variant.DisplayName == "Standard").Id, [productOption.Id]),
                 CancellationToken.None);
             Assert.NotNull(quote.Quote);
 
@@ -145,7 +184,7 @@ public sealed class SqlServerCatalogIntegrationTests
             Assert.NotNull(placement.Order);
             Assert.Equal("Pending", placement.Order!.Status);
             Assert.Equal(5, await database.ProductVariants.AsNoTracking()
-                .Where(variant => variant.Id == published.Variants[0].Id)
+                .Where(variant => variant.Id == published.Variants.Single(item => item.DisplayName == "Standard").Id)
                 .Select(variant => variant.StockQuantity)
                 .SingleAsync());
 
@@ -159,7 +198,7 @@ public sealed class SqlServerCatalogIntegrationTests
                 CancellationToken.None);
             Assert.Equal("Cancelled", cancellation.Order?.Status);
             Assert.Equal(7, await database.ProductVariants.AsNoTracking()
-                .Where(variant => variant.Id == published.Variants[0].Id)
+                .Where(variant => variant.Id == published.Variants.Single(item => item.DisplayName == "Standard").Id)
                 .Select(variant => variant.StockQuantity)
                 .SingleAsync());
             Assert.Equal(5, await database.AdminAuditEvents.AsNoTracking().CountAsync());
