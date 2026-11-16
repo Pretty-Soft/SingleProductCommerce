@@ -125,6 +125,10 @@ function mockSystemAdminApi(
       await respond(saved);
     } else if (path === "/api/v1/admin/catalog/product/images" && method === "POST") {
       await respond({ id: "uploaded-image-1", url: "/api/v1/store/product/images/uploaded-image-1", mediaKind: "product", altText: "Uploaded product photo", displayOrder: 1 }, 201);
+    } else if (path === "/api/v1/admin/catalog/product/images/uploaded-image-1" && method === "PUT") {
+      await respond({ id: "uploaded-image-1", url: "/api/v1/store/product/images/uploaded-image-1", mediaKind: "product", ...(request.postDataJSON() as { altText: string; displayOrder: number }) });
+    } else if (path === "/api/v1/admin/catalog/product/images/uploaded-image-1" && method === "DELETE") {
+      await route.fulfill({ status: 204, headers: corsHeaders });
     } else if (path === "/api/v1/admin/catalog/product/images/uploaded-image-1") {
       await route.fulfill({ status: 200, headers: corsHeaders, contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j5ZkAAAAASUVORK5CYII=", "base64") });
     } else if (path === "/api/v1/admin/storefront/settings" && method === "PUT") {
@@ -455,6 +459,14 @@ test("uploads a product image from the catalog editor and shows its saved entry"
   await expect(productImages.getByLabel("Image alternative text")).toHaveValue("Uploaded product photo");
   expect(uploadBody).toContain("product.png");
   expect(uploadBody).toContain("Uploaded product photo");
+
+  await productImages.getByLabel("Image alternative text").fill("Updated product photo");
+  await productImages.getByLabel("Display order").fill("2");
+  await productImages.getByRole("button", { name: "Save details" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Image details saved." })).toBeVisible();
+  await expect(productImages.getByLabel("Image alternative text")).toHaveValue("Updated product photo");
+  await productImages.getByRole("button", { name: "Delete image" }).click();
+  await expect(productImages.getByText("No product images uploaded.")).toBeVisible();
 });
 
 test("shows only the workspace sections assigned to a Catalog Manager", async ({ page }) => {
@@ -472,4 +484,37 @@ test("shows only the workspace sections assigned to a Catalog Manager", async ({
   await expect(nav.getByRole("button", { name: "Storefront settings", exact: true })).toHaveCount(0);
   await expect(nav.getByRole("button", { name: "Accounts & roles", exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Product information" })).toBeVisible();
+});
+
+test("shows only order and customer sections assigned to an Order Manager", async ({ page }) => {
+  const orderManager = { ...adminUser, roles: ["OrderManager"] };
+  await page.route(`${apiOrigin}/api/**`, mockSystemAdminApi(product => product, () => adminUser, () => undefined, () => undefined, orderManager));
+
+  await page.goto("/admin");
+  await page.getByLabel("Email address").fill("orders@example.test");
+  await page.getByLabel("Password").fill("OneCart-Test-Admin-2026!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+
+  const nav = page.getByRole("navigation", { name: "Admin sections" });
+  await expect(nav.getByRole("button", { name: "Orders", exact: true })).toBeVisible();
+  await expect(nav.getByRole("button", { name: "Customers", exact: true })).toBeVisible();
+  await expect(nav.getByRole("button", { name: "Catalog", exact: true })).toHaveCount(0);
+  await expect(nav.getByRole("button", { name: "Storefront settings", exact: true })).toHaveCount(0);
+  await expect(nav.getByRole("button", { name: "Accounts & roles", exact: true })).toHaveCount(0);
+});
+
+test("shows only storefront settings assigned to a Store Manager", async ({ page }) => {
+  const storeManager = { ...adminUser, roles: ["StoreManager"] };
+  await page.route(`${apiOrigin}/api/**`, mockSystemAdminApi(product => product, () => adminUser, () => undefined, () => undefined, storeManager));
+
+  await page.goto("/admin");
+  await page.getByLabel("Email address").fill("store@example.test");
+  await page.getByLabel("Password").fill("OneCart-Test-Admin-2026!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+
+  const nav = page.getByRole("navigation", { name: "Admin sections" });
+  await expect(nav.getByRole("button", { name: "Storefront settings", exact: true })).toBeVisible();
+  await expect(nav.getByRole("button", { name: "Catalog", exact: true })).toHaveCount(0);
+  await expect(nav.getByRole("button", { name: "Orders", exact: true })).toHaveCount(0);
+  await expect(nav.getByRole("button", { name: "Accounts & roles", exact: true })).toHaveCount(0);
 });
