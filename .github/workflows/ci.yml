@@ -143,8 +143,9 @@ jobs:
           if (-not (Test-Path 'frontend/dist/web.config')) { throw 'IIS SPA rewrite web.config was not included in storefront output.' }
           [xml]$apiConfig = Get-Content (Join-Path $apiOutput 'web.config') -Raw
           [xml]$storeConfig = Get-Content 'frontend/dist/web.config' -Raw
-          if (-not $apiConfig.configuration.'system.webServer'.aspNetCore) { throw 'IIS ASP.NET Core handler configuration is missing.' }
-          if (-not $storeConfig.configuration.'system.webServer'.rewrite) { throw 'IIS SPA route rewrite configuration is missing.' }
+          if (-not $apiConfig.SelectSingleNode("/configuration/location/system.webServer/handlers/add[@name='aspNetCore']")) { throw 'IIS ASP.NET Core handler configuration is missing.' }
+          if (-not $apiConfig.SelectSingleNode('/configuration/location/system.webServer/aspNetCore')) { throw 'IIS ASP.NET Core process configuration is missing.' }
+          if (-not $storeConfig.SelectSingleNode('/configuration/system.webServer/rewrite')) { throw 'IIS SPA route rewrite configuration is missing.' }
 
   containers:
     name: Container packaging
