@@ -247,9 +247,8 @@ jobs:
           "${compose[@]}" cp db:/tmp/onecart-pitr-base/. "$pitr_dir/base"
           "${compose[@]}" exec --no-TTY db rm -rf /tmp/onecart-pitr-base
 
-          recovery_target_time="$("${compose[@]}" exec --no-TTY db psql --username onecart --dbname onecart --tuples-only --no-align --command "SELECT to_char(clock_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS.US') || '+00';")"
-          recovery_target_time="$(printf '%s' "$recovery_target_time" | tr -d '\r\n')"
-          test -n "$recovery_target_time"
+          "${compose[@]}" exec --no-TTY db psql --username onecart --dbname onecart --command \
+            "SELECT pg_create_restore_point('onecart_before_after_marker');"
           "${compose[@]}" exec --no-TTY db psql --username onecart --dbname onecart --command \
             "INSERT INTO onecart_pitr_probe VALUES ('after-target'); SELECT pg_switch_wal();"
 
@@ -272,7 +271,7 @@ jobs:
             alpine:3.24 sh -ec 'tar -xzf /backup/wal-archive.tar.gz -C /target'
           cat > "$pitr_dir/recovery-settings.conf" <<EOF
           restore_command = 'cp /var/lib/postgresql/wal-archive/%f %p'
-          recovery_target_time = '$recovery_target_time'
+          recovery_target_name = 'onecart_before_after_marker'
           recovery_target_action = 'pause'
           EOF
           docker run --rm -v "$pitr_recovery_data_volume:/data" -v "$pitr_dir/recovery-settings.conf:/settings.conf:ro" \
