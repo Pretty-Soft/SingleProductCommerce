@@ -219,7 +219,13 @@ function Storefront() {
           <span className="brand-logo-copy"><strong>{product?.brandName ?? "Pretty Shop"}</strong><small>{product?.storefrontHeadline ?? "Your trust, Your Love"}</small></span>
         </a>
         <div className="store-header-actions">
-          <label className="store-language-picker"><span className="visually-hidden">Language</span><select value={language} onChange={event => setLanguage(event.target.value as StoreLanguage)} aria-label="Language">{storeLanguages.map(item => <option key={item.code} value={item.code}>{item.label}</option>)}</select></label>
+          <label className="store-language-picker">
+            <span className="visually-hidden">Language</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" /></svg>
+            <select value={language} onChange={event => setLanguage(event.target.value as StoreLanguage)} aria-label="Language">
+              {storeLanguages.map(item => <option key={item.code} value={item.code}>{item.label}</option>)}
+            </select>
+          </label>
           {product?.aboutUs.trim() && <a className="header-about-link" href="#about-us">{text.aboutUs}</a>}
           {product && <button className="cart-toggle" type="button" onClick={() => setCartOpen((open) => !open)} aria-expanded={cartOpen} aria-label={`${text.shoppingCart}, ${cartItemCount}`}><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 4h3l3.2 16.1h15.3l3.1-11.6H8M12 26a1.5 1.5 0 1 0 0 .1M23 26a1.5 1.5 0 1 0 0 .1" /></svg><span>{cartItemCount}</span></button>}
         </div>
