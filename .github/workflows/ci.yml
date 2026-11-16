@@ -285,8 +285,12 @@ jobs:
           recovered_state=
           for attempt in $(seq 1 30); do
             recovered_state="$(docker exec "$pitr_recovery_container" psql --username onecart --dbname onecart --tuples-only --no-align \
-              --command "SELECT pg_is_in_recovery() || '|' || COUNT(*)::text FROM onecart_pitr_probe WHERE marker = 'after-target';" 2>/dev/null || true)"
-            if [ "$recovered_state" = 't|0' ]; then break; fi
+              --command "SELECT CASE WHEN pg_is_in_recovery() THEN 'true' ELSE 'false' END || '|' || COUNT(*)::text FROM onecart_pitr_probe WHERE marker = 'after-target';" 2>/dev/null || true)"
+            if [ "$recovered_state" = 'true|0' ]; then break; fi
             sleep 1
           done
-          test "$recovered_state" = 't|0'
+          if [ "$recovered_state" != 'true|0' ]; then
+            docker logs "$pitr_recovery_container" || true
+            echo "PITR recovery assertion failed; database state: $recovered_state"
+            exit 1
+          fi
