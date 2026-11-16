@@ -59,7 +59,8 @@ function mockSystemAdminApi(
   onProductSave: (product: typeof initialAdminProduct) => typeof initialAdminProduct,
   onUserCreate: (user: { email: string; temporaryPassword: string; roleNames: string[] }) => unknown = () => adminUser,
   onSettingsSave: (settings: StorefrontSettingsPayload) => void = () => undefined,
-  onOrderStatus: (status: string) => void = () => undefined
+  onOrderStatus: (status: string) => void = () => undefined,
+  userOverride: typeof adminUser = adminUser
 ) {
   let authenticated = false;
   let orderStatus = "Pending";
@@ -79,7 +80,7 @@ function mockSystemAdminApi(
     } else if (path === "/api/v1/admin/csrf") {
       await respond({ requestToken: "csrf-test-token" });
     } else if (path === "/api/v1/admin/me") {
-      await respond(authenticated ? adminUser : { title: "Unauthorized" }, authenticated ? 200 : 401);
+      await respond(authenticated ? userOverride : { title: "Unauthorized" }, authenticated ? 200 : 401);
     } else if (path === "/api/v1/admin/login" && method === "POST") {
       authenticated = true;
       await respond({ requiresTwoFactor: false });
@@ -122,6 +123,10 @@ function mockSystemAdminApi(
     } else if (path === "/api/v1/admin/catalog/product" && method === "PUT") {
       const saved = onProductSave(request.postDataJSON() as typeof initialAdminProduct);
       await respond(saved);
+    } else if (path === "/api/v1/admin/catalog/product/images" && method === "POST") {
+      await respond({ id: "uploaded-image-1", url: "/api/v1/store/product/images/uploaded-image-1", mediaKind: "product", altText: "Uploaded product photo", displayOrder: 1 }, 201);
+    } else if (path === "/api/v1/admin/catalog/product/images/uploaded-image-1") {
+      await route.fulfill({ status: 200, headers: corsHeaders, contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j5ZkAAAAASUVORK5CYII=", "base64") });
     } else if (path === "/api/v1/admin/storefront/settings" && method === "PUT") {
       const settings = request.postDataJSON() as StorefrontSettingsPayload;
       onSettingsSave(settings);
@@ -285,6 +290,8 @@ test("saves About Us, multiline usage, and an unpublished admin-managed review",
 
   await settings.getByLabel("About Us", { exact: true }).fill("A neighborhood shop serving local families.");
   await settings.getByLabel("Instructions", { exact: true }).fill("Use a small amount.\n\nRepeat as needed.");
+  await settings.getByLabel("Bangla instructions").fill("অল্প পরিমাণ ব্যবহার করুন।");
+  await settings.getByLabel("Spanish instructions").fill("Use una pequeña cantidad.");
   await settings.getByRole("button", { name: "Add review" }).click();
   await settings.getByLabel("Display name", { exact: true }).fill("Verified customer");
   await settings.getByLabel("Review title", { exact: true }).fill("A good fit");
@@ -294,6 +301,10 @@ test("saves About Us, multiline usage, and an unpublished admin-managed review",
   await expect(settings.getByRole("status")).toContainText("Storefront settings saved.");
   expect(savedSettings?.aboutUs).toBe("A neighborhood shop serving local families.");
   expect(savedSettings?.usageSteps).toMatchObject([{ title: "Instructions", description: "Use a small amount.\n\nRepeat as needed." }]);
+  expect((savedSettings as (StorefrontSettingsPayload & { storefrontTranslations?: Record<string, Record<string, string>> }) | undefined)?.storefrontTranslations).toMatchObject({
+    bn: { "usage.00000000-0000-4000-8000-000000000001.description": "অল্প পরিমাণ ব্যবহার করুন।" },
+    es: { "usage.00000000-0000-4000-8000-000000000001.description": "Use una pequeña cantidad." }
+  });
   expect(savedSettings?.reviews).toHaveLength(1);
   expect(savedSettings?.reviews[0]).toMatchObject({ displayName: "Verified customer", rating: 5, title: "A good fit", isPublished: false });
 });
@@ -413,4 +424,52 @@ test("validates and submits the password reset form without exposing token data 
   await page.getByRole("button", { name: "Reset password" }).click();
   await expect(page.getByRole("status")).toContainText("Password reset.");
   expect(resetRequest).toEqual({ email: "owner@example.test", token: "one-time-reset-token", newPassword: "New-Admin-Password-2026!" });
+});
+
+test("uploads a product image from the catalog editor and shows its saved entry", async ({ page }) => {
+  let uploadBody = "";
+  const mockApi = mockSystemAdminApi(product => product);
+  await page.route(`${apiOrigin}/api/**`, async route => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path === "/api/v1/admin/catalog/product/images" && request.method() === "POST") {
+      uploadBody = request.postDataBuffer()?.toString("utf8") ?? "";
+    }
+    await mockApi(route);
+  });
+
+  await page.goto("/admin");
+  await page.getByLabel("Email address").fill("owner@example.test");
+  await page.getByLabel("Password").fill("OneCart-Test-Admin-2026!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("navigation", { name: "Admin sections" }).getByRole("button", { name: "Catalog", exact: true }).click();
+  await page.getByRole("navigation", { name: "Product editor sections" }).getByRole("button", { name: "Product images" }).click();
+  const productImages = page.locator("#product-media");
+  await productImages.getByLabel("Image file").setInputFiles({
+    name: "product.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j5ZkAAAAASUVORK5CYII=", "base64")
+  });
+  await productImages.getByLabel("Alternative text").fill("Uploaded product photo");
+  await productImages.getByRole("button", { name: "Save product image" }).click();
+
+  await expect(page.getByRole("status").filter({ hasText: "Product image saved." })).toBeVisible();
+  await expect(productImages.getByLabel("Image alternative text")).toHaveValue("Uploaded product photo");
+  expect(uploadBody).toContain("product.png");
+  expect(uploadBody).toContain("Uploaded product photo");
+});
+
+test("shows only the workspace sections assigned to a Catalog Manager", async ({ page }) => {
+  const catalogManager = { ...adminUser, roles: ["CatalogManager"] };
+  await page.route(`${apiOrigin}/api/**`, mockSystemAdminApi(product => product, () => adminUser, () => undefined, () => undefined, catalogManager));
+
+  await page.goto("/admin");
+  await page.getByLabel("Email address").fill("catalog@example.test");
+  await page.getByLabel("Password").fill("OneCart-Test-Admin-2026!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+
+  const nav = page.getByRole("navigation", { name: "Admin sections" });
+  await expect(nav.getByRole("button", { name: "Catalog", exact: true })).toBeVisible();
+  await expect(nav.getByRole("button", { name: "Orders", exact: true })).toHaveCount(0);
+  await expect(nav.getByRole("button", { name: "Storefront settings", exact: true })).toHaveCount(0);
+  await expect(nav.getByRole("button", { name: "Accounts & roles", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Product information" })).toBeVisible();
 });
