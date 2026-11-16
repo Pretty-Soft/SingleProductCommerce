@@ -14,6 +14,7 @@ OneCart Commerce is a commercial, single-product commerce platform. The current 
 - `docs/ADMINISTRATOR_GUIDE.md`: admin roles and workflows.
 - `docs/API_CONTRACTS.md`: versioned public and admin API route summary.
 - `docs/INSTALLATION_GUIDE.md`: current manual local setup and production-readiness boundary.
+- `docs/DEPLOYMENT_GUIDE.md`: deployment for Docker Compose, Linux/systemd/Nginx, and Windows IIS.
 - `docs/CUSTOMIZATION_GUIDE.md`: admin-configurable content and safe source changes.
 - `docs/ROADMAP.md`: proposed implementation sequence and decision gates.
 - `docs/OPERATIONS_POSTGRES.md`: PostgreSQL backup and restore procedures, including locally stored product images and Data Protection keys.
@@ -80,7 +81,7 @@ npm test
 npm run build
 ```
 
-GitHub Actions runs the API workflow tests, persistence tests, storefront tests, and production frontend build for pushes and pull requests. SQL Server integration tests remain a separate opt-in local check because they require a disposable SQL Server instance.
+GitHub Actions runs the API workflow tests, persistence tests, PostgreSQL commerce integration test, storefront tests, production frontend build, Docker Compose validation, and API/storefront container builds for pushes and pull requests. SQL Server integration tests remain a separate opt-in local check because they require a disposable SQL Server instance.
 
 The SQL Server integration test creates and drops a uniquely named disposable database. Run it only with a local/test SQL Server login that has database create/drop permission:
 
@@ -118,6 +119,10 @@ dotnet user-secrets set --project backend/OneCart.Api "ConnectionStrings:Store" 
 dotnet ef database update --project backend/OneCart.SqlServer.Migrations --startup-project backend/OneCart.Api --context OneCart.Api.Data.StoreDbContext
 dotnet run --project backend/OneCart.Api -- --bootstrap-system-admin zs.islam93@gmail.com
 ```
+
+## Production deployment
+
+See [the deployment guide](docs/DEPLOYMENT_GUIDE.md) for the supported PostgreSQL deployment paths: Docker Compose, Linux with systemd/Nginx, and Windows IIS. Docker Compose is the recommended portable path and provisions public HTTPS through Caddy. Each route has a separate runbook for secrets, migrations, first System Admin setup, persistent files, and upgrades. After configuring the database and applying migrations, the HTTPS first-admin wizard is available at `/install`.
 
 ## Project direction
 

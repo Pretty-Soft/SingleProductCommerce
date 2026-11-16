@@ -84,13 +84,13 @@ The project should be developed with human review and release quality in mind. C
 
 ### Installation and hosting
 
-- Provide a guided web installer so a store owner can configure the application without editing source code.
+- Provide a guided HTTPS web installer so a store owner can complete first administrator setup without editing source code. The host operator configures the database first; the deployment workflow validates connectivity and applies migrations before opening setup. The installer creates only the first System Admin, requires a one-time high-entropy setup token and the exact configured storefront origin, rate-limits attempts, and records an audit event. Product and storefront configuration follows in the authenticated admin panel.
 - Target portable deployment across IIS, Linux, Docker, and compatible .NET hosting.
 - Support configurable persistence rather than baking one database vendor into domain behavior.
 - Require SSL/TLS for all public API traffic. The canonical API base URL must use HTTPS, and production certificates must be valid and trusted by clients.
 - Plain HTTP requests to the API must not reach application endpoints. If a trusted reverse proxy terminates TLS, the app may rely on forwarded protocol information only from explicitly configured proxy addresses.
 - Installation, upgrades, backups, and recovery must be documented.
-- **Open decision:** Exact installer behavior, supported deployment topology, and minimum server requirements.
+**Owner-confirmed hosting decision (2026-11-16):** Provide deployment paths for all three targets: Docker Compose, Linux with systemd/Nginx, and Windows IIS. PostgreSQL is the supported database for all three. Initial capacity guidance is 2 vCPU, 4 GiB RAM, and 20 GiB SSD for a small, low-traffic store; this is guidance and not a performance guarantee. Docker uses Caddy for public HTTPS, Linux uses Nginx with an operator-managed certificate, and IIS uses a trusted certificate bound to the storefront and API hostnames. See `docs/DEPLOYMENT_GUIDE.md` for the completed deployment paths and first-admin setup.
 
 ### Commercial quality
 
@@ -153,7 +153,7 @@ These are recommendations for a maintainable first release, not finalized produc
 - Which additional database providers, beyond the confirmed first-release PostgreSQL provider, are required for release.
 - Whether “hybrid” means multiple providers used together, relational plus document storage, or another deployment pattern.
 - How the owner-provided conversion rule will translate existing product prices when the admin changes the one active store currency. Historical order totals and their currencies remain unchanged.
-- Installer and upgrade strategy for IIS, Linux, and Docker.
+- First-run setup token rotation and hosting-specific upgrade rehearsal.
 - Certificate provisioning, renewal, and trusted reverse-proxy addresses for supported hosting environments.
 - License activation behavior, offline installations, and local resale obligations.
 - Marketplace and direct-sale packaging, support, and update commitments.

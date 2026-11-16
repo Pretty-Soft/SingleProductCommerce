@@ -1,10 +1,14 @@
 import { CSSProperties, FormEvent, useEffect, useState } from "react";
 import AdminApp from "./AdminApp";
+import InitialSetup from "./InitialSetup";
 import { getMediaUrl, getPublishedProduct, placeStoreOrder, quoteCartSelection, StorefrontProduct, StoreOrderConfirmation } from "./storeApi";
 import { addCartSelection, CartLine, changeCartSelectionQuantity, removeCartSelection } from "./cart";
 import { storeLanguages, StoreLanguage, storeText } from "./storeI18n";
 
 export default function App() {
+  if (window.location.pathname === "/install" || window.location.pathname === "/install/") {
+    return <InitialSetup />;
+  }
   if (window.location.pathname.startsWith("/admin")) {
     return <AdminApp />;
   }

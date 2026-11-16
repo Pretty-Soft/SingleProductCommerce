@@ -1,0 +1,151 @@
+name: onecart
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: onecart
+      POSTGRES_USER: onecart
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    secrets:
+      - postgres_password
+    networks:
+      - database
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U onecart -d onecart"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  secrets-init:
+    image: alpine:3.24
+    user: "0:0"
+    restart: "no"
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        install -d -m 700 /target
+        install -m 400 /run/secrets/store_connection /target/store_connection
+        install -m 400 /run/secrets/bootstrap_token /target/bootstrap_token
+        chown 1654:1654 /target /target/store_connection /target/bootstrap_token
+    volumes:
+      - runtime-secrets:/target
+    secrets:
+      - store_connection
+      - bootstrap_token
+
+  migrate:
+    build:
+      context: .
+      dockerfile: backend/OneCart.Api/Dockerfile
+    image: onecart-api:local
+    command: ["--migrate"]
+    restart: "no"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Database__Provider: PostgreSql
+      ConnectionStrings__StoreFile: /run/onecart-secrets/store_connection
+    volumes:
+      - runtime-secrets:/run/onecart-secrets:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      secrets-init:
+        condition: service_completed_successfully
+    networks:
+      - database
+
+  api:
+    image: onecart-api:local
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: 8080
+      Database__Provider: PostgreSql
+      ConnectionStrings__StoreFile: /run/onecart-secrets/store_connection
+      ForwardedHeaders__KnownProxies__0: 172.30.0.2
+      Cors__AllowedOrigins__0: https://${ONECART_DOMAIN:?Set ONECART_DOMAIN in .env}
+      DataProtection__KeyDirectory: /var/onecart/data-protection-keys
+      ProductMedia__RootPath: /var/onecart/product-images
+      Setup__BootstrapTokenFile: /run/onecart-secrets/bootstrap_token
+      Email__Smtp__Host: ${SMTP_HOST:-}
+      Email__Smtp__Port: ${SMTP_PORT:-587}
+      Email__Smtp__Username: ${SMTP_USERNAME:-}
+      Email__Smtp__Password: ${SMTP_PASSWORD:-}
+      Email__From: ${SMTP_FROM:-}
+      Email__PasswordResetUrl: https://${ONECART_DOMAIN}/admin/reset-password
+    volumes:
+      - product-media:/var/onecart/product-images
+      - data-protection-keys:/var/onecart/data-protection-keys
+      - runtime-secrets:/run/onecart-secrets:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      secrets-init:
+        condition: service_completed_successfully
+    networks:
+      edge:
+        ipv4_address: 172.30.0.3
+      database:
+
+  storefront:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: https://${ONECART_DOMAIN:?Set ONECART_DOMAIN in .env}
+    image: onecart-storefront:local
+    restart: unless-stopped
+    networks:
+      - edge
+
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      ONECART_DOMAIN: ${ONECART_DOMAIN:?Set ONECART_DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+      - storefront
+    networks:
+      edge:
+        ipv4_address: 172.30.0.2
+
+networks:
+  edge:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+  database:
+    internal: true
+
+volumes:
+  postgres-data:
+  product-media:
+  data-protection-keys:
+  runtime-secrets:
+  caddy-data:
+  caddy-config:
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password
+  store_connection:
+    file: ./secrets/store_connection
+  bootstrap_token:
+    file: ./secrets/bootstrap_token

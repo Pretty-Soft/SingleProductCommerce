@@ -4,6 +4,15 @@ The API base is HTTPS-only. The default local IIS Express API URL is `https://lo
 
 All routes below are prefixed with `/api/v1`. JSON field names use camel case. The service returns standard HTTP status codes; validation failures use a `ValidationProblemDetails` response with an `errors` object. Signed cart quote tokens are opaque and must be returned unchanged during checkout.
 
+## One-time installation
+
+| Method and route | Access | Purpose |
+| --- | --- | --- |
+| `GET /setup/status` | Anonymous | Report whether first-admin setup is available. Returns `404` when setup is disabled; after an administrator exists, returns `{ "available": false }`. |
+| `POST /setup/system-admin` | Anonymous, token-protected, rate-limited | Create the first and only initial System Admin. Requires `X-OneCart-Setup-Token` and an `Origin` exactly matching a configured frontend origin. |
+
+The POST body is `{ "email": "owner@example.com", "password": "...", "confirmPassword": "..." }`. It returns `201` when created, `400` for validation errors, `403` for an invalid token or origin, and `409` after initial setup has completed. Setup is unavailable until the host configures a random token of at least 32 bytes. The host should rotate the token after setup. This endpoint is not general-purpose registration; subsequent accounts can be created only by a signed-in System Admin.
+
 ## Public storefront and checkout
 
 | Method and route | Access | Purpose |

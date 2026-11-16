@@ -1,0 +1,23 @@
+[Unit]
+Description=OneCart Commerce API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=onecart
+Group=onecart
+WorkingDirectory=/opt/onecart/api
+EnvironmentFile=/etc/onecart/api.env
+ExecStart=/usr/bin/dotnet /opt/onecart/api/OneCart.Api.dll
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/onecart
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

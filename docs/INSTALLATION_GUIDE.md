@@ -1,6 +1,6 @@
 # Installation and local setup
 
-This is the current manual installation path for local development. A guided web installer and a supported production deployment process are not implemented; hosting topology and installer behavior remain open decisions.
+This is the manual local-development setup. For supported production deployment targets, use the [deployment guide](DEPLOYMENT_GUIDE.md). A guided web installer is still in progress; the current first-install path uses explicit migration and System Admin bootstrap commands.
 
 ## Requirements
 
@@ -78,4 +78,4 @@ To enable administrator password-reset email, configure SMTP and the HTTPS reset
 
 ## Production boundary
 
-The project currently documents local setup only. Before production use, operators still need an approved hosting topology, valid TLS certificate provisioning and renewal, trusted reverse-proxy addresses, persistent and appropriately protected Data Protection keys, SMTP delivery, PostgreSQL backup/restore operations, monitoring, and a tested upgrade plan. Do not treat a local development certificate or this manual setup as production deployment guidance.
+Production hosting paths are documented for Docker Compose, Linux/systemd/Nginx, and Windows IIS in the [deployment guide](DEPLOYMENT_GUIDE.md). Configure trusted TLS, proxy addresses, persistent files, SMTP, and backup/restore for the selected target before serving customers. Do not use a local development certificate in production.

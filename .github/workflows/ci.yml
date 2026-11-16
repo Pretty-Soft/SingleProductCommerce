@@ -25,6 +25,35 @@ jobs:
       - name: Run persistence tests
         run: dotnet test backend/OneCart.Persistence.Tests/OneCart.Persistence.Tests.csproj --no-restore --configuration Release
 
+  postgresql-integration:
+    name: PostgreSQL commerce integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: onecart_test
+          POSTGRES_PASSWORD: onecart_ci_only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U onecart_test -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      ONECART_POSTGRES_TEST_CONNECTION: Host=localhost;Port=5432;Database=postgres;Username=onecart_test;Password=onecart_ci_only;Pooling=false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore integration test
+        run: dotnet restore backend/OneCart.Persistence.IntegrationTests/OneCart.Persistence.IntegrationTests.csproj
+      - name: Run PostgreSQL migration and commerce test
+        run: dotnet test backend/OneCart.Persistence.IntegrationTests/OneCart.Persistence.IntegrationTests.csproj --no-restore --configuration Release --filter FullyQualifiedName~PostgreSqlCommerceIntegrationTests
+
   frontend:
     name: Frontend checks
     runs-on: ubuntu-latest
@@ -41,3 +70,22 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+
+  containers:
+    name: Container packaging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose configuration
+        env:
+          ONECART_DOMAIN: shop.example.test
+          ACME_EMAIL: ci@example.test
+        run: |
+          mkdir -p secrets
+          printf 'ci-only-not-a-secret' > secrets/postgres_password
+          printf 'Host=db;Port=5432;Database=onecart;Username=onecart;Password=ci-only-not-a-secret' > secrets/store_connection
+          docker compose config --quiet
+      - name: Build API image
+        run: docker build --file backend/OneCart.Api/Dockerfile --tag onecart-api:ci .
+      - name: Build storefront image
+        run: docker build --file frontend/Dockerfile --build-arg VITE_API_BASE_URL=https://shop.example.test --tag onecart-storefront:ci .

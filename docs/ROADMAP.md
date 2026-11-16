@@ -27,7 +27,7 @@ Build a working path through product setup, public product display, COD checkout
 
 Acceptance: an administrator can configure the approved product shape; a customer can submit a valid COD order over HTTPS; the order is persisted with a stable status and can be reviewed by an authorized administrator.
 
-The catalog persistence, public read endpoint, protected product editor, variant management, configurable required/optional product attributes, scheduled percentage/fixed flash-sale discounts, live sale countdown, social sharing, WhatsApp contact, configurable branding, product image/logo uploads, trust/service content, and session-only shopping cart are implemented. Signed price quotes and guest COD checkout create Pending orders, capture order-line snapshots, decrement inventory atomically, and show an order number. System Admins can review orders and change their status; cancellation restores stock. Address/phone validation, exact status-transition policy, and currency conversion policy remain open.
+The catalog persistence, public read endpoint, protected product editor, variant management, configurable required/optional product attributes, scheduled percentage/fixed flash-sale discounts, live sale countdown, social sharing, WhatsApp contact, configurable branding, product image/logo uploads, trust/service content, and session-only shopping cart are implemented. Signed price quotes and guest COD checkout create Pending orders, capture order-line snapshots, decrement inventory atomically, and show an order number. System Admins can review orders and change their status; cancellation restores stock. SQL Server and PostgreSQL opt-in integration tests cover migrations and commerce inventory behavior. Address/phone validation, exact status-transition policy, and currency conversion policy remain open.
 
 ## Stage 3 — Store administration and security (complete; operational setup remains)
 
@@ -41,11 +41,11 @@ The storefront language selector supports English, Bangla, and Spanish, remember
 
 Acceptance: storefront UI and configured content can be presented in the three supported languages. Storefront color pickers and constrained font-size controls have a live preview and persistent settings; arbitrary CSS entry is intentionally unsupported. Currency conversion remains pending.
 
-## Stage 5 — Installation and supported hosting
+## Stage 5 — Installation and supported hosting (deployment paths and first-admin web setup implemented)
 
 Design the guided installer and upgrade path, then document deployment, TLS certificate provisioning and renewal, trusted proxy configuration, backups, restores, and minimum server requirements for the approved IIS, Linux, and Docker targets.
 
-The manual local-development setup is documented in `docs/INSTALLATION_GUIDE.md`; it is not a guided installer or production deployment guide. PostgreSQL logical backup/restore is documented in `docs/OPERATIONS_POSTGRES.md`, including local product media and Data Protection keys. Point-in-time recovery and a supported hosted deployment topology remain unimplemented.
+Owner confirmed all three hosting targets: Docker Compose, Linux with systemd/Nginx, and Windows IIS. Their PostgreSQL deployment paths, HTTPS termination, trusted proxy configuration, persistent data paths, first System Admin setup, and upgrade commands are documented in `docs/DEPLOYMENT_GUIDE.md`. The `/install` HTTPS setup is a one-time first-SystemAdmin bootstrap protected by a configured high-entropy token, exact allowed origin, rate limit, and audit record. Docker images and Compose packaging are included and built in CI. PostgreSQL logical backup/restore is documented in `docs/OPERATIONS_POSTGRES.md`, including local product media and Data Protection keys. Point-in-time recovery and automated clean-install/upgrade rehearsal remain unimplemented.
 
 Acceptance: a clean installation and a supported upgrade can be completed from documented steps without editing application source; public API traffic requires trusted HTTPS.
 
@@ -57,6 +57,6 @@ Acceptance: the published support matrix matches verified provider capabilities.
 
 ## Stage 7 — Commercial release readiness
 
-Automated CI now runs the API workflow tests, persistence tests, storefront tests, and production frontend build for pushes and pull requests. Administrator operations, current API routes, manual local installation, and customization are documented in `docs/ADMINISTRATOR_GUIDE.md`, `docs/API_CONTRACTS.md`, `docs/INSTALLATION_GUIDE.md`, and `docs/CUSTOMIZATION_GUIDE.md`. Complete end-to-end, security, production installation, upgrade, and deployment verification; packaging; licensing behavior if approved; support/update policy; and target-market review. SQL Server integration tests remain opt-in until CI has a disposable SQL Server service configured.
+Automated CI now runs API workflow tests, persistence tests, PostgreSQL commerce integration, storefront tests, a production frontend build, and Docker Compose/image validation for pushes and pull requests. Administrator operations, API routes, local installation, deployment, and customization are documented in the administrator, API, installation, deployment, and customization guides. Remaining release readiness includes end-to-end browser coverage, production security review, clean-install/upgrade rehearsal on each hosting target, backup restore rehearsal, packaging, licensing behavior if approved, support/update policy, and target-market review. SQL Server integration remains opt-in until CI has a disposable SQL Server service configured.
 
 Acceptance: release artifacts can be installed and operated using the supplied documentation, with no placeholder user-facing or security-critical flows.

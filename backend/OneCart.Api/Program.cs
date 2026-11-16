@@ -12,9 +12,7 @@ using OneCart.Api.Data;
 using OneCart.Api.Orders;
 
 var builder = WebApplication.CreateBuilder(args);
-var storeConnectionString = builder.Configuration.GetConnectionString("Store")
-    ?? throw new InvalidOperationException(
-        "Configure ConnectionStrings:Store for the selected Database:Provider.");
+var storeConnectionString = StoreConnectionStringConfiguration.GetRequired(builder.Configuration);
 
 builder.Services.AddDbContext<StoreDbContext>(options =>
     StoreDatabaseProvider.Configure(
@@ -26,6 +24,7 @@ builder.Services.AddScoped<AdminCatalogService>();
 builder.Services.AddScoped<StorefrontSettingsService>();
 builder.Services.AddScoped<IAdminEmailSender, SmtpAdminEmailSender>();
 builder.Services.AddScoped<AdminSecuritySettingsService>();
+builder.Services.AddScoped<InitialSystemAdminSetupService>();
 builder.Services.AddScoped<ProductMediaService>();
 builder.Services.AddScoped<CartQuoteService>();
 builder.Services.AddScoped<CheckoutService>();
@@ -94,6 +93,15 @@ builder.Services.Configure<SecurityStampValidatorOptions>(options =>
 builder.Services.AddAuthorization();
 builder.Services.AddRateLimiter(options =>
 {
+    options.AddPolicy("InitialSystemAdminSetup", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromHours(1),
+            QueueLimit = 0,
+            AutoReplenishment = true
+        }));
     options.AddPolicy("AdminPasswordReset", context => RateLimitPartition.GetFixedWindowLimiter(
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions
@@ -150,6 +158,14 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 });
 
 var app = builder.Build();
+
+if (args.Length == 1 && args[0] == "--migrate")
+{
+    await using var migrationScope = app.Services.CreateAsyncScope();
+    var database = migrationScope.ServiceProvider.GetRequiredService<StoreDbContext>();
+    await database.Database.MigrateAsync();
+    return;
+}
 
 if (app.Environment.IsDevelopment())
 {
@@ -215,6 +231,7 @@ app.MapGet("/api/v1/store/product/images/{imageId:guid}", async (
         : Results.File(image.Content, image.ContentType, enableRangeProcessing: false);
 });
 app.MapAdminEndpoints();
+app.MapInitialSetupEndpoints();
 app.MapOrderEndpoints();
 app.MapAdminCustomerEndpoints();
 

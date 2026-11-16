@@ -16,9 +16,7 @@ public sealed class StoreDbContextFactory : IDesignTimeDbContextFactory<StoreDbC
             .AddEnvironmentVariables()
             .Build();
 
-        var connectionString = configuration.GetConnectionString("Store")
-            ?? throw new InvalidOperationException(
-                "Configure ConnectionStrings:Store for the selected Database:Provider before running Entity Framework commands.");
+        var connectionString = StoreConnectionStringConfiguration.GetRequired(configuration);
 
         var optionsBuilder = new DbContextOptionsBuilder<StoreDbContext>();
         StoreDatabaseProvider.Configure(

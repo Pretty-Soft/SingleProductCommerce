@@ -1,0 +1,10 @@
+.git
+.vs
+**/bin
+**/obj
+**/node_modules
+**/dist
+**/App_Data
+**/.env
+**/secrets.json
+frontend/frontend-local.log
