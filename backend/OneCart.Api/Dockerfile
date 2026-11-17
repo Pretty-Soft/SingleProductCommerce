@@ -9,7 +9,7 @@ WORKDIR /app
 ENV ASPNETCORE_HTTP_PORTS=8080
 EXPOSE 8080
 COPY --from=build /app/publish .
-RUN mkdir -p /var/onecart/product-images /var/onecart/data-protection-keys \
+RUN mkdir -p /var/onecart/product-images /var/onecart/data-protection-keys /var/onecart/installation \
     && chown -R $APP_UID:$APP_UID /var/onecart
 USER $APP_UID
 ENTRYPOINT ["dotnet", "OneCart.Api.dll"]

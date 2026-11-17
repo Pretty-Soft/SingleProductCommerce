@@ -8,15 +8,18 @@ All routes below are prefixed with `/api/v1`. JSON field names use camel case. T
 
 | Method and route | Access | Purpose |
 | --- | --- | --- |
-| `GET /setup/status` | Anonymous | Report whether first-admin setup is available. Returns `404` when setup is disabled; after an administrator exists, returns `{ "available": false }`. |
+| `GET /setup/status` | Anonymous | Report `{ available, requiresDatabase }`. Returns `404` when the setup token is not configured. |
+| `POST /setup/database/test` | Anonymous, token-protected, rate-limited | Test database connectivity before installation. Requires the setup token and exact configured frontend origin. |
+| `POST /setup/install` | Anonymous, token-protected, rate-limited | Migrate the chosen database, save its connection in protected host storage, create the first SystemAdmin, and set default language and one active currency. |
 | `POST /setup/system-admin` | Anonymous, token-protected, rate-limited | Create the first and only initial System Admin. Requires `X-OneCart-Setup-Token` and an `Origin` exactly matching a configured frontend origin. |
 
-The POST body is `{ "email": "owner@example.com", "password": "...", "confirmPassword": "..." }`. It returns `201` when created, `400` for validation errors, `403` for an invalid token or origin, and `409` after initial setup has completed. Setup is unavailable until the host configures a random token of at least 32 bytes. The host should rotate the token after setup. This endpoint is not general-purpose registration; subsequent accounts can be created only by a signed-in System Admin.
+`/setup/database/test` accepts `{ provider, host, port, databaseName, userName, password, trustServerCertificate, encryptConnection }`. `/setup/install` accepts that object as `database` plus `{ email, password, confirmPassword, defaultLanguageCode, currencyCode }`. The legacy `/setup/system-admin` body is `{ "email": "owner@example.com", "password": "...", "confirmPassword": "..." }` and is used only when a database was configured by the host. Successful installation returns `201`; invalid credentials/fields return `400`, invalid token or origin returns `403`, and completed setup returns `409`. SQL Server is experimental; PostgreSQL is the supported production provider. Database credentials are never returned in the response. Setup is unavailable until the host configures a random token of at least 32 bytes. Rotate it after setup. Subsequent accounts can be created only by a signed-in SystemAdmin.
 
 ## Public storefront and checkout
 
 | Method and route | Access | Purpose |
 | --- | --- | --- |
+| `GET /store/configuration` | Anonymous | Read the default storefront language selected during installation. |
 | `GET /store/product?language=en\|bn\|es` | Anonymous | Read the published product, active variants/options, images, sale, WhatsApp link, and trust details. Language defaults to English; an unpublished product returns `404`. Unsupported languages return `400`. |
 | `GET /store/product/images/{imageId}` | Anonymous | Read an image only when it belongs to the published product. |
 | `POST /store/cart/quote` | Anonymous | Request a signed add-time price quote for a variant and selected option IDs. |

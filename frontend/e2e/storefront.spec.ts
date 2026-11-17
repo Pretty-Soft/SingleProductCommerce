@@ -177,3 +177,17 @@ test("uses the deployed HTTPS API URL without rebuilding the storefront", async 
   await expect(page.getByRole("heading", { name: "Coconut Curls Shampoo" })).toBeVisible();
   expect(requestedOrigin).toBe("https://configured.example.test");
 });
+
+test("uses the installed default language for a first-time visitor", async ({ page }) => {
+  const requestedLanguages: string[] = [];
+  await page.route("**/api/v1/store/configuration", route => route.fulfill({
+    status: 200, contentType: "application/json", body: JSON.stringify({ defaultLanguageCode: "bn" })
+  }));
+  await page.route("**/api/v1/store/product?*", route => {
+    requestedLanguages.push(new URL(route.request().url()).searchParams.get("language") ?? "");
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ...storefrontProduct(), images: [] }) });
+  });
+  await page.goto("/");
+  await expect(page.getByRole("combobox", { name: "Language" })).toHaveValue("bn");
+  await expect.poll(() => requestedLanguages).toContain("bn");
+});

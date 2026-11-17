@@ -7,4 +7,6 @@ public sealed class AdminSystemSetting
     public bool MfaRequired { get; set; }
 
     public string? CurrencyCode { get; set; }
+
+    public string DefaultLanguageCode { get; set; } = "en";
 }

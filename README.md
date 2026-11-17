@@ -31,6 +31,8 @@ OneCart Commerce is a commercial, single-product commerce platform. The current 
 
 PostgreSQL remains the default and first-release database provider. Configure its connection string in local .NET user secrets. Replace the password with the one configured for your local PostgreSQL server; do not commit it.
 
+For a fresh post-deployment installation, the API can also start without database credentials: configure a one-time setup token, open `/install`, and choose the database, first SystemAdmin, default language, and store currency. The protected installer applies migrations and saves the database connection outside source control. See [installation](docs/INSTALLATION_GUIDE.md) and [deployment](docs/DEPLOYMENT_GUIDE.md) guides. PostgreSQL is the supported production provider; the SQL Server wizard choice is experimental.
+
 ```powershell
 dotnet user-secrets set --project backend/OneCart.Api "ConnectionStrings:Store" "Host=localhost;Port=5432;Database=onecart;Username=postgres;Password=YOUR_LOCAL_PASSWORD"
 dotnet tool restore

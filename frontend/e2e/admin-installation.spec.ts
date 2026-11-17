@@ -220,6 +220,41 @@ test("completes the one-time setup form through the configured token header", as
   });
 });
 
+test("installs a fresh store with database, language, currency, and first SystemAdmin", async ({ page }) => {
+  let submitted: Record<string, unknown> | undefined;
+  await page.route(`${apiOrigin}/api/**`, async route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/v1/setup/status") {
+      await route.fulfill({ status: 200, headers: corsHeaders, contentType: "application/json", body: JSON.stringify({ available: true, requiresDatabase: true }) });
+    } else if (path === "/api/v1/setup/database/test") {
+      expect(route.request().headers()["x-onecart-setup-token"]).toBe("local-setup-token");
+      await route.fulfill({ status: 200, headers: corsHeaders, contentType: "application/json", body: JSON.stringify({ connected: true }) });
+    } else if (path === "/api/v1/setup/install") {
+      submitted = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({ status: 201, headers: corsHeaders, contentType: "application/json", body: JSON.stringify({ role: "SystemAdmin" }) });
+    } else {
+      await route.fulfill({ status: 404, headers: corsHeaders });
+    }
+  });
+  await page.goto("/install");
+  await page.getByLabel("Database user").fill("store_owner");
+  await page.getByLabel("Database password").fill("database-secret");
+  await page.getByLabel("One-time setup token").fill("local-setup-token");
+  await page.getByRole("button", { name: "Test database connection" }).click();
+  await expect(page.getByText("Database connection succeeded.")).toBeVisible();
+  await page.getByLabel("Administrator email").fill("owner@example.test");
+  await page.getByLabel("Password", { exact: true }).fill("OneCart-Test-Admin-2026!");
+  await page.getByLabel("Confirm password").fill("OneCart-Test-Admin-2026!");
+  await page.getByLabel("Default storefront language").selectOption("bn");
+  await page.getByLabel("Store currency").selectOption("BDT");
+  await page.getByRole("button", { name: "Install store" }).click();
+  await expect(page.getByRole("status")).toContainText("Your System Admin account is ready");
+  expect(submitted).toMatchObject({
+    email: "owner@example.test", defaultLanguageCode: "bn", currencyCode: "BDT",
+    database: { provider: "PostgreSql", host: "localhost", databaseName: "onecart", userName: "store_owner", password: "database-secret" }
+  });
+});
+
 test("adds a second variant, edits its stock, and saves them together", async ({ page }) => {
   let savedVariants: typeof initialAdminProduct.variants = [];
   let savedCatalog: typeof initialAdminProduct | undefined;

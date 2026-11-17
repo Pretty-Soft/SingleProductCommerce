@@ -22,7 +22,9 @@ public sealed class InitialSystemAdminSetupService(
     public async Task<InitialSystemAdminSetupResult> CreateAsync(
         string email,
         string password,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? defaultLanguageCode = null,
+        string? currencyCode = null)
     {
         await EnsureRolesAsync();
 
@@ -52,6 +54,18 @@ public sealed class InitialSystemAdminSetupService(
         var addRole = await userManager.AddToRoleAsync(user, AdminRoles.SystemAdmin);
         if (!addRole.Succeeded)
             return InitialSystemAdminSetupResult.Invalid(addRole.Errors.Select(error => error.Description).ToArray());
+
+        if (defaultLanguageCode is not null || currencyCode is not null)
+        {
+            var setting = await database.AdminSystemSettings.SingleOrDefaultAsync(cancellationToken);
+            if (setting is null)
+            {
+                setting = new AdminSystemSetting { Id = 1 };
+                database.AdminSystemSettings.Add(setting);
+            }
+            if (defaultLanguageCode is not null) setting.DefaultLanguageCode = defaultLanguageCode;
+            if (currencyCode is not null) setting.CurrencyCode = currencyCode;
+        }
 
         database.AdminAuditEvents.Add(new AdminAuditEvent
         {

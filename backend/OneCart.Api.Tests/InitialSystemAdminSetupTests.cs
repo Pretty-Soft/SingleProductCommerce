@@ -47,7 +47,7 @@ public sealed class InitialSystemAdminSetupTests
         {
             var setup = scope.ServiceProvider.GetRequiredService<InitialSystemAdminSetupService>();
             Assert.True(await setup.IsAvailableAsync(CancellationToken.None));
-            var created = await setup.CreateAsync("owner@example.com", "OneCart-Setup1!A", CancellationToken.None);
+            var created = await setup.CreateAsync("owner@example.com", "OneCart-Setup1!A", CancellationToken.None, "bn", "BDT");
 
             Assert.True(created.Succeeded);
             Assert.False(created.AlreadyComplete);
@@ -62,6 +62,9 @@ public sealed class InitialSystemAdminSetupTests
             Assert.False(await setup.IsAvailableAsync(CancellationToken.None));
             var database = scope.ServiceProvider.GetRequiredService<StoreDbContext>();
             Assert.Equal(1, await database.AdminAuditEvents.CountAsync());
+            var settings = await database.AdminSystemSettings.SingleAsync();
+            Assert.Equal("bn", settings.DefaultLanguageCode);
+            Assert.Equal("BDT", settings.CurrencyCode);
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AdminUser>>();
             Assert.Single(await userManager.GetUsersInRoleAsync(AdminRoles.SystemAdmin));
         }

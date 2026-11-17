@@ -1,0 +1,93 @@
+name: onecart-wizard
+
+services:
+  secrets-init:
+    image: alpine:3.24
+    user: "0:0"
+    restart: "no"
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        install -d -m 700 /target
+        install -m 400 /run/secrets/bootstrap_token /target/bootstrap_token
+        chown 1654:1654 /target /target/bootstrap_token
+    volumes:
+      - runtime-secrets:/target
+    secrets:
+      - bootstrap_token
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/OneCart.Api/Dockerfile
+    image: onecart-api:local
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: 8080
+      ForwardedHeaders__KnownProxies__0: ${ONECART_CADDY_IP:-172.31.0.2}
+      Cors__AllowedOrigins__0: https://${ONECART_DOMAIN:?Set ONECART_DOMAIN in .env}
+      DataProtection__KeyDirectory: /var/onecart/data-protection-keys
+      ProductMedia__RootPath: /var/onecart/product-images
+      Setup__InstallationFile: /var/onecart/installation/installation.json
+      Setup__BootstrapTokenFile: /run/onecart-secrets/bootstrap_token
+      Email__PasswordResetUrl: https://${ONECART_DOMAIN}/admin/reset-password
+    volumes:
+      - product-media:/var/onecart/product-images
+      - data-protection-keys:/var/onecart/data-protection-keys
+      - installation-config:/var/onecart/installation
+      - runtime-secrets:/run/onecart-secrets:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      secrets-init:
+        condition: service_completed_successfully
+    networks:
+      edge:
+      proxy_backend:
+        aliases: [api-backend]
+        ipv4_address: ${ONECART_API_IP:-172.31.0.3}
+
+  storefront:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: https://${ONECART_DOMAIN:?Set ONECART_DOMAIN in .env}
+    image: onecart-storefront:local
+    restart: unless-stopped
+    networks: [edge]
+
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      ONECART_DOMAIN: ${ONECART_DOMAIN:?Set ONECART_DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env}
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [api, storefront]
+    networks: [edge, proxy_backend]
+
+networks:
+  edge:
+  proxy_backend:
+    internal: true
+    ipam:
+      config:
+        - subnet: ${ONECART_PROXY_SUBNET:-172.31.0.0/24}
+
+volumes:
+  product-media:
+  data-protection-keys:
+  installation-config:
+  runtime-secrets:
+  caddy-data:
+  caddy-config:
+
+secrets:
+  bootstrap_token:
+    file: ./secrets/bootstrap_token

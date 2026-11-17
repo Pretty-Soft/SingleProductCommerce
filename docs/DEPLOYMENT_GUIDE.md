@@ -17,7 +17,7 @@ PostgreSQL is the supported first-release database. SQL Server remains experimen
 - SMTP settings if administrators need password-reset email.
 - Store secrets in the hosting platform's secret manager or an access-controlled environment file. Do not place them in source control, a public artifact, or a customer-accessible web root.
 
-All deployments must set these API configuration values through the host environment:
+Set the applicable API configuration values through the host environment. The browser wizard supplies the database settings when the host omits them.
 
 | Setting | Purpose |
 | --- | --- |
@@ -29,6 +29,13 @@ All deployments must set these API configuration values through the host environ
 | `DataProtection__KeyDirectory` | Persistent directory for authentication and signed-cart keys. |
 | `ProductMedia__RootPath` | Persistent directory for product image bytes. |
 | `Email__PasswordResetUrl` | HTTPS storefront password-reset page. |
+| `Setup__InstallationFile` | Optional protected host path for the database configuration saved by the first-run wizard. Keep this file and the Data Protection keys together in backups. |
+
+### First-run wizard after deployment
+
+For a new store, the API can start without `ConnectionStrings__Store` or `ConnectionStrings__StoreFile`. Configure the exact HTTPS `Cors__AllowedOrigins__0`, a high-entropy `Setup__BootstrapToken` or protected token file, persistent `DataProtection__KeyDirectory`, and a writable persistent `Setup__InstallationFile` path before starting it. The public store API returns `503 installation_required` until setup completes. Open `https://YOUR_DOMAIN/install` and enter the token, database provider/host/name/login, first SystemAdmin, default language, and store currency. The wizard tests the database connection, applies migrations, saves the database connection encrypted with ASP.NET Core Data Protection, creates the first administrator, and records the setup audit event. Only the API process identity should read the installation file and Data Protection keys. Back up both together; losing the keys makes the protected connection file unreadable. Existing deployments with operator-provided connection configuration continue to use the administrator-only setup form.
+
+After successful setup, `/admin` is available. The public catalog remains empty until the SystemAdmin creates and publishes the product. SQL Server appears in the wizard as an **experimental** option for local evaluation; PostgreSQL remains the supported production choice.
 
 ## Build deployment packages
 
@@ -39,6 +46,8 @@ Configure SMTP with `Email__Smtp__Host`, `Email__Smtp__Port`, `Email__Smtp__User
 After configuring the database, apply migrations by running the published API with `--migrate`. Create the first System Admin with `--bootstrap-system-admin admin@example.com`; enter the password at its hidden console prompt. Both commands run against the same production environment configuration as the API.
 
 ## Docker Compose (recommended portable path)
+
+To configure an external PostgreSQL database after deployment through the browser, use `docker-compose.wizard.yml`. Set `ONECART_DOMAIN` and `ACME_EMAIL` in the ignored `.env`, generate `secrets/bootstrap_token` with at least 32 random bytes, and run `docker compose -f docker-compose.wizard.yml up -d --build`. Point DNS at the host and open `https://YOUR_DOMAIN/install`. The database must be reachable from the API container; `host.docker.internal` maps to the Docker host, while remote hosts can use their DNS name. This stack does not run a database container. It persists installation configuration, Data Protection keys, and media in separate named volumes; back them up together with the external database. Do not start this stack alongside the root `docker-compose.yml` on the same domain or ports. SQL Server remains experimental.
 
 The root `docker-compose.yml` builds the API and storefront, starts PostgreSQL, applies migrations using a one-shot migration container, and serves the site through Caddy. Caddy obtains and renews certificates automatically. The API is not published directly to the host; it trusts forwarded HTTPS only from Caddy's fixed address on a dedicated API↔proxy network. The public-facing edge network has dynamically assigned container addresses, so the storefront cannot take the proxy's trusted address. PostgreSQL is isolated on an internal Docker network.
 

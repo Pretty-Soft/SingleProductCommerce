@@ -939,6 +939,33 @@ footer {
   padding: clamp(24px, 5vw, 40px);
 }
 
+.setup-card:has(.setup-database-fields) { max-width: 760px; }
+
+.setup-database-fields,
+.setup-store-fields {
+  border: 1px solid #ecd8df;
+  border-radius: 16px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+  min-width: 0;
+  padding: 20px;
+}
+
+.setup-database-fields legend,
+.setup-store-fields legend { color: #952f57; font-weight: 800; padding: 0 8px; }
+.setup-database-fields > button,
+.setup-database-fields > p { grid-column: 1 / -1; margin: 0; }
+.setup-card .setup-check { align-items: center; display: flex; gap: 10px; }
+.setup-card .setup-check input { min-height: auto; width: auto; }
+.setup-card select { min-height: 46px; width: 100%; }
+
+@media (max-width: 620px) {
+  .setup-database-fields,
+  .setup-store-fields { grid-template-columns: minmax(0, 1fr); padding: 16px; }
+}
+
 .setup-card form {
   margin-top: 24px;
 }

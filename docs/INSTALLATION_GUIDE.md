@@ -1,6 +1,6 @@
 # Installation and local setup
 
-This guide covers local development and the first-run web installer. For supported production deployment targets, use the [deployment guide](DEPLOYMENT_GUIDE.md). The installer creates the first System Admin only; product and storefront setup is completed afterward in the admin panel.
+This guide covers local development and the first-run web installer. For supported production deployment targets, use the [deployment guide](DEPLOYMENT_GUIDE.md). On a fresh deployment without database configuration, the installer collects the database connection, applies migrations, creates the first SystemAdmin, and sets default language and currency. Product and storefront content is completed afterward in the admin panel.
 
 ## Requirements
 
@@ -44,6 +44,8 @@ $setupToken = $null
 ```
 
 In Development, API startup applies pending migrations. Start the API and storefront as described below, open `http://127.0.0.1:5175/install`, enter the configured token, and create the first System Admin. Development CORS allows the local storefront origin; in production, the installer requires the exact configured HTTPS storefront origin. The setup endpoint is rate-limited and becomes unavailable after the first System Admin is created.
+
+For a fresh install through the browser, configure only the setup token first and leave `ConnectionStrings:Store` and `ConnectionStrings:StoreFile` unset. The API starts in installation mode. On `/install`, choose PostgreSQL or experimental SQL Server, enter the database server/name/user/password, test connectivity, then choose the SystemAdmin email/password, default storefront language, and one store currency. The server migrates the database and stores its connection encrypted in the Git-ignored `backend/OneCart.Api/App_Data/installation.json`. Persist and protect both this file and the Data Protection keys. If an operator already supplied a connection string, `/install` continues to show only the first-SystemAdmin form.
 
 The command-line bootstrap remains available for local recovery or headless setup. Use it only when no System Admin exists; it migrates the database, seeds built-in roles, and prompts for a password without placing it in command history:
 

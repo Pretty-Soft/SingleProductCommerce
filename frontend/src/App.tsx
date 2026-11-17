@@ -1,7 +1,7 @@
 import { CSSProperties, FormEvent, useEffect, useState } from "react";
 import AdminApp from "./AdminApp";
 import InitialSetup from "./InitialSetup";
-import { getMediaUrl, getPublishedProduct, placeStoreOrder, quoteCartSelection, StorefrontProduct, StoreOrderConfirmation } from "./storeApi";
+import { getDefaultStoreLanguage, getMediaUrl, getPublishedProduct, placeStoreOrder, quoteCartSelection, StorefrontProduct, StoreOrderConfirmation } from "./storeApi";
 import { addCartSelection, CartLine, changeCartSelectionQuantity, removeCartSelection } from "./cart";
 import { storeLanguages, StoreLanguage, storeText } from "./storeI18n";
 
@@ -44,6 +44,15 @@ function Storefront() {
   const [orderConfirmation, setOrderConfirmation] = useState<StoreOrderConfirmation | null>(null);
 
   useEffect(() => {
+    if (window.localStorage.getItem("onecart-language")) return;
+    let active = true;
+    void getDefaultStoreLanguage().then(configured => {
+      if (active && !window.localStorage.getItem("onecart-language") && (configured === "bn" || configured === "es")) setLanguage(configured);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
     let active = true;
     void getPublishedProduct(language)
       .then((loaded) => {
@@ -63,7 +72,6 @@ function Storefront() {
   }, [language]);
 
   useEffect(() => {
-    window.localStorage.setItem("onecart-language", language);
     document.documentElement.lang = language;
   }, [language]);
 
@@ -226,7 +234,11 @@ function Storefront() {
           <label className="store-language-picker">
             <span className="visually-hidden">Language</span>
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" /></svg>
-            <select value={language} onChange={event => setLanguage(event.target.value as StoreLanguage)} aria-label="Language">
+            <select value={language} onChange={event => {
+              const chosenLanguage = event.target.value as StoreLanguage;
+              window.localStorage.setItem("onecart-language", chosenLanguage);
+              setLanguage(chosenLanguage);
+            }} aria-label="Language">
               {storeLanguages.map(item => <option key={item.code} value={item.code}>{item.label}</option>)}
             </select>
           </label>

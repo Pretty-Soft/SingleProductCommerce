@@ -893,6 +893,13 @@ namespace OneCart.SqlServer.Migrations.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("nvarchar(3)");
 
+                    b.Property<string>("DefaultLanguageCode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(2)
+                        .HasColumnType("nvarchar(2)")
+                        .HasDefaultValue("en");
+
                     b.Property<int>("Id")
                         .HasColumnType("int");
 

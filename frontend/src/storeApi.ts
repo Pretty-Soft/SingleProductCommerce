@@ -132,6 +132,13 @@ export interface StorefrontVariant {
   isAvailable: boolean;
 }
 
+export async function getDefaultStoreLanguage(): Promise<string> {
+  const response = await fetch(`${apiBase}/api/v1/store/configuration`, { credentials: "omit" });
+  if (!response.ok) return "en";
+  const payload = await response.json() as { defaultLanguageCode?: string };
+  return payload.defaultLanguageCode ?? "en";
+}
+
 export async function getPublishedProduct(language = "en"): Promise<StorefrontProduct | null> {
   const response = await fetch(`${apiBase}/api/v1/store/product?language=${encodeURIComponent(language)}`, { credentials: "omit" });
   if (response.status === 404) return null;

@@ -12,13 +12,14 @@ using OneCart.Api.Data;
 using OneCart.Api.Orders;
 
 var builder = WebApplication.CreateBuilder(args);
-var storeConnectionString = StoreConnectionStringConfiguration.GetRequired(builder.Configuration);
-
-builder.Services.AddDbContext<StoreDbContext>(options =>
-    StoreDatabaseProvider.Configure(
-        options,
-        StoreDatabaseProvider.GetProviderName(builder.Configuration["Database:Provider"]),
-        storeConnectionString));
+builder.Services.AddSingleton<InstallationConfigurationStore>();
+builder.Services.AddScoped<FirstRunInstallationService>();
+builder.Services.AddDbContext<StoreDbContext>((services, options) =>
+{
+    var database = services.GetRequiredService<InstallationConfigurationStore>().Current
+        ?? throw new InvalidOperationException("Complete the HTTPS first-run installer before using the store database.");
+    StoreDatabaseProvider.Configure(options, database.Provider, database.ConnectionString);
+});
 builder.Services.AddScoped<StorefrontCatalogService>();
 builder.Services.AddScoped<AdminCatalogService>();
 builder.Services.AddScoped<StorefrontSettingsService>();
@@ -152,6 +153,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 });
 
 var app = builder.Build();
+var installation = app.Services.GetRequiredService<InstallationConfigurationStore>();
 
 if (args.Length == 1 && args[0] == "--migrate")
 {
@@ -161,7 +163,7 @@ if (args.Length == 1 && args[0] == "--migrate")
     return;
 }
 
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() && installation.Current is not null)
 {
     await using var scope = app.Services.CreateAsyncScope();
     var database = scope.ServiceProvider.GetRequiredService<StoreDbContext>();
@@ -196,6 +198,19 @@ app.Use(async (context, next) =>
 });
 
 app.UseCors("AdminUi");
+app.Use(async (context, next) =>
+{
+    if (!installation.IsReady
+        && !context.Request.Path.StartsWithSegments("/api/v1/setup")
+        && context.Request.Path != "/health")
+    {
+        context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+        await context.Response.WriteAsJsonAsync(new { error = "installation_required" });
+        return;
+    }
+    await next();
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -204,6 +219,14 @@ app.MapGet("/health", () => Results.Ok(new
     status = "ok",
     service = "OneCart.Api"
 }));
+
+app.MapGet("/api/v1/store/configuration", async (StoreDbContext database, CancellationToken cancellationToken) =>
+{
+    var language = await database.AdminSystemSettings.AsNoTracking()
+        .Select(setting => setting.DefaultLanguageCode)
+        .SingleOrDefaultAsync(cancellationToken);
+    return Results.Ok(new { defaultLanguageCode = language ?? "en" });
+});
 
 app.MapGet("/api/v1/store/product", async (
     string? language,
