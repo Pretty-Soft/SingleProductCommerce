@@ -89,11 +89,20 @@ request() {
 }
 
 health=''
+health_status='000'
 for attempt in $(seq 1 30); do
-  if health="$(request "$origin/health" 2>/dev/null)"; then break; fi
+  health_response="$(curl --silent --show-error --cacert "$certificate_dir/fullchain.pem" \
+    --connect-to "${host}:443:127.0.0.1:443" --write-out $'\n%{http_code}' \
+    "$origin/health" 2>/dev/null || true)"
+  health_status="${health_response##*$'\n'}"
+  health="${health_response%$'\n'*}"
+  if [ "$health_status" = '200' ]; then break; fi
   sleep 1
 done
-printf '%s' "$health" | jq -e '.status == "ok" and .service == "OneCart.Api"' >/dev/null
+if ! printf '%s' "$health" | jq -e '.status == "ok" and .service == "OneCart.Api"' >/dev/null; then
+  printf 'HTTPS health check failed (HTTP %s): %s\n' "$health_status" "$health" >&2
+  exit 1
+fi
 sudo systemctl is-active --quiet onecart-api.service
 
 http_status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
