@@ -887,6 +887,10 @@ namespace OneCart.Api.Migrations
 
             modelBuilder.Entity("OneCart.Api.Admin.AdminSystemSetting", b =>
                 {
+                    b.Property<string>("CurrencyCode")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
                     b.Property<int>("Id")
                         .HasColumnType("integer");
 

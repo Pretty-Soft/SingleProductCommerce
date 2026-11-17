@@ -38,7 +38,7 @@ public sealed class CatalogValidationTests
     }
 
     [Fact]
-    public void Locks_store_currency_change_after_initial_setup()
+    public void Requires_explicit_repricing_before_currency_change()
     {
         var existingProduct = new StoreProduct { CurrencyCode = "USD" };
         var request = ValidPublishedProduct() with { CurrencyCode = "BDT" };
@@ -46,6 +46,96 @@ public sealed class CatalogValidationTests
         var errors = AdminCatalogService.ValidateProduct(request, existingProduct);
 
         Assert.Contains(nameof(AdminProductRequest.CurrencyCode), errors.Keys);
+    }
+
+    [Fact]
+    public void Allows_currency_change_after_product_deletion_when_no_order_is_open()
+    {
+        var request = ValidPublishedProduct() with
+        {
+            CurrencyCode = "EUR",
+            Variants = [Variant() with { CurrencyCode = "EUR" }]
+        };
+
+        var errors = AdminCatalogService.ValidateProduct(request, null, "BDT");
+
+        Assert.DoesNotContain(nameof(AdminProductRequest.CurrencyCode), errors.Keys);
+    }
+
+    [Fact]
+    public void Blocks_currency_change_while_an_order_is_pending_or_processing()
+    {
+        var request = ValidPublishedProduct() with
+        {
+            CurrencyCode = "EUR", CurrencyRepricingConfirmed = true,
+            Variants = [Variant() with { CurrencyCode = "EUR" }]
+        };
+
+        var errors = AdminCatalogService.ValidateProduct(request, new StoreProduct { CurrencyCode = "BDT" }, "BDT", hasOpenOrders: true);
+
+        Assert.Contains(nameof(AdminProductRequest.CurrencyCode), errors.Keys);
+    }
+
+    [Fact]
+    public void Allows_confirmed_repricing_when_all_orders_are_closed()
+    {
+        var request = ValidPublishedProduct() with
+        {
+            CurrencyCode = "EUR", CurrencyRepricingConfirmed = true,
+            Variants = [Variant() with { CurrencyCode = "EUR" }]
+        };
+
+        var errors = AdminCatalogService.ValidateProduct(request, new StoreProduct { CurrencyCode = "BDT" }, "BDT", hasOpenOrders: false);
+
+        Assert.DoesNotContain(nameof(AdminProductRequest.CurrencyCode), errors.Keys);
+    }
+
+    [Fact]
+    public void Requires_new_variant_prices_and_disables_old_sale_on_currency_change()
+    {
+        var request = ValidPublishedProduct() with
+        {
+            CurrencyCode = "EUR", CurrencyRepricingConfirmed = true,
+            Variants = [Variant() with { CurrencyCode = "EUR", Price = 0 }],
+            FlashSale = new AdminFlashSaleRequest(true, "Old sale", "fixedAmount", 5, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(1))
+        };
+
+        var errors = AdminCatalogService.ValidateProduct(request, new StoreProduct { CurrencyCode = "BDT" }, "BDT");
+
+        Assert.Contains(nameof(AdminProductRequest.Variants), errors.Keys);
+        Assert.Contains(nameof(AdminProductRequest.FlashSale), errors.Keys);
+    }
+
+    [Fact]
+    public void Requires_each_retained_price_to_be_reentered_before_currency_change()
+    {
+        var variantId = Guid.NewGuid();
+        var optionId = Guid.NewGuid();
+        var product = new StoreProduct { CurrencyCode = "BDT" };
+        product.Variants.Add(new ProductVariant { Id = variantId, Price = 100 });
+        var group = new ProductAttributeGroup();
+        group.Options.Add(new ProductAttributeOption { Id = optionId, PriceAdjustment = 10 });
+        product.AttributeGroups.Add(group);
+        var request = ValidPublishedProduct() with
+        {
+            CurrencyCode = "EUR",
+            CurrencyRepricingConfirmed = true,
+            Variants = [Variant(variantId) with { CurrencyCode = "EUR", Price = 5 }],
+            AttributeGroups = [new AdminProductAttributeGroupRequest(null, "Size", true, false, 0,
+                [new AdminProductAttributeOptionRequest(optionId, "Large", 2, true, 0)])]
+        };
+
+        var missing = AdminCatalogService.ValidateProduct(request, product, "BDT");
+        Assert.Contains(nameof(AdminProductRequest.RepricedVariantIds), missing.Keys);
+        Assert.Contains(nameof(AdminProductRequest.RepricedOptionIds), missing.Keys);
+
+        var entered = AdminCatalogService.ValidateProduct(request with
+        {
+            RepricedVariantIds = [variantId],
+            RepricedOptionIds = [optionId]
+        }, product, "BDT");
+        Assert.DoesNotContain(nameof(AdminProductRequest.RepricedVariantIds), entered.Keys);
+        Assert.DoesNotContain(nameof(AdminProductRequest.RepricedOptionIds), entered.Keys);
     }
 
     [Fact]

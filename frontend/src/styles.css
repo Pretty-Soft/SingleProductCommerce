@@ -3447,6 +3447,10 @@ footer {
 .order-list-bottom > strong { color: #9d1c4d; font-size: 0.88rem; }
 .order-list-bottom > span { white-space: nowrap; }
 
+.admin-menu-toggle svg,
+.admin-sign-out svg { flex: 0 0 20px; height: 20px; width: 20px; }
+.admin-sign-out { align-items: center; display: inline-flex; gap: 7px; justify-content: center; }
+
 @media (max-width: 700px) {
   .orders-layout { gap: 16px; grid-template-columns: minmax(0, 1fr); }
   .orders-list { gap: 8px; min-width: 0; }
@@ -3463,4 +3467,8 @@ footer {
   .order-lines li { overflow-wrap: anywhere; }
   .order-status-editor { align-items: stretch; flex-direction: column; }
   .order-status-editor button { width: 100%; }
+  .admin-menu-toggle,
+  .admin-account .admin-sign-out { align-items: center; flex: 0 0 42px; height: 42px; justify-content: center; min-height: 42px; padding: 0; width: 42px; }
+  .admin-menu-toggle span,
+  .admin-sign-out span { display: none; }
 }

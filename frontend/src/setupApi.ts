@@ -1,9 +1,4 @@
-const configuredApiBase = import.meta.env.VITE_API_BASE_URL ?? "https://localhost:44300";
-const apiBase = configuredApiBase.replace(/\/$/, "");
-
-if (new URL(apiBase).protocol !== "https:") {
-  throw new Error("The OneCart API base URL must use HTTPS.");
-}
+import { apiBase } from "./apiBase";
 
 export async function checkInitialSetup(): Promise<boolean> {
   const response = await fetch(`${apiBase}/api/v1/setup/status`, { cache: "no-store" });

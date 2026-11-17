@@ -251,5 +251,6 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
         adminSettings.HasKey(setting => setting.Id);
         adminSettings.Property(setting => setting.Id).ValueGeneratedNever();
         adminSettings.Property(setting => setting.MfaRequired).HasDefaultValue(false).IsRequired();
+        adminSettings.Property(setting => setting.CurrencyCode).HasMaxLength(3);
     }
 }

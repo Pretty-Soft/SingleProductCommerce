@@ -889,6 +889,10 @@ namespace OneCart.SqlServer.Migrations.Migrations
 
             modelBuilder.Entity("OneCart.Api.Admin.AdminSystemSetting", b =>
                 {
+                    b.Property<string>("CurrencyCode")
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
                     b.Property<int>("Id")
                         .HasColumnType("int");
 

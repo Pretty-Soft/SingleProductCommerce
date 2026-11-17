@@ -160,3 +160,20 @@ test("keeps the responsive storefront usable on a narrow viewport", async ({ pag
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
   }
 });
+
+test("uses the deployed HTTPS API URL without rebuilding the storefront", async ({ page }) => {
+  let requestedOrigin = "";
+  await page.route("**/runtime-config.js", route => route.fulfill({
+    status: 200,
+    contentType: "text/javascript",
+    body: 'window.__ONECART_API_BASE_URL__ = "https://configured.example.test";'
+  }));
+  await page.route("**/api/v1/store/product**", async route => {
+    requestedOrigin = new URL(route.request().url()).origin;
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ...storefrontProduct(), images: [] }) });
+  });
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Coconut Curls Shampoo" })).toBeVisible();
+  expect(requestedOrigin).toBe("https://configured.example.test");
+});

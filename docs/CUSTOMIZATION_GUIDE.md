@@ -7,7 +7,7 @@ Use the admin interface for supported storefront and catalog changes. Source-lev
 - The Catalog section manages the single product, SKU variants, inventory, product attributes/options, catalog copy, and product images.
 - Storefront settings manage the shop name, headline, subtitle, flash sale, social sharing, WhatsApp contact, trust/service details, brand logo, and storefront translations.
 - English is the source and fallback. Bangla and Spanish content is entered by admins in the appropriate Catalog or Storefront section.
-- Store currency is configured once during initial product setup. Changing it later is locked until the owner approves a conversion rule. Do not edit stored price/currency fields manually to bypass this rule.
+- The store has one active currency selected from the admin dropdown. Only a SystemAdmin can change it, after all orders are Completed or Cancelled and after entering new variant and option prices. Do not edit stored price/currency fields directly to bypass this workflow.
 
 Role assignments restrict the areas each administrator can edit. See the [administrator guide](ADMINISTRATOR_GUIDE.md) before granting a role.
 

@@ -45,7 +45,7 @@ jobs:
           cp deploy/linux/onecart-api.service deploy/linux/nginx-onecart.conf deploy/linux/onecart-api.env.example "$package_root/deploy/linux/"
           cp README.md "$package_root/"
           cp docs/DEPLOYMENT_GUIDE.md docs/INSTALLATION_GUIDE.md docs/ADMINISTRATOR_GUIDE.md docs/OPERATIONS_POSTGRES.md "$package_root/docs/"
-          printf 'Replace api.example.test in the storefront build with the production HTTPS API origin before publishing. See docs/DEPLOYMENT_GUIDE.md.\n' > "$package_root/INSTALL-NOTES.txt"
+          printf 'Set storefront/runtime-config.js to the public HTTPS API origin before publishing. Do not put secrets in that public file. See docs/DEPLOYMENT_GUIDE.md.\n' > "$package_root/INSTALL-NOTES.txt"
           archive="onecart-linux-${PACKAGE_VERSION}.tar.gz"
           tar -czf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" onecart-linux
           sha256sum "$RUNNER_TEMP/$archive" > "$RUNNER_TEMP/$archive.sha256"
@@ -99,7 +99,7 @@ jobs:
           Copy-Item README.md $packageRoot -Force
           Copy-Item docs/DEPLOYMENT_GUIDE.md, docs/INSTALLATION_GUIDE.md, docs/ADMINISTRATOR_GUIDE.md, docs/OPERATIONS_POSTGRES.md (Join-Path $packageRoot 'docs') -Force
           @'
-          Replace api.example.test in the storefront build with the production HTTPS API origin before publishing. Install the .NET 10 ASP.NET Core Hosting Bundle and IIS URL Rewrite. See DEPLOYMENT_GUIDE.md.
+          Set storefront/runtime-config.js to the public HTTPS API origin before publishing. Do not put secrets in that public file. Install the .NET 10 ASP.NET Core Hosting Bundle and IIS URL Rewrite. See DEPLOYMENT_GUIDE.md.
           '@ | Set-Content (Join-Path $packageRoot 'INSTALL-NOTES.txt')
           $archive = Join-Path $env:RUNNER_TEMP "onecart-iis-$env:PACKAGE_VERSION.zip"
           Compress-Archive -Path (Join-Path $packageRoot '*') -DestinationPath $archive -Force

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using OneCart.Api.Catalog;
@@ -51,6 +52,12 @@ public sealed class PostgreSqlCommerceIntegrationTests
                 "integration-test@onecart.local",
                 CancellationToken.None);
             Assert.Null(save.Errors);
+            Assert.Equal("USD", (await new AdminCatalogService(database).GetCurrencyStateAsync(CancellationToken.None)).CurrencyCode);
+
+            var rejectedCurrencyChange = await new AdminCatalogService(database).SaveProductAsync(
+                request with { CurrencyCode = "EUR" }, Guid.NewGuid(),
+                "integration-test@onecart.local", CancellationToken.None);
+            Assert.Contains(nameof(AdminProductRequest.CurrencyCode), rejectedCurrencyChange.Errors!.Keys);
 
             var published = await new StorefrontCatalogService(database).GetPublishedProductAsync(CancellationToken.None);
             Assert.NotNull(published);
@@ -75,6 +82,7 @@ public sealed class PostgreSqlCommerceIntegrationTests
                 CancellationToken.None);
             Assert.NotNull(placed.Order);
             Assert.Equal("Pending", placed.Order!.Status);
+            Assert.False((await new AdminCatalogService(database).GetCurrencyStateAsync(CancellationToken.None)).CanChange);
             Assert.Equal(5, await database.ProductVariants.AsNoTracking()
                 .Where(item => item.Id == variant.Id)
                 .Select(item => item.StockQuantity)
@@ -92,6 +100,28 @@ public sealed class PostgreSqlCommerceIntegrationTests
                 .Where(item => item.Id == variant.Id)
                 .Select(item => item.StockQuantity)
                 .SingleAsync());
+            Assert.True((await new AdminCatalogService(database).GetCurrencyStateAsync(CancellationToken.None)).CanChange);
+
+            var repricedRequest = request with
+            {
+                CurrencyCode = "EUR",
+                CurrencyRepricingConfirmed = true,
+                RepricedVariantIds = [variant.Id],
+                RepricedOptionIds = [option.Id],
+                Variants = [new AdminProductVariantRequest(variant.Id, variant.Sku, variant.DisplayName, 25m, "EUR", 7, true)],
+                AttributeGroups = [new AdminProductAttributeGroupRequest(group.Id, group.Name, true, false, 0,
+                    [new AdminProductAttributeOptionRequest(option.Id, option.Name, 30m, true, 0)])]
+            };
+            await using var repricingDatabase = new StoreDbContext(options.Options);
+            var repriced = await new AdminCatalogService(repricingDatabase).SaveProductAsync(
+                repricedRequest, Guid.NewGuid(), "integration-test@onecart.local", CancellationToken.None);
+            Assert.Null(repriced.Errors);
+            Assert.Equal("EUR", (await new AdminCatalogService(repricingDatabase).GetCurrencyStateAsync(CancellationToken.None)).CurrencyCode);
+
+            var oldCartResult = await new CheckoutService(repricingDatabase, quoteService).PlaceOrderAsync(
+                new OrderPlacementRequest("Old Cart", "+8801712345678", "Old cart address",
+                    [new OrderLineRequest(quote.Quote!.Token, 1)]), CancellationToken.None);
+            Assert.Equal(StatusCodes.Status409Conflict, oldCartResult.StatusCode);
         }
         finally
         {

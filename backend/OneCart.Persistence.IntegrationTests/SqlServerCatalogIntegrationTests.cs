@@ -90,6 +90,12 @@ public sealed class SqlServerCatalogIntegrationTests
 
             Assert.Null(saved.Errors);
             Assert.NotNull(saved.Product);
+            Assert.Equal("USD", (await writeService.GetCurrencyStateAsync(CancellationToken.None)).CurrencyCode);
+
+            var rejectedCurrencyChange = await writeService.SaveProductAsync(
+                request with { CurrencyCode = "EUR" }, Guid.NewGuid(),
+                "integration-test@onecart.local", CancellationToken.None);
+            Assert.Contains(nameof(AdminProductRequest.CurrencyCode), rejectedCurrencyChange.Errors!.Keys);
 
             // Exercise the admin's normal edit path: update existing variant prices and stock,
             // add a new variant in the same save, then read all variants back from SQL Server.
@@ -228,6 +234,7 @@ public sealed class SqlServerCatalogIntegrationTests
                 CancellationToken.None);
             Assert.NotNull(placement.Order);
             Assert.Equal("Pending", placement.Order!.Status);
+            Assert.False((await new AdminCatalogService(database).GetCurrencyStateAsync(CancellationToken.None)).CanChange);
             var standardVariantId = published.Variants.Single(item => item.DisplayName == "Standard").Id;
             await using (var inventoryDatabase = new StoreDbContext(options.Options))
             Assert.Equal(9, await inventoryDatabase.ProductVariants.AsNoTracking()
@@ -244,6 +251,7 @@ public sealed class SqlServerCatalogIntegrationTests
                 "integration-test@onecart.local",
                 CancellationToken.None);
             Assert.Equal("Cancelled", cancellation.Order?.Status);
+            Assert.True((await new AdminCatalogService(database).GetCurrencyStateAsync(CancellationToken.None)).CanChange);
             await using (var inventoryDatabase = new StoreDbContext(options.Options))
             Assert.Equal(11, await inventoryDatabase.ProductVariants.AsNoTracking()
                 .Where(variant => variant.Id == standardVariantId)

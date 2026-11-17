@@ -1,6 +1,6 @@
 # API contracts
 
-The API base is HTTPS-only. The default local IIS Express API URL is `https://localhost:44300`; production uses the deployment's trusted HTTPS URL. The frontend must set `VITE_API_BASE_URL` to an HTTPS URL. Do not send credentials or admin cookies to an untrusted origin.
+The API base is HTTPS-only. The default local IIS Express API URL is `https://localhost:44300`; production uses the deployment's trusted HTTPS URL. The frontend uses a public HTTPS URL from `runtime-config.js` when set, then `VITE_API_BASE_URL`, then the local development default. Do not put credentials in runtime configuration or send admin cookies to an untrusted origin.
 
 All routes below are prefixed with `/api/v1`. JSON field names use camel case. The service returns standard HTTP status codes; validation failures use a `ValidationProblemDetails` response with an `errors` object. Signed cart quote tokens are opaque and must be returned unchanged during checkout.
 
@@ -70,6 +70,7 @@ Any first-sign-in temporary password change is required before using protected a
 | Method and route | Role | Purpose |
 | --- | --- | --- |
 | `GET /admin/catalog/product` | SystemAdmin, CatalogManager | Read product setup and catalog translations. |
+| `GET /admin/catalog/currency` | SystemAdmin, CatalogManager | Read `{ currencyCode, canChange }`; changes require no Pending or Processing orders. |
 | `PUT /admin/catalog/product` | SystemAdmin, CatalogManager | Save product, variants, attributes, and catalog translations. |
 | `DELETE /admin/catalog/product` | SystemAdmin, CatalogManager | Permanently delete the product and child catalog data when no order references its variants; returns 409 when order history must be preserved. |
 | `POST /admin/catalog/product/images` | SystemAdmin, CatalogManager, StoreManager | Upload product image or brand logo, subject to media-kind authorization. |

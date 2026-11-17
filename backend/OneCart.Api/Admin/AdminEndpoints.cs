@@ -98,6 +98,11 @@ public static class AdminEndpoints
             .RequireAuthorization(policy => policy.RequireRole(AdminRoles.CatalogAccess))
             .AddEndpointFilter(RequireChangedPasswordAsync);
 
+        group.MapGet("/catalog/currency", async (AdminCatalogService catalog, CancellationToken cancellationToken) =>
+                Results.Ok(await catalog.GetCurrencyStateAsync(cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(AdminRoles.CatalogAccess))
+            .AddEndpointFilter(RequireChangedPasswordAsync);
+
         group.MapPut("/catalog/product", SaveAdminProductAsync)
             .RequireAuthorization(policy => policy.RequireRole(AdminRoles.CatalogAccess))
             .AddEndpointFilter(ValidateAntiforgeryAsync)
@@ -570,7 +575,8 @@ public static class AdminEndpoints
 
     private static bool IsStoreSettingsChanged(AdminProductRequest request, AdminProductResponse current)
     {
-        if (!string.Equals(request.BrandName?.Trim(), current.BrandName, StringComparison.Ordinal)
+        if (!string.Equals(request.CurrencyCode?.Trim(), current.CurrencyCode, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(request.BrandName?.Trim(), current.BrandName, StringComparison.Ordinal)
             || !string.Equals(request.StorefrontHeadline?.Trim() ?? string.Empty, current.StorefrontHeadline, StringComparison.Ordinal)
             || !string.Equals(request.StorefrontSubtitle?.Trim() ?? string.Empty, current.StorefrontSubtitle, StringComparison.Ordinal)
             || request.FlashSale != current.FlashSale

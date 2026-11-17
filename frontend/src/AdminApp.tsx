@@ -273,8 +273,8 @@ export default function AdminApp() {
       <header className={`admin-header${hasWorkspace ? " admin-workspace-header" : ""}`}>
         {hasWorkspace ? (
           <>
-            <button className="admin-menu-toggle" type="button" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen((open) => !open)}>
-              <span aria-hidden="true">☰</span> Menu
+            <button className="admin-menu-toggle" type="button" aria-label="Menu" title="Menu" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen((open) => !open)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg><span>Menu</span>
             </button>
             <div className="admin-page-heading">
               <p>ONECART ADMIN</p>
@@ -294,8 +294,8 @@ export default function AdminApp() {
         {currentUser && (
           <div className="admin-account">
             <span>{currentUser.email}</span>
-            <button className="button button-quiet" onClick={handleLogout} disabled={busy}>
-              Sign out
+            <button className="button button-quiet admin-sign-out" aria-label="Sign out" title="Sign out" onClick={handleLogout} disabled={busy}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3M13 16l4-4-4-4M8 12h9" /></svg><span>Sign out</span>
             </button>
           </div>
         )}

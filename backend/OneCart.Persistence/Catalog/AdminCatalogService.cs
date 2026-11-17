@@ -7,6 +7,16 @@ namespace OneCart.Api.Catalog;
 
 public sealed class AdminCatalogService(StoreDbContext database)
 {
+    public async Task<StoreCurrencyState> GetCurrencyStateAsync(CancellationToken cancellationToken)
+    {
+        var currencyCode = await database.AdminSystemSettings.AsNoTracking()
+            .Select(setting => setting.CurrencyCode)
+            .SingleOrDefaultAsync(cancellationToken);
+        var hasOpenOrders = await database.StoreOrders.AsNoTracking()
+            .AnyAsync(order => order.Status == "Pending" || order.Status == "Processing", cancellationToken);
+        return new StoreCurrencyState(currencyCode, !hasOpenOrders);
+    }
+
     public async Task<AdminProductResponse?> GetProductAsync(CancellationToken cancellationToken)
     {
         var product = await database.Products
@@ -37,7 +47,10 @@ public sealed class AdminCatalogService(StoreDbContext database)
             .Include(candidate => candidate.Images)
             .Include(candidate => candidate.TrustItems)
             .SingleOrDefaultAsync(cancellationToken);
-        var errors = ValidateProduct(request, product);
+        var storeSetting = await database.AdminSystemSettings.SingleOrDefaultAsync(cancellationToken);
+        var hasOpenOrders = await database.StoreOrders.AsNoTracking()
+            .AnyAsync(order => order.Status == "Pending" || order.Status == "Processing", cancellationToken);
+        var errors = ValidateProduct(request, product, storeSetting?.CurrencyCode, hasOpenOrders);
         if (errors.Count > 0)
         {
             return AdminCatalogSaveResult.Invalid(errors);
@@ -75,6 +88,15 @@ public sealed class AdminCatalogService(StoreDbContext database)
         product.StorefrontHeadline = request.StorefrontHeadline?.Trim() ?? string.Empty;
         product.StorefrontSubtitle = request.StorefrontSubtitle?.Trim() ?? string.Empty;
         product.CurrencyCode = request.CurrencyCode!.Trim().ToUpperInvariant();
+        if (storeSetting is null)
+        {
+            storeSetting = new AdminSystemSetting { Id = 1, CurrencyCode = product.CurrencyCode };
+            database.AdminSystemSettings.Add(storeSetting);
+        }
+        else
+        {
+            storeSetting.CurrencyCode = product.CurrencyCode;
+        }
         product.IsPublished = request.IsPublished;
         var flashSale = request.FlashSale ?? AdminFlashSaleRequest.Disabled;
         product.FlashSaleEnabled = flashSale.Enabled;
@@ -228,7 +250,7 @@ public sealed class AdminCatalogService(StoreDbContext database)
         return AdminCatalogSaveResult.Saved(ToResponse(product));
     }
 
-    public static Dictionary<string, string[]> ValidateProduct(AdminProductRequest request, StoreProduct? product)
+    public static Dictionary<string, string[]> ValidateProduct(AdminProductRequest request, StoreProduct? product, string? lockedCurrencyCode = null, bool hasOpenOrders = false)
     {
         var errors = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         foreach (var (field, messages) in CatalogTranslations.Validate(request.CatalogTranslations, nameof(request.CatalogTranslations)))
@@ -284,10 +306,28 @@ public sealed class AdminCatalogService(StoreDbContext database)
         {
             AddError(nameof(request.CurrencyCode), "Choose a three-letter store currency code.");
         }
-        else if (product is not null && !string.IsNullOrWhiteSpace(product.CurrencyCode)
-            && !string.Equals(product.CurrencyCode, storeCurrency, StringComparison.Ordinal))
+        else if ((!string.IsNullOrWhiteSpace(lockedCurrencyCode)
+            && !string.Equals(lockedCurrencyCode, storeCurrency, StringComparison.Ordinal))
+            || (product is not null && !string.IsNullOrWhiteSpace(product.CurrencyCode)
+                && !string.Equals(product.CurrencyCode, storeCurrency, StringComparison.Ordinal)))
         {
-            AddError(nameof(request.CurrencyCode), "Changing store currency is locked until a price conversion rule is configured.");
+            if (hasOpenOrders)
+                AddError(nameof(request.CurrencyCode), "Complete or cancel all Pending and Processing orders before changing currency.");
+            else if (product is not null && !request.CurrencyRepricingConfirmed)
+                AddError(nameof(request.CurrencyCode), "Confirm that all variant and option prices were entered for the new currency.");
+            if (product is not null && request.Variants?.Any(variant => variant.Price <= 0) == true)
+                AddError(nameof(request.Variants), "Enter a new positive price for every variant before changing currency.");
+            if (product is not null && product.Variants
+                .Where(variant => request.Variants?.Any(candidate => candidate.Id == variant.Id) == true)
+                .Any(variant => request.RepricedVariantIds?.Contains(variant.Id) != true))
+                AddError(nameof(request.RepricedVariantIds), "Re-enter the price of every retained variant in the new currency.");
+            if (product is not null && product.AttributeGroups.SelectMany(group => group.Options)
+                .Where(option => option.PriceAdjustment != 0
+                    && request.AttributeGroups?.SelectMany(group => group.Options ?? []).Any(candidate => candidate.Id == option.Id) == true)
+                .Any(option => request.RepricedOptionIds?.Contains(option.Id) != true))
+                AddError(nameof(request.RepricedOptionIds), "Re-enter every previously priced option adjustment in the new currency.");
+            if (product is not null && request.FlashSale?.Enabled == true)
+                AddError(nameof(request.FlashSale), "Turn off the current flash sale before changing currency, then configure a new promotion.");
         }
 
         var trustItems = request.TrustItems?.Where(item => item is not null).ToList() ?? [];
@@ -666,7 +706,12 @@ public sealed record AdminProductRequest(
     string? StorefrontSubtitle = null,
     IReadOnlyList<AdminProductTrustItemRequest>? TrustItems = null,
     string? CurrencyCode = null,
-    Dictionary<string, Dictionary<string, string>>? CatalogTranslations = null);
+    Dictionary<string, Dictionary<string, string>>? CatalogTranslations = null,
+    bool CurrencyRepricingConfirmed = false,
+    IReadOnlyList<Guid>? RepricedVariantIds = null,
+    IReadOnlyList<Guid>? RepricedOptionIds = null);
+
+public sealed record StoreCurrencyState(string? CurrencyCode, bool CanChange);
 
 public sealed record AdminFlashSaleRequest(
     bool Enabled,

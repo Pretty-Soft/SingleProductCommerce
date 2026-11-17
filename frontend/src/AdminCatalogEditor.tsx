@@ -17,6 +17,9 @@ interface EditableProduct {
   slug: string;
   description: string;
   currencyCode: string;
+  currencyRepricingConfirmed?: boolean;
+  repricedVariantIds?: string[];
+  repricedOptionIds?: string[];
   isPublished: boolean;
   variants: EditableVariant[];
   attributeGroups: EditableAttributeGroup[];
@@ -96,6 +99,9 @@ const emptyProduct = (): EditableProduct => ({
   slug: "",
   description: "",
   currencyCode: "",
+  currencyRepricingConfirmed: false,
+  repricedVariantIds: [],
+  repricedOptionIds: [],
   isPublished: false,
   variants: [emptyVariant()],
   attributeGroups: [],
@@ -113,6 +119,15 @@ const emptyProduct = (): EditableProduct => ({
 });
 
 const LANGUAGES = [{ code: "bn", label: "Bangla" }, { code: "es", label: "Spanish" }] as const;
+const CURRENCIES = [
+  ["BDT", "Bangladeshi Taka"], ["USD", "US Dollar"], ["EUR", "Euro"],
+  ["GBP", "British Pound"], ["INR", "Indian Rupee"], ["AED", "UAE Dirham"],
+  ["SAR", "Saudi Riyal"], ["CAD", "Canadian Dollar"], ["AUD", "Australian Dollar"],
+  ["JPY", "Japanese Yen"], ["CNY", "Chinese Yuan"], ["SGD", "Singapore Dollar"],
+  ["MYR", "Malaysian Ringgit"], ["PKR", "Pakistani Rupee"], ["NPR", "Nepalese Rupee"],
+  ["LKR", "Sri Lankan Rupee"], ["CHF", "Swiss Franc"], ["NZD", "New Zealand Dollar"],
+  ["QAR", "Qatari Riyal"], ["KWD", "Kuwaiti Dinar"]
+] as const;
 
 function emptyVariant(currencyCode = ""): EditableVariant {
   return {
@@ -144,6 +159,8 @@ function emptyAttributeOption(displayOrder: number): EditableAttributeOption {
 export default function AdminCatalogEditor({ canManageStoreSettings = true }: { canManageStoreSettings?: boolean }) {
   const [product, setProduct] = useState<EditableProduct>(emptyProduct);
   const [savedProduct, setSavedProduct] = useState<EditableProduct | null>(null);
+  const [lockedCurrency, setLockedCurrency] = useState<string | null>(null);
+  const [currencyCanChange, setCurrencyCanChange] = useState(true);
   const [editingSection, setEditingSection] = useState<CatalogSectionId | null>(null);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     "product-basics": true
@@ -162,22 +179,28 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
 
   useEffect(() => {
     let active = true;
-    void adminRequest<EditableProduct>("/api/v1/admin/catalog/product")
-      .then((loaded) => {
-        if (active) {
-          setProduct(loaded);
-          setSavedProduct(loaded);
+    void Promise.all([
+      adminRequest<{ currencyCode: string | null; canChange: boolean }>("/api/v1/admin/catalog/currency"),
+      adminRequest<EditableProduct>("/api/v1/admin/catalog/product").catch((reason: unknown) => {
+        if (reason instanceof Error && reason.message.includes("404")) return null;
+        throw reason;
+      })
+    ])
+      .then(([currency, loaded]) => {
+        if (!active) return;
+        const initial = loaded ?? emptyProduct();
+        if (!loaded && currency.currencyCode) {
+          initial.currencyCode = currency.currencyCode;
+          initial.variants = initial.variants.map(variant => ({ ...variant, currencyCode: currency.currencyCode! }));
         }
+        setLockedCurrency(currency.currencyCode);
+        setCurrencyCanChange(currency.canChange);
+        setProduct(initial);
+        setSavedProduct(initial);
       })
       .catch((reason: unknown) => {
         if (!active) return;
-        if (reason instanceof Error && reason.message.includes("404")) {
-          const blankProduct = emptyProduct();
-          setProduct(blankProduct);
-          setSavedProduct(blankProduct);
-        } else {
-          setError(reason instanceof Error ? reason.message : "Could not load product settings.");
-        }
+        setError(reason instanceof Error ? reason.message : "Could not load product settings.");
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -225,6 +248,9 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
   function updateVariant(index: number, changes: Partial<EditableVariant>) {
     setProduct((current) => ({
       ...current,
+      repricedVariantIds: changes.price !== undefined && current.variants[index]?.id
+        ? [...new Set([...(current.repricedVariantIds ?? []), current.variants[index].id!])]
+        : current.repricedVariantIds,
       variants: current.variants.map((variant, itemIndex) => itemIndex === index
         ? { ...variant, ...changes }
         : variant)
@@ -243,6 +269,9 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
   function updateAttributeOption(groupIndex: number, optionIndex: number, changes: Partial<EditableAttributeOption>) {
     setProduct((current) => ({
       ...current,
+      repricedOptionIds: changes.priceAdjustment !== undefined && current.attributeGroups[groupIndex]?.options[optionIndex]?.id
+        ? [...new Set([...(current.repricedOptionIds ?? []), current.attributeGroups[groupIndex].options[optionIndex].id!])]
+        : current.repricedOptionIds,
       attributeGroups: current.attributeGroups.map((group, itemIndex) => itemIndex === groupIndex
         ? { ...group, options: group.options.map((option, choiceIndex) => choiceIndex === optionIndex
           ? { ...option, ...changes }
@@ -267,6 +296,8 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
       });
       setProduct(saved);
       setSavedProduct(saved);
+      setLockedCurrency(saved.currencyCode);
+      setCurrencyCanChange(true);
       setEditingSection(null);
       setMessage("Product, storefront content, variants, and attributes saved.");
     } catch (reason) {
@@ -284,6 +315,8 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
     try {
       await adminRequest<void>("/api/v1/admin/catalog/product", { method: "DELETE" });
       const blankProduct = emptyProduct();
+      blankProduct.currencyCode = lockedCurrency ?? product.currencyCode;
+      blankProduct.variants = blankProduct.variants.map(variant => ({ ...variant, currencyCode: blankProduct.currencyCode }));
       setProduct(blankProduct);
       setSavedProduct(blankProduct);
       setEditingSection(null);
@@ -296,6 +329,7 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
   }
 
   function isSectionEditable(section: CatalogSectionId) {
+    if (lockedCurrency && product.currencyCode !== lockedCurrency && ["basics", "variants", "pricing", "attributes"].includes(section)) return true;
     return !product.id || editingSection === section || sharesVariantEditScope(section, editingSection);
   }
 
@@ -352,6 +386,8 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
       });
       setProduct(saved);
       setSavedProduct(saved);
+      setLockedCurrency(saved.currencyCode);
+      setCurrencyCanChange(true);
       setEditingSection(null);
       setMessage("Section changes saved.");
     } catch (reason) {
@@ -547,25 +583,35 @@ export default function AdminCatalogEditor({ canManageStoreSettings = true }: { 
           <div className="store-currency-setting">
             <label>
               Store currency
-              <input
-                maxLength={3}
-                minLength={3}
-                pattern="[A-Za-z]{3}"
+              <select
                 required
                 value={product.currencyCode}
-                disabled={Boolean(product.id)}
-                placeholder="e.g. BDT"
+                disabled={Boolean(lockedCurrency) && (!currencyCanChange || !canManageStoreSettings)}
                 onChange={(event) => {
-                  const currencyCode = event.target.value.toUpperCase();
+                  const currencyCode = event.target.value;
                   setProduct((current) => ({
                     ...current,
                     currencyCode,
-                    variants: current.variants.map((variant) => ({ ...variant, currencyCode }))
+                    currencyRepricingConfirmed: false,
+                    repricedVariantIds: [],
+                    repricedOptionIds: [],
+                    variants: current.variants.map((variant) => ({ ...variant, currencyCode, price: current.id ? 0 : variant.price })),
+                    attributeGroups: current.attributeGroups.map(group => ({ ...group, options: group.options.map(option => ({ ...option, priceAdjustment: current.id ? 0 : option.priceAdjustment })) })),
+                    flashSale: current.id ? { ...current.flashSale, enabled: false, discountValue: 0 } : current.flashSale
                   }));
                 }}
-              />
+              >
+                <option value="">Choose currency</option>
+                {product.currencyCode && !CURRENCIES.some(([code]) => code === product.currencyCode) && <option value={product.currencyCode}>{product.currencyCode} (existing)</option>}
+                {CURRENCIES.map(([code, name]) => <option key={code} value={code}>{code} — {name}</option>)}
+              </select>
             </label>
-            <p className="admin-muted">Applies to all variant prices and orders. Changing it after setup is locked until the price conversion rule is configured.</p>
+            <p className="admin-muted">One active currency. Changes are available only after all orders are Completed or Cancelled.</p>
+            {lockedCurrency && !currencyCanChange && <p className="admin-muted">Finish or cancel Pending and Processing orders before changing currency.</p>}
+            {product.id && lockedCurrency && product.currencyCode !== lockedCurrency && <label className="currency-repricing-confirmation">
+              <input type="checkbox" checked={Boolean(product.currencyRepricingConfirmed)} onChange={event => updateProduct("currencyRepricingConfirmed", event.target.checked)} />
+              I entered new prices for every variant and priced option. The old flash sale is turned off.
+            </label>}
           </div>
           <div className="catalog-fields">
             {canManageStoreSettings && <>

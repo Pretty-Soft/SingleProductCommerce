@@ -15,9 +15,9 @@ Confirmed: the catalog is one product with selectable variants, and PostgreSQL i
 
 Still open for owner decision:
 
-- Address structure/validation, phone-number validation, and exact admin status transitions. Guest checkout with customer name, phone, and delivery address is confirmed; orders start Pending, display an order number, and admins can update or cancel them.
+- Exact admin status transitions. Guest checkout with customer name, phone, and delivery address is confirmed; fields are required and length-limited, while customers are responsible for phone and address correctness. Orders start Pending, display an order number, and admins can update or cancel them.
 - Variant option dimensions (such as size/color). Stock will be decremented atomically when an order is placed and restored when an admin cancels it; no extra per-order quantity cap is required.
-- Currency conversion rule for changing existing product prices. One active currency for the whole store is confirmed, cart lines retain numeric price and currency from add time, mixed-currency carts/orders are rejected, and historical order totals remain unchanged.
+- One active currency is selected from common choices. A SystemAdmin can change it after all orders are Completed or Cancelled by entering new variant and option prices; no automatic conversion occurs. Cart lines retain numeric price and currency from add time, stale-currency quotes cannot check out, and historical order totals remain unchanged. Currency-specific rounding remains open.
 
 The core order workflow proceeds with the confirmed rules. Remaining policies stay explicit until the owner decides them.
 
@@ -27,7 +27,7 @@ Build a working path through product setup, public product display, COD checkout
 
 Acceptance: an administrator can configure the approved product shape; a customer can submit a valid COD order over HTTPS; the order is persisted with a stable status and can be reviewed by an authorized administrator.
 
-The catalog persistence, public read endpoint, protected product editor, variant and attribute CRUD, per-variant inventory editing, configurable required/optional product attributes, scheduled percentage/fixed flash-sale discounts, live sale countdown, social sharing, WhatsApp contact, configurable branding, product image/logo uploads, trust/service content, and session-only shopping cart are implemented. Product and child deletion now preserves order history by rejecting deletion when order lines reference its variants. Signed price quotes and guest COD checkout create Pending orders, capture order-line snapshots, decrement inventory atomically, and show an order number. System Admins can review orders and change their status; cancellation restores stock. SQL Server and PostgreSQL opt-in integration tests cover migrations and commerce inventory behavior. Address/phone validation, exact status-transition policy, and currency conversion policy remain open.
+The catalog persistence, public read endpoint, protected product editor, variant and attribute CRUD, per-variant inventory editing, configurable required/optional product attributes, scheduled percentage/fixed flash-sale discounts, live sale countdown, social sharing, WhatsApp contact, configurable branding, product image/logo uploads, trust/service content, and session-only shopping cart are implemented. Product and child deletion now preserves order history by rejecting deletion when order lines reference its variants. Signed price quotes and guest COD checkout create Pending orders, capture order-line snapshots, decrement inventory atomically, and show an order number. System Admins can review orders and change their status; cancellation restores stock. SQL Server and PostgreSQL opt-in integration tests cover migrations and commerce inventory behavior. Exact status-transition policy and currency-specific rounding remain open.
 
 ## Stage 3 — Store administration and security (complete; operational setup remains)
 
@@ -37,9 +37,9 @@ Acceptance: protected operations enforce authorization server-side, validate inp
 
 ## Stage 4 — Localization and presentation settings (localization and theme controls complete)
 
-The storefront language selector supports English, Bangla, and Spanish, remembers the visitor's selection, and loads localized product/storefront text from the API. English is the default and per-field fallback. Administrators can edit translations for product names/descriptions, variants, attribute groups/options, store branding, sale labels, WhatsApp copy, and trust/service details. UI-language strings ship with the application. Currency conversion and its product-price conversion rule remain future work and retain their open decision.
+The storefront language selector supports English, Bangla, and Spanish, remembers the visitor's selection, and loads localized product/storefront text from the API. English is the default and per-field fallback. Administrators can edit translations for product names/descriptions, variants, attribute groups/options, store branding, sale labels, WhatsApp copy, and trust/service details. UI-language strings ship with the application. The SystemAdmin chooses the active store currency from a common-currency dropdown and can change it only after all orders close and manual repricing is confirmed.
 
-Acceptance: storefront UI and configured content can be presented in the three supported languages. Storefront color pickers and constrained font-size controls have a live preview and persistent settings; arbitrary CSS entry is intentionally unsupported. Currency conversion remains pending.
+Acceptance: storefront UI and configured content can be presented in the three supported languages. Storefront color pickers and constrained font-size controls have a live preview and persistent settings; arbitrary CSS entry is intentionally unsupported. Currency-specific rounding remains pending.
 
 ## Stage 5 — Installation and supported hosting (deployment paths and first-admin web setup implemented)
 

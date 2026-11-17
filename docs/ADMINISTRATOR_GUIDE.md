@@ -35,7 +35,7 @@ Product images are stored under the API host's `App_Data/product-images` folder 
 
 System Admins and Store Managers can update the shop name, headline, subtitle, flash-sale schedule and discount, sharing setting, WhatsApp contact, and trust/service details. They can also manage the brand logo. Storefront text can be entered in Bangla and Spanish; missing content falls back to English. The visitor's language selection is remembered in that browser.
 
-Price currency is selected for the store and must match all variant prices. Currency changes after product setup remain locked until the owner defines a conversion rule. Existing orders retain their original price and currency snapshots.
+Choose the store currency from the product editor's common-currency list during initial setup. Only a SystemAdmin can change it later, and only when all orders are Completed or Cancelled. Enter new prices for every variant and priced option, then confirm the repricing in the product editor; the previous flash sale is disabled. The choice also remains available after product deletion when no order is open. Existing orders retain their original price and currency snapshots. Customers with old-currency cart quotes must add those items again before checkout.
 
 ## Orders and customer contacts
 

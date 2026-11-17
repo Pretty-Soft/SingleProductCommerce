@@ -66,6 +66,10 @@ public sealed class CheckoutService(StoreDbContext database, CartQuoteService qu
         {
             return OrderPlacementResult.Unavailable("The product is no longer available. Refresh the store and review your cart.");
         }
+        if (preparedLines.Any(line => !string.Equals(line.Quote.CurrencyCode, product.CurrencyCode, StringComparison.Ordinal)))
+        {
+            return OrderPlacementResult.Unavailable("The store currency changed after this item was added. Remove it and add it again before checkout.");
+        }
 
         foreach (var line in preparedLines)
         {

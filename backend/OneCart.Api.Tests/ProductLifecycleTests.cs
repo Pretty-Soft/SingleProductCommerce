@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using OneCart.Api.Admin;
 using OneCart.Api.Catalog;
 using OneCart.Api.Data;
 using OneCart.Api.Orders;
@@ -29,6 +30,7 @@ public sealed class ProductLifecycleTests
             Price = 10m, CurrencyCode = "USD", StockQuantity = 4, IsActive = true
         });
         database.Products.Add(product);
+        database.AdminSystemSettings.Add(new AdminSystemSetting { Id = 1, CurrencyCode = "USD" });
         await database.SaveChangesAsync();
 
         var mediaRoot = Path.Combine(Path.GetTempPath(), "onecart-product-delete-" + Guid.NewGuid().ToString("N"));
@@ -48,6 +50,7 @@ public sealed class ProductLifecycleTests
             Assert.Equal(0, await database.Products.CountAsync());
             Assert.Equal(0, await database.ProductVariants.CountAsync());
             Assert.Equal(0, await database.ProductImages.CountAsync());
+            Assert.Equal("USD", (await new AdminCatalogService(database).GetCurrencyStateAsync(CancellationToken.None)).CurrencyCode);
             Assert.False(File.Exists(Path.Combine(mediaRoot, storageKey)));
             Assert.Contains(database.AdminAuditEvents, item => item.Action == "catalog.product.delete");
         }

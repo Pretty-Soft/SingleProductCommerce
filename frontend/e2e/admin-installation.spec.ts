@@ -94,6 +94,8 @@ function mockSystemAdminApi(
       await respond([]);
     } else if (path === "/api/v1/admin/security/mfa-policy") {
       await respond({ required: false });
+    } else if (path === "/api/v1/admin/catalog/currency") {
+      await respond({ currencyCode: "BDT", canChange: false });
     } else if (path === "/api/v1/admin/orders" && method === "GET") {
       await respond([{
         id: "00000000-0000-4000-8000-000000000030", orderNumber: "OC-TEST-1001", status: orderStatus,
@@ -234,6 +236,8 @@ test("adds a second variant, edits its stock, and saves them together", async ({
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
   await page.getByRole("button", { name: "Catalog", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Product catalog" })).toBeVisible();
+  await expect(page.getByLabel("Store currency")).toHaveValue("BDT");
+  await expect(page.getByLabel("Store currency").locator('option[value="EUR"]')).toHaveText("EUR — Euro");
 
   const sectionNav = page.getByRole("navigation", { name: "Product editor sections" });
   await sectionNav.getByRole("button", { name: "Variants" }).click();
@@ -270,6 +274,53 @@ test("adds a second variant, edits its stock, and saves them together", async ({
   page.once("dialog", dialog => dialog.accept());
   await page.locator("#product-basics").getByRole("button", { name: "Delete product" }).click();
   await expect(page.getByText("Product deleted. You can now create a new product.")).toBeVisible();
+});
+
+test("offers a first-time store currency choice for a new product", async ({ page }) => {
+  await page.route(`${apiOrigin}/api/**`, mockSystemAdminApi(product => product));
+  await page.route(`${apiOrigin}/api/v1/admin/catalog/currency`, route => route.fulfill({
+    status: 200, headers: corsHeaders, contentType: "application/json", body: JSON.stringify({ currencyCode: null, canChange: true })
+  }));
+  await page.route(`${apiOrigin}/api/v1/admin/catalog/product`, route => route.fulfill({
+    status: 404, headers: corsHeaders, contentType: "application/json", body: JSON.stringify({ title: "Not found" })
+  }));
+  await page.goto("/admin");
+  await page.getByLabel("Email address").fill("owner@example.test");
+  await page.getByLabel("Password").fill("OneCart-Test-Admin-2026!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Catalog", exact: true }).click();
+  const currency = page.getByLabel("Store currency");
+  await expect(currency).toBeEnabled();
+  await currency.selectOption("EUR");
+  await expect(currency).toHaveValue("EUR");
+  await page.getByRole("navigation", { name: "Product editor sections" }).getByRole("button", { name: "Variants" }).click();
+  await expect(page.getByLabel("Regular price (EUR)").first()).toBeVisible();
+});
+
+test("requires manual variant repricing when changing an established store currency", async ({ page }) => {
+  let saved: Record<string, unknown> | undefined;
+  await page.route(`${apiOrigin}/api/**`, mockSystemAdminApi(product => {
+    saved = product as unknown as Record<string, unknown>;
+    return product;
+  }));
+  await page.route(`${apiOrigin}/api/v1/admin/catalog/currency`, route => route.fulfill({
+    status: 200, headers: corsHeaders, contentType: "application/json", body: JSON.stringify({ currencyCode: "BDT", canChange: true })
+  }));
+  await page.goto("/admin");
+  await page.getByLabel("Email address").fill("owner@example.test");
+  await page.getByLabel("Password").fill("OneCart-Test-Admin-2026!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Catalog", exact: true }).click();
+  await page.locator("#product-basics").getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByLabel("Store currency").selectOption("EUR");
+  await page.getByRole("navigation", { name: "Product editor sections" }).getByRole("button", { name: "Variants" }).click();
+  await expect(page.locator("#product-variants").getByLabel("Regular price (EUR)")).toHaveValue("0");
+  await page.locator("#product-variants").getByLabel("Regular price (EUR)").fill("15");
+  await page.getByLabel("I entered new prices for every variant and priced option. The old flash sale is turned off.").check();
+  await page.locator("#product-basics").getByRole("button", { name: "Save section" }).click();
+  await expect(page.getByText("Section changes saved.")).toBeVisible();
+  expect(saved?.currencyCode).toBe("EUR");
+  expect(saved?.repricedVariantIds).toEqual([initialAdminProduct.variants[0].id]);
 });
 
 test("creates a limited Catalog Manager account from the System Admin workspace", async ({ page }) => {
@@ -367,6 +418,9 @@ test("keeps the order list and details readable on a phone", async ({ page }) =>
   await page.getByLabel("Email address").fill("owner@example.test");
   await page.getByLabel("Password").fill("OneCart-Test-Admin-2026!");
   await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.locator(".admin-menu-toggle span")).toBeHidden();
+  await expect(page.locator(".admin-sign-out span")).toBeHidden();
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
   await page.getByRole("button", { name: "Menu" }).click();
   await page.getByRole("navigation", { name: "Admin sections" }).getByRole("button", { name: "Orders", exact: true }).click();
   await expect(page.locator(".order-list-item")).toBeVisible();
