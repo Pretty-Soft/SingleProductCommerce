@@ -3392,7 +3392,17 @@ footer {
 }
 
 @media (max-width: 390px) {
-  .topbar { grid-template-areas: "logo" "actions"; grid-template-columns: minmax(0, 1fr); }
+  .topbar { gap: 4px; grid-template-areas: "logo actions"; grid-template-columns: minmax(0, 1fr) auto; }
+  .brand-logo-link { gap: 5px; }
+  .brand-logo-link .brand-mark { flex-basis: 28px; height: 28px; width: 28px; }
+  .brand-logo { max-height: 32px; max-width: 32px; }
+  .brand-logo-copy strong { font-size: 0.91rem; }
+  .brand-logo-copy small { font-size: 0.55rem; }
+  .store-header-actions { gap: 3px; }
+  .store-language-picker { min-width: 0; padding-inline: 3px; }
+  .store-language-picker select { font-size: 0.65rem; width: 63px; }
+  .cart-toggle { height: 34px; min-height: 34px; width: 34px; }
+  .cart-toggle svg { height: 25px; width: 25px; }
   .store-header-actions { justify-self: end; }
   .flash-sale-timer-label { border-left: 0; margin-left: 0; padding-left: 0; }
   .admin-workspace-header { gap: 8px; }

@@ -149,4 +149,14 @@ test("keeps the responsive storefront usable on a narrow viewport", async ({ pag
   expect(firstVariant!.height).toBeLessThan(120);
   const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
   expect(hasHorizontalOverflow).toBe(false);
+  for (const width of [320, 375, 390]) {
+    await page.setViewportSize({ width, height: 812 });
+    const brand = await page.locator(".brand-logo-link").boundingBox();
+    const actions = await page.locator(".store-header-actions").boundingBox();
+    expect(brand).not.toBeNull();
+    expect(actions).not.toBeNull();
+    expect(Math.abs(brand!.y - actions!.y)).toBeLessThan(20);
+    expect(brand!.x + brand!.width).toBeLessThanOrEqual(actions!.x);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  }
 });
