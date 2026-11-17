@@ -203,7 +203,7 @@ jobs:
         run: |
           $iisFeatures = Install-WindowsFeature Web-Server, Web-Mgmt-Tools, Web-Http-Logging, Web-Request-Monitor, Web-Filtering -IncludeManagementTools
           if (-not $iisFeatures.Success) { throw "IIS role installation failed: $($iisFeatures.ExitCode)." }
-          Import-Module WebAdministration
+          Import-Module WebAdministration -SkipEditionCheck
           Start-Service W3SVC
 
           $hostingBundle = Join-Path $env:RUNNER_TEMP 'dotnet-hosting-10.0.4-win.exe'
