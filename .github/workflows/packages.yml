@@ -42,18 +42,21 @@ jobs:
           npm run build
           cd ..
           cp -a frontend/dist/. "$package_root/storefront/"
+          test -f "$package_root/api/OneCart.Api.dll"
+          test -f "$package_root/api/OneCart.MySql.Migrations.dll"
+          test -f "$package_root/storefront/runtime-config.js"
           cp deploy/linux/onecart-api.service deploy/linux/nginx-onecart.conf deploy/linux/onecart-api.env.example "$package_root/deploy/linux/"
           cp README.md "$package_root/"
           cp docs/DEPLOYMENT_GUIDE.md docs/INSTALLATION_GUIDE.md docs/ADMINISTRATOR_GUIDE.md docs/OPERATIONS_POSTGRES.md "$package_root/docs/"
           printf 'Set storefront/runtime-config.js to the public HTTPS API origin before publishing. Do not put secrets in that public file. See docs/DEPLOYMENT_GUIDE.md.\n' > "$package_root/INSTALL-NOTES.txt"
           archive="onecart-linux-${PACKAGE_VERSION}.tar.gz"
           tar -czf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" onecart-linux
-          sha256sum "$RUNNER_TEMP/$archive" > "$RUNNER_TEMP/$archive.sha256"
+          (cd "$RUNNER_TEMP" && sha256sum "$archive" > "$archive.sha256" && sha256sum -c "$archive.sha256")
       - name: Build Docker source package
         run: |
           archive="onecart-docker-source-${PACKAGE_VERSION}.zip"
           git archive --format=zip --prefix=onecart/ HEAD -o "$RUNNER_TEMP/$archive"
-          sha256sum "$RUNNER_TEMP/$archive" > "$RUNNER_TEMP/$archive.sha256"
+          (cd "$RUNNER_TEMP" && sha256sum "$archive" > "$archive.sha256" && sha256sum -c "$archive.sha256")
       - uses: actions/upload-artifact@v4
         with:
           name: onecart-linux-and-docker-${{ env.PACKAGE_VERSION }}
@@ -96,6 +99,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
           Pop-Location
           Copy-Item frontend/dist/* $storeOutput -Recurse -Force
+          foreach ($required in @('api/OneCart.Api.dll', 'api/OneCart.MySql.Migrations.dll', 'api/web.config', 'storefront/runtime-config.js')) {
+            if (!(Test-Path (Join-Path $packageRoot $required) -PathType Leaf)) { throw "Package is missing $required" }
+          }
           Copy-Item README.md $packageRoot -Force
           Copy-Item docs/DEPLOYMENT_GUIDE.md, docs/INSTALLATION_GUIDE.md, docs/ADMINISTRATOR_GUIDE.md, docs/OPERATIONS_POSTGRES.md (Join-Path $packageRoot 'docs') -Force
           @'

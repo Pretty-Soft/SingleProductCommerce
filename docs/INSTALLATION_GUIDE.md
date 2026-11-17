@@ -4,6 +4,8 @@ This guide covers local development and the first-run web installer. For support
 
 ## Requirements
 
+For local MySQL 8.4 testing on a fresh deployment, choose **MySQL (experimental)** on `/install`, enter `127.0.0.1`, port `3306`, a new database name, and a MySQL login with permission to create or migrate that database. For a loopback-only Development setup without a trusted MySQL certificate, clear **Verify MySQL TLS certificate**. Production wizard connections require certificate verification. Keep passwords in the setup form or protected local configuration.
+
 - .NET 10 SDK
 - Node.js 20.19+ or 22.12+ and npm
 - PostgreSQL, configured for local connections
@@ -45,7 +47,7 @@ $setupToken = $null
 
 In Development, API startup applies pending migrations. Start the API and storefront as described below, open `http://127.0.0.1:5175/install`, enter the configured token, and create the first System Admin. Development CORS allows the local storefront origin; in production, the installer requires the exact configured HTTPS storefront origin. The setup endpoint is rate-limited and becomes unavailable after the first System Admin is created.
 
-For a fresh install through the browser, configure only the setup token first and leave `ConnectionStrings:Store` and `ConnectionStrings:StoreFile` unset. The API starts in installation mode. On `/install`, choose PostgreSQL or experimental SQL Server, enter the database server/name/user/password, test connectivity, then choose the SystemAdmin email/password, default storefront language, and one store currency. The server migrates the database and stores its connection encrypted in the Git-ignored `backend/OneCart.Api/App_Data/installation.json`. Persist and protect both this file and the Data Protection keys. If an operator already supplied a connection string, `/install` continues to show only the first-SystemAdmin form.
+For a fresh install through the browser, configure only the setup token first and leave `ConnectionStrings:Store` and `ConnectionStrings:StoreFile` unset. The API starts in installation mode. On `/install`, choose PostgreSQL, experimental SQL Server, or experimental MySQL, enter the database server/name/user/password, test connectivity, then choose the SystemAdmin email/password, default storefront language, and one store currency. The server migrates the database and stores its connection encrypted in the Git-ignored `backend/OneCart.Api/App_Data/installation.json`. Persist and protect both this file and the Data Protection keys. If an operator already supplied a connection string, `/install` continues to show only the first-SystemAdmin form.
 
 The command-line bootstrap remains available for local recovery or headless setup. Use it only when no System Admin exists; it migrates the database, seeds built-in roles, and prompts for a password without placing it in command history:
 

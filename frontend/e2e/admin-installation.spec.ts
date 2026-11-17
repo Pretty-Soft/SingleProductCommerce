@@ -466,6 +466,33 @@ test("keeps the order list and details readable on a phone", async ({ page }) =>
   expect(pageWidth).toBeLessThanOrEqual(375);
 });
 
+test("shows a local QR image during required authenticator enrollment", async ({ page }) => {
+  let code = "";
+  const user = { ...adminUser, mfaRequired: true, twoFactorEnabled: false };
+  const mockApi = mockSystemAdminApi(product => product, undefined, undefined, undefined, user);
+  await page.route(`${apiOrigin}/api/**`, async route => {
+    if (new URL(route.request().url()).pathname !== "/api/v1/admin/mfa/setup" || route.request().method() === "OPTIONS") return mockApi(route);
+    if (route.request().method() === "POST") {
+      code = route.request().postDataJSON().code;
+      user.twoFactorEnabled = true;
+      return route.fulfill({ status: 204, headers: corsHeaders });
+    }
+    return route.fulfill({ headers: corsHeaders, json: { authenticatorKey: "JBSW Y3DP EHPK 3PXP", account: user.email } });
+  });
+  await page.goto("/admin");
+  await page.getByLabel("Email address").fill(user.email);
+  await page.getByLabel("Password").fill("OneCart-Test-Admin-2026!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  const qr = page.getByRole("img", { name: "Scan to enroll OneCart in your authenticator app" });
+  await expect(qr).toBeVisible();
+  await expect(qr).toHaveAttribute("src", /^data:image\/png;base64,/);
+  await expect(page.getByText("JBSW Y3DP EHPK 3PXP")).toHaveCount(0);
+  await page.getByLabel("Authenticator code").fill("123456");
+  await page.getByRole("button", { name: "Verify and enable MFA" }).click();
+  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  expect(code).toBe("123456");
+});
+
 test("requires an authenticator code after password sign-in when MFA is enrolled", async ({ page }) => {
   let authenticated = false;
   let submittedCode = "";
@@ -546,7 +573,8 @@ test("validates and submits the password reset form without exposing token data 
     return respond({ title: "Not found" }, 404);
   });
 
-  await page.goto("/admin/reset-password?email=owner%40example.test&token=one-time-reset-token");
+  await page.goto("/admin/reset-password#email=owner%40example.test&token=one-time-reset-token");
+  await page.reload();
   await page.getByLabel("New password").fill("New-Admin-Password-2026!");
   await page.getByLabel("Confirm password").fill("Different-Password-2026!");
   await page.getByRole("button", { name: "Reset password" }).click();
@@ -557,6 +585,40 @@ test("validates and submits the password reset form without exposing token data 
   await page.getByRole("button", { name: "Reset password" }).click();
   await expect(page.getByRole("status")).toContainText("Password reset.");
   expect(resetRequest).toEqual({ email: "owner@example.test", token: "one-time-reset-token", newPassword: "New-Admin-Password-2026!" });
+});
+
+test("SystemAdmin saves SMTP credentials and tests the saved relay", async ({ page }) => {
+  const mockApi = mockSystemAdminApi(product => product);
+  let savedPassword: string | undefined;
+  let tested = false;
+  const settings = { host: "smtp.gmail.com", port: 587, from: "owner@example.test", username: "owner@example.test", hasPassword: true };
+  await page.route(`${apiOrigin}/api/**`, async route => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path === "/api/v1/admin/security/smtp" && request.method() !== "OPTIONS") {
+      if (request.method() === "PUT") savedPassword = request.postDataJSON().password;
+      return route.fulfill({ headers: corsHeaders, json: settings });
+    }
+    if (path === "/api/v1/admin/security/smtp/test" && request.method() === "POST") {
+      tested = true;
+      return route.fulfill({ headers: corsHeaders, status: 204 });
+    }
+    return mockApi(route);
+  });
+  await page.goto("/admin");
+  await page.getByLabel("Email address").fill("owner@example.test");
+  await page.getByLabel("Password").fill("OneCart-Test-Admin-2026!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByText("SMTP and password recovery", { exact: true }).click();
+  await expect(page.getByLabel("SMTP password")).toHaveValue("");
+  await page.getByLabel("SMTP password").fill("fake-test-app-password");
+  await page.getByRole("button", { name: "Save SMTP settings" }).click();
+  await expect(page.getByText("SMTP settings saved.")).toBeVisible();
+  await expect(page.getByLabel("SMTP password")).toHaveValue("");
+  expect(savedPassword).toBe("fake-test-app-password");
+  await page.getByRole("button", { name: "Test saved settings" }).click();
+  await expect(page.getByText("Check your administrator inbox.", { exact: false })).toBeVisible();
+  expect(tested).toBe(true);
 });
 
 test("uploads a product image from the catalog editor and shows its saved entry", async ({ page }) => {

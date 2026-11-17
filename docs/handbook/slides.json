@@ -1,0 +1,121 @@
+[
+  [
+    "OneCart Commerce",
+    "A complete storefront for one product",
+    [
+      "Present a product with clear variants, pricing and content.",
+      "Manage the store through an administrator workspace.",
+      "Accept guest orders with cash on delivery."
+    ]
+  ],
+  [
+    "Storefront experience",
+    "Product information that supports a purchase",
+    [
+      "Responsive image gallery and variant choices",
+      "Required or optional product attributes",
+      "Sale countdown, previous price and savings",
+      "Product details, benefits, usage and published reviews"
+    ]
+  ],
+  [
+    "Daily store management",
+    "Product changes from the admin panel",
+    [
+      "Add and edit variant prices and inventory.",
+      "Upload images to storage on your host.",
+      "Manage branding, About Us and storefront content.",
+      "Preview colors and typography before publishing."
+    ]
+  ],
+  [
+    "Cash-on-delivery workflow",
+    "Guest checkout with recorded order history",
+    [
+      "Guests provide name, phone and delivery address.",
+      "A signed quote preserves the add-time price.",
+      "Order placement reduces stock transactionally.",
+      "Admin cancellation restores stock once."
+    ]
+  ],
+  [
+    "Team responsibilities",
+    "Access follows each administrator’s role",
+    [
+      "SystemAdmin controls the full application and accounts.",
+      "CatalogManager maintains product data and stock.",
+      "OrderManager handles orders and contact records.",
+      "StoreManager maintains storefront presentation."
+    ]
+  ],
+  [
+    "Languages and currency",
+    "A store configured for its audience",
+    [
+      "English, Bangla and Spanish storefront interfaces",
+      "Admin-maintained content translations with English fallback",
+      "One active store currency chosen by the administrator",
+      "Manual repricing after all orders close when changing currency"
+    ]
+  ],
+  [
+    "Administrator security",
+    "Multiple controls protect administrative access",
+    [
+      "HTTPS API and secure HTTP-only cookies",
+      "Authenticator QR enrollment and optional or required MFA",
+      "Server-enforced roles and anti-forgery validation",
+      "Temporary sign-in blocks and request rate limits"
+    ]
+  ],
+  [
+    "Protected operations",
+    "Controls around recovery, secrets and orders",
+    [
+      "Password reset through a configurable STARTTLS relay",
+      "Encrypted installer and SMTP configuration",
+      "Server-signed cart quotes and stored order snapshots",
+      "Audit records for key administrator changes"
+    ]
+  ],
+  [
+    "Deployment choices",
+    "Installation on the owner’s infrastructure",
+    [
+      "Browser wizard for database, first admin and store defaults",
+      "PostgreSQL as the default provider",
+      "SQL Server and MySQL available as experimental installer choices",
+      "Configuration for Docker, Linux and Windows IIS"
+    ]
+  ],
+  [
+    "Verified locally",
+    "Evidence across three database engines",
+    [
+      "PostgreSQL 18 passed 3 integration tests.",
+      "SQL Server Express passed 2 integration tests.",
+      "MySQL 8.4.13 passed installation and commerce integration.",
+      "MFA and password recovery were confirmed locally by the owner."
+    ]
+  ],
+  [
+    "Launch readiness",
+    "The host completes production verification",
+    [
+      "Configure trusted HTTPS and the exact storefront origin.",
+      "Test SMTP delivery and recovery on the deployed host.",
+      "Rehearse upgrades and coordinated backup restoration.",
+      "SQL Server and MySQL production support checks remain pending."
+    ]
+  ],
+  [
+    "Product demonstration",
+    "A demonstration built around the store journey",
+    [
+      "Configure the brand and publish a product.",
+      "Select a variant and place a guest COD order.",
+      "Process the order and review inventory changes.",
+      "Review team access, MFA and recovery settings."
+    ]
+  ]
+]

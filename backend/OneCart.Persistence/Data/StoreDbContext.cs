@@ -37,6 +37,8 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
         base.OnModelCreating(modelBuilder);
 
         var isSqlServer = Database.IsSqlServer();
+        var isMySql = Database.ProviderName == "MySql.EntityFrameworkCore";
+        var jsonStorage = isMySql ? "longtext" : isSqlServer ? "nvarchar(max)" : "jsonb";
 
         var products = modelBuilder.Entity<StoreProduct>();
         products.ToTable("store_products", table =>
@@ -53,21 +55,27 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
                     ? "[FlashSaleEnabled] = 0 OR ([FlashSaleStartsAtUtc] IS NOT NULL AND [FlashSaleEndsAtUtc] IS NOT NULL AND [FlashSaleEndsAtUtc] > [FlashSaleStartsAtUtc])"
                     : "\"FlashSaleEnabled\" = FALSE OR (\"FlashSaleStartsAtUtc\" IS NOT NULL AND \"FlashSaleEndsAtUtc\" IS NOT NULL AND \"FlashSaleEndsAtUtc\" > \"FlashSaleStartsAtUtc\")");
         });
-        products.HasIndex(product => product.IsPublished)
-            .IsUnique()
-            .HasFilter(isSqlServer ? "[IsPublished] = 1" : "\"IsPublished\" = TRUE");
+        if (isMySql)
+        {
+            products.Property<int?>("PublishedProductKey")
+                .HasComputedColumnSql("CASE WHEN `IsPublished` = 1 THEN 1 ELSE NULL END", stored: true);
+            products.HasIndex("PublishedProductKey").IsUnique();
+        }
+        else
+            products.HasIndex(product => product.IsPublished).IsUnique()
+                .HasFilter(isSqlServer ? "[IsPublished] = 1" : "\"IsPublished\" = TRUE");
         products.HasKey(product => product.Id);
         products.Property(product => product.Name).HasMaxLength(200).IsRequired();
         products.Property(product => product.Slug).HasMaxLength(180).IsRequired();
         products.HasIndex(product => product.Slug).IsUnique();
         products.Property(product => product.Description).HasMaxLength(8000).IsRequired();
-        products.Property(product => product.CatalogTranslationsJson).HasColumnType(isSqlServer ? "nvarchar(max)" : "jsonb").HasDefaultValue("{}").IsRequired();
-        products.Property(product => product.StorefrontTranslationsJson).HasColumnType(isSqlServer ? "nvarchar(max)" : "jsonb").HasDefaultValue("{}").IsRequired();
+        products.Property(product => product.CatalogTranslationsJson).HasColumnType(jsonStorage).HasDefaultValue("{}").IsRequired();
+        products.Property(product => product.StorefrontTranslationsJson).HasColumnType(jsonStorage).HasDefaultValue("{}").IsRequired();
         products.Property(product => product.BrandName).HasMaxLength(120).HasDefaultValue("OneCart").IsRequired();
         products.Property(product => product.StorefrontHeadline).HasMaxLength(200).IsRequired();
         products.Property(product => product.AboutUs).HasMaxLength(5000).HasDefaultValue("").IsRequired();
-        products.Property(product => product.StorefrontBenefitsJson).HasColumnType(isSqlServer ? "nvarchar(max)" : "jsonb").HasDefaultValue("[]").IsRequired();
-        products.Property(product => product.StorefrontUsageStepsJson).HasColumnType(isSqlServer ? "nvarchar(max)" : "jsonb").HasDefaultValue("[]").IsRequired();
+        products.Property(product => product.StorefrontBenefitsJson).HasColumnType(jsonStorage).HasDefaultValue("[]").IsRequired();
+        products.Property(product => product.StorefrontUsageStepsJson).HasColumnType(jsonStorage).HasDefaultValue("[]").IsRequired();
         products.Property(product => product.StorefrontSubtitle).HasMaxLength(500).IsRequired();
         products.Property(product => product.ThemePrimaryColor).HasMaxLength(7).HasDefaultValue("#242020").IsRequired();
         products.Property(product => product.ThemeAccentColor).HasMaxLength(7).HasDefaultValue("#c17b88").IsRequired();
@@ -156,9 +164,15 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
         });
         productImages.HasKey(image => image.Id);
         productImages.HasIndex(image => image.StorageKey).IsUnique();
-        productImages.HasIndex(image => image.ProductId)
-            .IsUnique()
-            .HasFilter(isSqlServer ? "[MediaKind] = N'logo'" : "\"MediaKind\" = 'logo'");
+        if (isMySql)
+        {
+            productImages.Property<int?>("LogoKey")
+                .HasComputedColumnSql("CASE WHEN `MediaKind` = 'logo' THEN 1 ELSE NULL END", stored: true);
+            productImages.HasIndex(nameof(ProductImage.ProductId), "LogoKey").IsUnique();
+        }
+        else
+            productImages.HasIndex(image => image.ProductId).IsUnique()
+                .HasFilter(isSqlServer ? "[MediaKind] = N'logo'" : "\"MediaKind\" = 'logo'");
         productImages.Property(image => image.StorageKey).HasMaxLength(32).IsRequired();
         productImages.Property(image => image.ContentType).HasMaxLength(40).IsRequired();
         productImages.Property(image => image.MediaKind).HasMaxLength(20).IsRequired();
@@ -253,5 +267,25 @@ public sealed class StoreDbContext(DbContextOptions<StoreDbContext> options)
         adminSettings.Property(setting => setting.MfaRequired).HasDefaultValue(false).IsRequired();
         adminSettings.Property(setting => setting.CurrencyCode).HasMaxLength(3);
         adminSettings.Property(setting => setting.DefaultLanguageCode).HasMaxLength(2).HasDefaultValue("en").IsRequired();
+
+        if (isMySql)
+        {
+            products.Property(product => product.Description).HasColumnType("longtext");
+            products.Property(product => product.AboutUs).HasColumnType("longtext").Metadata.SetDefaultValue(null);
+            products.Property(product => product.CatalogTranslationsJson).Metadata.SetDefaultValue(null);
+            products.Property(product => product.StorefrontTranslationsJson).Metadata.SetDefaultValue(null);
+            products.Property(product => product.StorefrontBenefitsJson).Metadata.SetDefaultValue(null);
+            products.Property(product => product.StorefrontUsageStepsJson).Metadata.SetDefaultValue(null);
+
+            foreach (var entity in modelBuilder.Model.GetEntityTypes())
+            {
+                foreach (var constraint in entity.GetCheckConstraints().ToArray())
+                {
+                    var sql = constraint.Sql.Replace('"', '`');
+                    entity.RemoveCheckConstraint(constraint.ModelName);
+                    entity.AddCheckConstraint(constraint.ModelName, sql);
+                }
+            }
+        }
     }
 }

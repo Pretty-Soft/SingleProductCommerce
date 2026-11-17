@@ -1,12 +1,18 @@
 # Administrator guide
 
+## SMTP and password recovery
+
+Sign in as SystemAdmin and open **Accounts → SMTP and password recovery**. Enter the relay host, STARTTLS port, sender address, and relay login. Save, then select **Test saved settings** to send a message to your administrator inbox. A saved password is never displayed. Leave its field blank to keep it when the relay host, port, and username stay the same.
+
+For Gmail, use `smtp.gmail.com` on port `587`, your Gmail address as the username and sender, and a Google app password. Configure the storefront reset URL on the API host as described in the [deployment guide](DEPLOYMENT_GUIDE.md).
+
 This guide describes the current admin application. It documents implemented behavior and does not resolve the remaining policy decisions in `PRODUCT_REQUIREMENTS.md`.
 
 ## Sign in and account recovery
 
 Administrators sign in at `/admin` with an account created by a System Admin. There is no public account registration or customer sign-in. A first-time admin must replace the temporary password. Passwords must contain at least 12 characters, including uppercase, lowercase, a digit, and a symbol.
 
-An authenticator app can be enrolled from the admin workspace. MFA is optional by default. A System Admin can make it mandatory for all admins and can reset another admin's authenticator enrollment. If required MFA is enabled, the admin must enroll before using the workspace. Users can disable their own optional MFA after verifying a current code.
+To enroll an authenticator app, add an account in the app, scan the QR code shown by OneCart, and enter the current six-digit code to confirm enrollment. MFA is optional by default. A System Admin can make it mandatory for all admins and can reset another admin's authenticator enrollment. If required MFA is enabled, the admin must enroll before using the workspace. Users can disable their own optional MFA after verifying a current code.
 
 Password recovery sends an email link. Configure SMTP and the HTTPS reset URL as described in the [local setup guide](../README.md#run-locally). Requests use a generic response whether or not an account exists.
 
@@ -36,6 +42,8 @@ Product images are stored under the API host's `App_Data/product-images` folder 
 System Admins and Store Managers can update the shop name, headline, subtitle, flash-sale schedule and discount, sharing setting, WhatsApp contact, and trust/service details. They can also manage the brand logo. Storefront text can be entered in Bangla and Spanish; missing content falls back to English. The visitor's language selection is remembered in that browser.
 
 Choose the store currency from the product editor's common-currency list during initial setup. Only a SystemAdmin can change it later, and only when all orders are Completed or Cancelled. Enter new prices for every variant and priced option, then confirm the repricing in the product editor; the previous flash sale is disabled. The choice also remains available after product deletion when no order is open. Existing orders retain their original price and currency snapshots. Customers with old-currency cart quotes must add those items again before checkout.
+
+You can enter variant prices and option adjustments with up to four decimal places. At purchase time, OneCart adds the active sale/base price and selected adjustments, then rounds the final unit price once using the active currency’s standard precision: BDT, USD, EUR, and GBP use two decimal places; currencies such as JPY use none; currencies such as KWD use three. The stored cart quote and resulting order use that rounded unit price.
 
 ## Orders and customer contacts
 

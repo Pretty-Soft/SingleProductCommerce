@@ -6,8 +6,10 @@ public static class StoreDatabaseProvider
 {
     public const string PostgreSql = "PostgreSql";
     public const string SqlServer = "SqlServer";
+    public const string MySql = "MySql";
     public const string PostgreSqlMigrationsAssembly = "OneCart.Api";
     public const string SqlServerMigrationsAssembly = "OneCart.SqlServer.Migrations";
+    public const string MySqlMigrationsAssembly = "OneCart.MySql.Migrations";
 
     public static string GetProviderName(string? configuredProviderName) =>
         configuredProviderName?.Trim() is { Length: > 0 } configured
@@ -32,7 +34,13 @@ public static class StoreDatabaseProvider
             return;
         }
 
+        if (string.Equals(providerName, MySql, StringComparison.OrdinalIgnoreCase))
+        {
+            options.UseMySQL(connectionString, mysql => mysql.MigrationsAssembly(MySqlMigrationsAssembly));
+            return;
+        }
+
         throw new InvalidOperationException(
-            $"Unsupported Database:Provider '{providerName}'. Choose '{PostgreSql}' or '{SqlServer}'.");
+            $"Unsupported Database:Provider '{providerName}'. Choose '{PostgreSql}', '{SqlServer}', or '{MySql}'.");
     }
 }

@@ -67,6 +67,18 @@ public sealed class InitialSystemAdminSetupTests
             Assert.Equal("BDT", settings.CurrencyCode);
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AdminUser>>();
             Assert.Single(await userManager.GetUsersInRoleAsync(AdminRoles.SystemAdmin));
+            var user = await userManager.FindByEmailAsync("owner@example.com");
+            Assert.NotNull(user);
+            userManager.Options.Lockout.MaxFailedAccessAttempts = 5;
+            userManager.Options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+            for (var attempt = 0; attempt < 4; attempt++)
+                await userManager.AccessFailedAsync(user);
+            Assert.False(await userManager.IsLockedOutAsync(user));
+            await userManager.AccessFailedAsync(user);
+            Assert.True(await userManager.IsLockedOutAsync(user));
+            Assert.InRange((user.LockoutEnd!.Value - DateTimeOffset.UtcNow).TotalMinutes, 14, 16);
+            await userManager.SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow.AddSeconds(-1));
+            Assert.False(await userManager.IsLockedOutAsync(user));
         }
     }
 }

@@ -56,7 +56,9 @@ public sealed class StorefrontCatalogService(StoreDbContext database)
                 variant.Sku,
                 Catalog($"variant.{variant.Id}.name", variant.DisplayName),
                 variant.Price,
-                saleConfigured ? CalculateSalePrice(variant.Price, product.FlashSaleDiscountType, product.FlashSaleDiscountValue) : null,
+                saleConfigured
+                    ? CurrencyRounding.Round(CalculateSalePrice(variant.Price, product.FlashSaleDiscountType, product.FlashSaleDiscountValue), product.CurrencyCode)
+                    : null,
                 product.CurrencyCode,
                 variant.StockQuantity > 0))
             .ToArray();
@@ -158,6 +160,6 @@ public sealed class StorefrontCatalogService(StoreDbContext database)
             _ => 0m
         };
 
-        return decimal.Round(Math.Max(0m, price - discount), 4, MidpointRounding.AwayFromZero);
+        return Math.Max(0m, price - discount);
     }
 }

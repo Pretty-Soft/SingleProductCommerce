@@ -1434,16 +1434,13 @@ footer {
   grid-column: 1 / -1;
 }
 
-.mfa-key {
-  margin: 1rem 0;
-  padding: 1rem;
-  border: 1px dashed var(--line, #dce4e4);
+.mfa-qr {
+  display: block;
+  margin: 1rem auto;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #dce4e4;
   border-radius: 12px;
-  background: #f5f8f7;
-  color: #183b3b;
-  font: 700 1.15rem/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
-  letter-spacing: .08em;
-  overflow-wrap: anywhere;
 }
 
 .admin-logo-preview {

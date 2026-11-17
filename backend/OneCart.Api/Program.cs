@@ -23,7 +23,9 @@ builder.Services.AddDbContext<StoreDbContext>((services, options) =>
 builder.Services.AddScoped<StorefrontCatalogService>();
 builder.Services.AddScoped<AdminCatalogService>();
 builder.Services.AddScoped<StorefrontSettingsService>();
-builder.Services.AddScoped<IAdminEmailSender, SmtpAdminEmailSender>();
+builder.Services.AddScoped<SmtpAdminEmailSender>();
+builder.Services.AddScoped<IAdminEmailSender>(services => services.GetRequiredService<SmtpAdminEmailSender>());
+builder.Services.AddSingleton<AdminSmtpSettings>();
 builder.Services.AddScoped<AdminSecuritySettingsService>();
 builder.Services.AddScoped<InitialSystemAdminSetupService>();
 builder.Services.AddScoped<ProductMediaService>();
@@ -87,6 +89,15 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.Events.OnRedirectToLogin = ApiCookieEvents.RedirectToUnauthorized;
     options.Events.OnRedirectToAccessDenied = ApiCookieEvents.RedirectToForbidden;
 });
+builder.Services.Configure<Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions>(
+    IdentityConstants.TwoFactorUserIdScheme, options =>
+    {
+        options.Cookie.Name = "__Host-OneCart.TwoFactor";
+        options.Cookie.Path = "/";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.SameSite = SameSiteMode.None;
+    });
 builder.Services.Configure<SecurityStampValidatorOptions>(options =>
 {
     options.ValidationInterval = TimeSpan.Zero;

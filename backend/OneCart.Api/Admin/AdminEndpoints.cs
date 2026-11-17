@@ -158,6 +158,56 @@ public static class AdminEndpoints
             .AddEndpointFilter(ValidateAntiforgeryAsync)
             .AddEndpointFilter(RequireChangedPasswordAsync);
 
+        group.MapGet("/security/smtp", (AdminSmtpSettings settings, HttpContext context) =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            return Results.Ok(settings.Get().PublicView());
+        })
+            .RequireAuthorization(policy => policy.RequireRole(AdminRoles.SystemAdmin))
+            .AddEndpointFilter(RequireChangedPasswordAsync);
+
+        group.MapPut("/security/smtp", async (SmtpSettings request, AdminSmtpSettings settings,
+            UserManager<AdminUser> users, StoreDbContext database, HttpContext context) =>
+        {
+            var actor = await users.GetUserAsync(context.User);
+            if (actor is null) return Results.Unauthorized();
+            if (!settings.TrySave(request, out var saved))
+                return Results.BadRequest(new { error = "Enter a valid SMTP hostname, STARTTLS port, sender address, and matching login credentials." });
+            database.AdminAuditEvents.Add(new AdminAuditEvent
+            {
+                Id = Guid.NewGuid(), ActorUserId = actor.Id, ActorEmail = actor.Email ?? "",
+                Action = "smtp.update", TargetId = actor.Id, Target = "SMTP settings",
+                Details = "Administrator updated the SMTP relay settings.", CreatedAtUtc = DateTimeOffset.UtcNow
+            });
+            await database.SaveChangesAsync(context.RequestAborted);
+            context.Response.Headers.CacheControl = "no-store";
+            return Results.Ok(saved.PublicView());
+        })
+            .RequireAuthorization(policy => policy.RequireRole(AdminRoles.SystemAdmin))
+            .AddEndpointFilter(ValidateAntiforgeryAsync)
+            .AddEndpointFilter(RequireChangedPasswordAsync);
+
+        group.MapPost("/security/smtp/test", async (SmtpAdminEmailSender sender, UserManager<AdminUser> users,
+            HttpContext context, ILogger<AdminEndpointsMarker> logger) =>
+        {
+            var actor = await users.GetUserAsync(context.User);
+            if (string.IsNullOrWhiteSpace(actor?.Email)) return Results.Unauthorized();
+            try
+            {
+                await sender.SendTestAsync(actor.Email, context.RequestAborted);
+                return Results.NoContent();
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                logger.LogWarning(exception, "SystemAdmin SMTP test failed.");
+                return Results.BadRequest(new { error = "The test message could not be sent. Check the relay, STARTTLS settings, and credentials." });
+            }
+        })
+            .RequireAuthorization(policy => policy.RequireRole(AdminRoles.SystemAdmin))
+            .RequireRateLimiting("AdminPasswordReset")
+            .AddEndpointFilter(ValidateAntiforgeryAsync)
+            .AddEndpointFilter(RequireChangedPasswordAsync);
+
         group.MapGet("/security/mfa-policy", async (AdminSecuritySettingsService settings, CancellationToken cancellationToken) =>
                 Results.Ok(new { required = await settings.GetMfaRequiredAsync(cancellationToken) }))
             .RequireAuthorization(policy => policy.RequireRole(AdminRoles.SystemAdmin))
@@ -200,7 +250,9 @@ public static class AdminEndpoints
             ? Results.Ok(new { signedIn = true, requiresTwoFactor = false })
             : result.RequiresTwoFactor
                 ? Results.Ok(new { signedIn = false, requiresTwoFactor = true })
-                : Results.Unauthorized();
+                : Results.Json(new { error = result.IsLockedOut
+                    ? "Sign-in is temporarily blocked after repeated failed attempts. Try again in 15 minutes, or reset your password."
+                    : "The email or password is incorrect. After five failed attempts, sign-in pauses for 15 minutes." }, statusCode: StatusCodes.Status401Unauthorized);
     }
 
     private static async Task<IResult> LoginWithAuthenticatorAsync(
@@ -208,9 +260,14 @@ public static class AdminEndpoints
         SignInManager<AdminUser> signInManager)
     {
         if (string.IsNullOrWhiteSpace(request.Code) || request.Code.Length > 32) return Results.Unauthorized();
+        if (await signInManager.GetTwoFactorAuthenticationUserAsync() is null)
+            return Results.Json(new { error = "The sign-in session expired or its cookie was blocked. Sign in with your email and password again." }, statusCode: StatusCodes.Status401Unauthorized);
         var code = request.Code.Replace(" ", string.Empty, StringComparison.Ordinal).Replace("-", string.Empty, StringComparison.Ordinal);
         var result = await signInManager.TwoFactorAuthenticatorSignInAsync(code, isPersistent: false, rememberClient: false);
-        return result.Succeeded ? Results.Ok(new { signedIn = true }) : Results.Unauthorized();
+        return result.Succeeded ? Results.Ok(new { signedIn = true })
+            : Results.Json(new { error = result.IsLockedOut
+                ? "Sign-in is temporarily blocked after repeated failed attempts. Try again in 15 minutes, or reset your password."
+                : "The authenticator code was rejected. Enter the current code and check that your phone time is automatic." }, statusCode: StatusCodes.Status401Unauthorized);
     }
 
     private static async Task<IResult> RequestPasswordResetAsync(
@@ -218,29 +275,25 @@ public static class AdminEndpoints
         UserManager<AdminUser> userManager,
         IAdminEmailSender emailSender,
         IConfiguration configuration,
+        IWebHostEnvironment environment,
+        HttpRequest httpRequest,
         ILogger<AdminEndpointsMarker> logger,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Email) || request.Email.Length > 256 || !new EmailAddressAttribute().IsValid(request.Email))
             return Results.BadRequest(new { error = "Enter a valid email address." });
 
-        var baseUrl = configuration["Email:PasswordResetUrl"];
-        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var resetBase)
-            || (resetBase.Scheme != Uri.UriSchemeHttps && !string.Equals(resetBase.Host, "localhost", StringComparison.OrdinalIgnoreCase)))
+        var resetBase = PasswordResetLink.GetDestination(configuration, environment.IsDevelopment(), httpRequest.Headers.Origin.ToString());
+        if (resetBase is null)
             return Results.Problem("Password reset email is not configured.", statusCode: StatusCodes.Status503ServiceUnavailable);
 
         var user = await userManager.FindByEmailAsync(request.Email.Trim());
         if (user is not null)
         {
             var token = await userManager.GeneratePasswordResetTokenAsync(user);
-            var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(resetBase.ToString(), new Dictionary<string, string?>
-            {
-                ["email"] = user.Email,
-                ["token"] = Microsoft.AspNetCore.WebUtilities.WebEncoders.Base64UrlEncode(System.Text.Encoding.UTF8.GetBytes(token))
-            });
             try
             {
-                await emailSender.SendPasswordResetAsync(user.Email!, new Uri(query), cancellationToken);
+                await emailSender.SendPasswordResetAsync(user.Email!, PasswordResetLink.Create(resetBase, user.Email!, token), cancellationToken);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -268,7 +321,14 @@ public static class AdminEndpoints
         catch (FormatException) { return Results.BadRequest(new { error = "The reset link is invalid or expired." }); }
 
         var result = await userManager.ResetPasswordAsync(user, decodedToken, request.NewPassword);
-        if (!result.Succeeded) return IdentityValidationResult(result);
+        if (!result.Succeeded)
+        {
+            if (result.Errors.Any(error => error.Code == "InvalidToken"))
+                return Results.BadRequest(new { error = "This reset link is invalid, expired, or already used. Request a new link from the sign-in page and open the newest email." });
+            return IdentityValidationResult(result);
+        }
+        await userManager.SetLockoutEndDateAsync(user, null);
+        await userManager.ResetAccessFailedCountAsync(user);
         user.MustChangePassword = false;
         var update = await userManager.UpdateAsync(user);
         if (!update.Succeeded) return IdentityValidationResult(update);

@@ -3,7 +3,7 @@ import { apiBase } from "./apiBase";
 export interface InitialSetupStatus { available: boolean; requiresDatabase: boolean }
 
 export interface DatabaseSetupInput {
-  provider: "PostgreSql" | "SqlServer";
+  provider: "PostgreSql" | "SqlServer" | "MySql";
   host: string;
   port: number | null;
   databaseName: string;

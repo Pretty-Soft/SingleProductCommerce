@@ -152,6 +152,47 @@ public sealed class OrderWorkflowTests
     }
 
     [Fact]
+    public async Task QuoteRounds_the_final_variant_and_option_price_to_the_active_currency_precision()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<StoreDbContext>().UseSqlite(connection).Options;
+        await using var database = new StoreDbContext(options);
+        await database.Database.EnsureCreatedAsync();
+
+        var product = new StoreProduct
+        {
+            Id = Guid.NewGuid(), Name = "Precision product", Slug = "precision-product", Description = "Rounding check",
+            CurrencyCode = "USD", IsPublished = true, CreatedAtUtc = DateTimeOffset.UtcNow, UpdatedAtUtc = DateTimeOffset.UtcNow
+        };
+        var variant = new ProductVariant
+        {
+            Id = Guid.NewGuid(), Product = product, Sku = "PRECISION-USD", DisplayName = "Standard", Price = 100.005m,
+            CurrencyCode = "USD", StockQuantity = 1, IsActive = true
+        };
+        var group = new ProductAttributeGroup
+        {
+            Id = Guid.NewGuid(), Product = product, Name = "Finish", IsRequired = false, AllowMultiple = false
+        };
+        var option = new ProductAttributeOption
+        {
+            Id = Guid.NewGuid(), AttributeGroup = group, Name = "Polished", PriceAdjustment = 0.004m, IsActive = true
+        };
+        product.Variants.Add(variant);
+        product.AttributeGroups.Add(group);
+        group.Options.Add(option);
+        database.Products.Add(product);
+        await database.SaveChangesAsync();
+
+        var quotes = new CartQuoteService(database, new EphemeralDataProtectionProvider().CreateProtector("OneCart.CartQuote.v1"));
+        var result = await quotes.CreateAsync(new CartQuoteRequest(variant.Id, [option.Id]), CancellationToken.None);
+
+        Assert.NotNull(result.Quote);
+        Assert.Equal(100.01m, result.Quote.UnitPrice);
+        Assert.Equal("USD", result.Quote.CurrencyCode);
+    }
+
+    [Fact]
     public async Task CheckoutRejectsTamperedQuoteWithoutChangingStock()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");

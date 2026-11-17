@@ -6,11 +6,13 @@ import AdminStoreSettings from "./AdminStoreSettings";
 import AdminMfaEnrollment from "./AdminMfaEnrollment";
 import AdminMfaDisable from "./AdminMfaDisable";
 import AdminPasswordReset from "./AdminPasswordReset";
+import AdminSmtpSettings from "./AdminSmtpSettings";
 import { adminRequest, AdminAuditEvent, AdminRole, AdminUser, refreshCsrfToken } from "./adminApi";
 
 type RoleChanges = Record<string, string[]>;
 
 export default function AdminApp() {
+  const [showSmtpSettings, setShowSmtpSettings] = useState(false);
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
   const [roles, setRoles] = useState<AdminRole[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -312,6 +314,12 @@ export default function AdminApp() {
               <label>Password<input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
             </> : <label>Authenticator code<input inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]{6,12}" required value={authenticatorCode} onChange={event => setAuthenticatorCode(event.target.value)} /></label>}
             <button className="button login-submit" type="submit" disabled={busy}>{busy ? "Signing in…" : requiresTwoFactor ? "Verify and sign in" : "Sign in"}</button>
+            {requiresTwoFactor && <button className="button button-quiet" type="button" disabled={busy} onClick={() => {
+              setRequiresTwoFactor(false);
+              setAuthenticatorCode("");
+              setError("");
+              setMessage("");
+            }}>Back to sign in</button>}
             {!requiresTwoFactor && <button className="button button-quiet" type="button" onClick={() => void handleForgotPassword()} disabled={busy || !email}>{busy ? "Sending…" : "Forgot password? Send reset link"}</button>}
             {message && <p className="admin-message login-feedback" role="status">{message}</p>}
             {error && <p className="admin-error login-feedback" role="alert">{error}</p>}
@@ -383,6 +391,12 @@ export default function AdminApp() {
                 <div className="section-heading"><div><h2>Admin MFA policy</h2><p className="admin-muted">Choose whether authenticator codes are optional or required for every administrator.</p></div></div>
                 <label className="role-option"><input type="checkbox" checked={mfaPolicyRequired} disabled={busy} onChange={event => void handleMfaPolicyChange(event.target.checked)} />Require authenticator MFA for all admin accounts</label>
               </section>
+              <details className="admin-card" onToggle={event => {
+                if (event.currentTarget.open) setShowSmtpSettings(true);
+              }}>
+                <summary>SMTP and password recovery</summary>
+                {showSmtpSettings && <AdminSmtpSettings />}
+              </details>
               <section className="admin-card">
                 <div className="section-heading">
                   <div>

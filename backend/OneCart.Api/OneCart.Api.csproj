@@ -8,6 +8,7 @@
   <ItemGroup>
     <ProjectReference Include="..\OneCart.Persistence\OneCart.Persistence.csproj" />
     <ProjectReference Include="..\OneCart.SqlServer.Migrations\OneCart.SqlServer.Migrations.csproj" />
+    <ProjectReference Include="..\OneCart.MySql.Migrations\OneCart.MySql.Migrations.csproj" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.4">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>

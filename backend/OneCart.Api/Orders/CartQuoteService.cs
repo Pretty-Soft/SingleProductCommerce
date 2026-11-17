@@ -70,7 +70,7 @@ public sealed class CartQuoteService(StoreDbContext database, IDataProtector pro
         var basePrice = saleActive
             ? StorefrontCatalogService.CalculateSalePrice(variant.Price, product.FlashSaleDiscountType, product.FlashSaleDiscountValue)
             : variant.Price;
-        var unitPrice = basePrice + selected.Sum(option => option.PriceAdjustment);
+        var unitPrice = CurrencyRounding.Round(basePrice + selected.Sum(option => option.PriceAdjustment), product.CurrencyCode);
         var payload = new CartQuotePayload(
             product.Id,
             product.Name,

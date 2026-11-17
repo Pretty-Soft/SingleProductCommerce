@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using MySql.Data.MySqlClient;
 using Npgsql;
 using OneCart.Api.Data;
 
@@ -73,26 +74,68 @@ public sealed class FirstRunInstallationService(
             database = new InstallationDatabase(StoreDatabaseProvider.SqlServer, connection.ConnectionString);
             return true;
         }
-        error = "Choose PostgreSQL or the experimental SQL Server option.";
+        if (string.Equals(request.Provider, StoreDatabaseProvider.MySql, StringComparison.OrdinalIgnoreCase))
+        {
+            var host = request.Host.Trim();
+            var local = host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+                || (System.Net.IPAddress.TryParse(host, out var address) && System.Net.IPAddress.IsLoopback(address));
+            if (!request.EncryptConnection && !local)
+            {
+                error = "MySQL requires TLS for connections to a remote database server.";
+                return false;
+            }
+            var connection = new MySqlConnectionStringBuilder
+            {
+                Server = host, Port = (uint)(request.Port ?? 3306),
+                Database = request.DatabaseName.Trim(), UserID = request.UserName.Trim(),
+                Password = request.Password, Pooling = false, ConnectionTimeout = 10,
+                SslMode = request.EncryptConnection ? MySqlSslMode.VerifyFull : MySqlSslMode.Disabled,
+                AllowPublicKeyRetrieval = !request.EncryptConnection
+            };
+            database = new InstallationDatabase(StoreDatabaseProvider.MySql, connection.ConnectionString);
+            return true;
+        }
+        error = "Choose PostgreSQL, SQL Server, or MySQL.";
         return false;
     }
 
     public async Task<bool> TestConnectionAsync(InstallationDatabase database, CancellationToken cancellationToken)
     {
+        if (!environment.IsDevelopment() && database.Provider == StoreDatabaseProvider.MySql
+            && new MySqlConnectionStringBuilder(database.ConnectionString).SslMode != MySqlSslMode.VerifyFull)
+            return false;
+
         if (!environment.IsDevelopment() && database.Provider == StoreDatabaseProvider.SqlServer)
         {
             var sql = new SqlConnectionStringBuilder(database.ConnectionString);
             if (sql.TrustServerCertificate || sql.Encrypt == SqlConnectionEncryptOption.Optional) return false;
         }
         if (await CanConnectAsync(database, cancellationToken)) return true;
-        var maintenanceConnection = database.Provider == StoreDatabaseProvider.PostgreSql
-            ? new NpgsqlConnectionStringBuilder(database.ConnectionString) { Database = "postgres" }.ConnectionString
-            : new SqlConnectionStringBuilder(database.ConnectionString) { InitialCatalog = "master" }.ConnectionString;
+        var maintenanceConnection = database.Provider switch
+        {
+            StoreDatabaseProvider.PostgreSql => new NpgsqlConnectionStringBuilder(database.ConnectionString) { Database = "postgres" }.ConnectionString,
+            StoreDatabaseProvider.MySql => new MySqlConnectionStringBuilder(database.ConnectionString) { Database = "" }.ConnectionString,
+            _ => new SqlConnectionStringBuilder(database.ConnectionString) { InitialCatalog = "master" }.ConnectionString
+        };
         return await CanConnectAsync(database with { ConnectionString = maintenanceConnection }, cancellationToken);
     }
 
     private static async Task<bool> CanConnectAsync(InstallationDatabase database, CancellationToken cancellationToken)
     {
+        if (database.Provider == StoreDatabaseProvider.MySql)
+        {
+            await using var connection = new MySqlConnection(database.ConnectionString);
+            try
+            {
+                await connection.OpenAsync(cancellationToken);
+                return true;
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                return false;
+            }
+        }
+
         var options = new DbContextOptionsBuilder<StoreDbContext>();
         StoreDatabaseProvider.Configure(options, database.Provider, database.ConnectionString);
         await using var context = new StoreDbContext(options.Options);

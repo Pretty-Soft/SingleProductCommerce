@@ -94,9 +94,13 @@ export default function InitialSetup() {
                 {requiresDatabase && <fieldset className="setup-database-fields">
                   <legend>Database connection</legend>
                   <label>Database provider
-                    <select value={database.provider} onChange={event => updateDatabase({ provider: event.target.value as DatabaseSetupInput["provider"], port: event.target.value === "PostgreSql" ? 5432 : null })}>
+                    <select value={database.provider} onChange={event => {
+                      const provider = event.target.value as DatabaseSetupInput["provider"];
+                      updateDatabase({ provider, port: provider === "PostgreSql" ? 5432 : provider === "MySql" ? 3306 : null, encryptConnection: true, trustServerCertificate: false });
+                    }}>
                       <option value="PostgreSql">PostgreSQL</option>
                       <option value="SqlServer">SQL Server (experimental)</option>
+                      <option value="MySql">MySQL (experimental)</option>
                     </select>
                   </label>
                   <label>Host or server name<input required maxLength={255} value={database.host} onChange={event => updateDatabase({ host: event.target.value })} /></label>
@@ -106,6 +110,7 @@ export default function InitialSetup() {
                   <label>Database password<input required type="password" maxLength={512} autoComplete="new-password" value={database.password} onChange={event => updateDatabase({ password: event.target.value })} /></label>
                   {database.provider === "SqlServer" && <label className="setup-check"><input type="checkbox" checked={database.trustServerCertificate} onChange={event => updateDatabase({ trustServerCertificate: event.target.checked })} /> Trust this SQL Server certificate (local testing only)</label>}
                   {database.provider === "SqlServer" && <label className="setup-check"><input type="checkbox" checked={database.encryptConnection} onChange={event => updateDatabase({ encryptConnection: event.target.checked })} /> Encrypt SQL connection (recommended; disable only for local servers without TLS)</label>}
+                  {database.provider === "MySql" && <label className="setup-check"><input type="checkbox" checked={database.encryptConnection} onChange={event => updateDatabase({ encryptConnection: event.target.checked })} /> Verify MySQL TLS certificate (disable only for loopback development)</label>}
                   <button className="button button-quiet" type="button" disabled={busy || !setupToken || !database.userName || !database.password} onClick={() => void testDatabase()}>Test database connection</button>
                   {databaseTested && <p role="status">Database connection succeeded.</p>}
                 </fieldset>}

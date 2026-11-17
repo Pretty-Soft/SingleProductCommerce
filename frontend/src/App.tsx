@@ -1,6 +1,7 @@
 import { CSSProperties, FormEvent, useEffect, useState } from "react";
 import AdminApp from "./AdminApp";
 import InitialSetup from "./InitialSetup";
+import { roundCurrency } from "./currencyRounding";
 import { getDefaultStoreLanguage, getMediaUrl, getPublishedProduct, placeStoreOrder, quoteCartSelection, StorefrontProduct, StoreOrderConfirmation } from "./storeApi";
 import { addCartSelection, CartLine, changeCartSelectionQuantity, removeCartSelection } from "./cart";
 import { storeLanguages, StoreLanguage, storeText } from "./storeI18n";
@@ -106,12 +107,12 @@ function Storefront() {
   const selectedBasePrice = flashSaleActive && selectedVariant?.salePrice != null
     ? selectedVariant.salePrice
     : selectedVariant?.price ?? 0;
-  const currentTotal = selectedBasePrice + selectedOptions.reduce((total, option) => total + option.priceAdjustment, 0);
+  const currentTotal = roundCurrency(selectedBasePrice + selectedOptions.reduce((total, option) => total + option.priceAdjustment, 0), product?.currencyCode ?? "USD");
   const cartItemCount = cartItems.reduce((total, item) => total + item.quantity, 0);
   const cartSubtotals = cartItems.reduce<Record<string, number>>((totals, item) => {
     const variant = product?.variants.find((candidate) => candidate.id === item.variantId);
     if (!product || !variant) return totals;
-    totals[item.currencyCode] = (totals[item.currencyCode] ?? 0) + item.unitPrice * item.quantity;
+    totals[item.currencyCode] = roundCurrency((totals[item.currencyCode] ?? 0) + item.unitPrice * item.quantity, item.currencyCode);
     return totals;
   }, {});
 
@@ -364,7 +365,7 @@ function Storefront() {
                 <button type="button" aria-label={text.increase} onClick={() => setQuantity((value) => value + 1)}>+</button>
               </div>
             </div>
-            <p className="store-total" aria-live="polite">{text.total}: {formatPrice(currentTotal * quantity, selectedVariant?.currencyCode ?? "USD")}</p>
+            <p className="store-total" aria-live="polite">{text.total}: {formatPrice(roundCurrency(currentTotal * quantity, selectedVariant?.currencyCode ?? "USD"), selectedVariant?.currencyCode ?? "USD")}</p>
             {flashSaleActive && selectedVariant?.salePrice != null && (
               <p className="discount-note">
                 {text.save} {product.flashSale.discountType === "percentage"
