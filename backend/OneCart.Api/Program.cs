@@ -177,6 +177,8 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+app.UseMiddleware<SecurityHeadersMiddleware>();
+
 app.Use(async (context, next) =>
 {
     if (!context.Request.IsHttps)
