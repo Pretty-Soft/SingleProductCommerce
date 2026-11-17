@@ -90,7 +90,7 @@ npm run test:e2e
 npm run build
 ```
 
-GitHub Actions runs API and persistence tests, PostgreSQL commerce and full database/media/Data Protection-key recovery integration tests, storefront unit and Chromium browser tests, the production frontend build, Linux and Windows package/configuration checks, a live Linux systemd/Nginx HTTPS fresh-install rehearsal, container builds, and a clean Docker HTTPS install/backup-restore smoke test for pushes and pull requests. SQL Server integration tests remain a separate opt-in local check because they require a disposable SQL Server instance.
+GitHub Actions runs API and persistence tests, PostgreSQL commerce and full database/media/Data Protection-key recovery integration tests, storefront unit and Chromium browser tests, the production frontend build, Linux and Windows package/configuration checks, a live Linux systemd/Nginx HTTPS fresh-install rehearsal, an isolated IIS HTTPS runtime smoke test, container builds, and a clean Docker HTTPS install/backup-restore smoke test for pushes and pull requests. SQL Server integration tests remain a separate opt-in local check because they require a disposable SQL Server instance. The IIS smoke test validates the published API and SPA behind IIS HTTPS and confirms the API rejects HTTP; it does not replace a deployment rehearsal on the production Windows host.
 
 Run the **Deployment packages** GitHub Actions workflow manually, push to `main`, or push a `v*` tag to generate checksummed Linux, Windows IIS, and Docker source archives as downloadable 30-day workflow artifacts. The storefront build uses `https://api.example.test` as a placeholder API origin; set the real HTTPS origin and host secrets during deployment. The workflow does not publish a public release.
 

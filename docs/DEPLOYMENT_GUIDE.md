@@ -137,6 +137,8 @@ Deploy the API output (including its generated `web.config`) to a dedicated IIS 
 
 Supply production configuration through the IIS host environment or the organization's protected secret store, not by adding passwords to the published `web.config`. Run `dotnet OneCart.Api.dll --migrate` and then `--bootstrap-system-admin` from the published API directory using the same secure environment. Configure database, CORS, reset URL, media path, key path, and SMTP as described in [Shared requirements](#shared-requirements).
 
+CI runs an isolated IIS smoke test against the published API and storefront over HTTPS and verifies the API rejects plain HTTP. This checks runtime wiring and bindings, but does not replace an install, upgrade, or recovery rehearsal on the target Windows host.
+
 Set `Setup__BootstrapTokenFile` to an ACL-protected file available to the API app-pool identity, or supply `Setup__BootstrapToken` from the host's secret manager. Enter the generated token at `https://shop.example.com/install`. Rotate the token secret after creating the first System Admin.
 
 For both API and storefront sites, configure the IIS **Physical Path**, enable anonymous authentication, and bind each trusted HTTPS certificate to the correct hostname. Store writable media and key directories outside the publish directory. The API can read a custom `ConnectionStrings:StoreFile` path when the host's secret store exposes connection secrets as files; otherwise supply `ConnectionStrings:Store` securely.

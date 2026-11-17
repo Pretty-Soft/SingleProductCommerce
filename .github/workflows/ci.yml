@@ -198,6 +198,77 @@ jobs:
           if (-not $apiConfig.SelectSingleNode("/configuration/location/system.webServer/handlers/add[@name='aspNetCore']")) { throw 'IIS ASP.NET Core handler configuration is missing.' }
           if (-not $apiConfig.SelectSingleNode('/configuration/location/system.webServer/aspNetCore')) { throw 'IIS ASP.NET Core process configuration is missing.' }
           if (-not $storeConfig.SelectSingleNode('/configuration/system.webServer/rewrite')) { throw 'IIS SPA route rewrite configuration is missing.' }
+      - name: Rehearse IIS runtime and HTTPS host bindings
+        shell: pwsh
+        run: |
+          $iisFeatures = Install-WindowsFeature Web-Server, Web-Mgmt-Tools, Web-Http-Logging, Web-Request-Monitor, Web-Filtering -IncludeManagementTools
+          if (-not $iisFeatures.Success) { throw "IIS role installation failed: $($iisFeatures.ExitCode)." }
+          Import-Module WebAdministration
+          Start-Service W3SVC
+
+          $hostingBundle = Join-Path $env:RUNNER_TEMP 'dotnet-hosting-10.0.4-win.exe'
+          Invoke-WebRequest 'https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/10.0.4/dotnet-hosting-10.0.4-win.exe' -OutFile $hostingBundle
+          $installer = Start-Process -FilePath $hostingBundle -ArgumentList '/install', '/quiet', '/norestart' -Wait -PassThru
+          if ($installer.ExitCode -notin @(0, 3010)) { throw "ASP.NET Core Hosting Bundle install failed: $($installer.ExitCode)." }
+
+          $apiOutput = Join-Path $env:RUNNER_TEMP 'onecart-api'
+          $apiPath = Join-Path $env:ProgramFiles 'OneCart\IIS\api'
+          $storePath = Join-Path $env:ProgramFiles 'OneCart\IIS\storefront'
+          $dataRoot = Join-Path $env:ProgramData 'OneCart\IIS'
+          New-Item -ItemType Directory -Force -Path $apiPath, $storePath, (Join-Path $dataRoot 'media'), (Join-Path $dataRoot 'keys') | Out-Null
+          Copy-Item (Join-Path $apiOutput '*') $apiPath -Recurse -Force
+          Copy-Item 'frontend/dist/*' $storePath -Recurse -Force
+
+          [Environment]::SetEnvironmentVariable('ASPNETCORE_ENVIRONMENT', 'Production', 'Machine')
+          [Environment]::SetEnvironmentVariable('Database__Provider', 'PostgreSql', 'Machine')
+          [Environment]::SetEnvironmentVariable('ConnectionStrings__Store', 'Host=127.0.0.1;Port=1;Database=onecart;Username=ci;Password=ci-only', 'Machine')
+          [Environment]::SetEnvironmentVariable('Cors__AllowedOrigins__0', 'https://shop.example.test', 'Machine')
+          [Environment]::SetEnvironmentVariable('ProductMedia__RootPath', (Join-Path $dataRoot 'media'), 'Machine')
+          [Environment]::SetEnvironmentVariable('DataProtection__KeyDirectory', (Join-Path $dataRoot 'keys'), 'Machine')
+
+          New-WebAppPool -Name 'OneCartApi'
+          Set-ItemProperty 'IIS:\AppPools\OneCartApi' -Name managedRuntimeVersion -Value ''
+          $apiIdentity = 'IIS AppPool\OneCartApi'
+          & icacls.exe $apiPath /grant "${apiIdentity}:(OI)(CI)(RX)" /T | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'Could not grant the API pool read access to the published application.' }
+          & icacls.exe $dataRoot /grant "${apiIdentity}:(OI)(CI)(M)" /T | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'Could not grant the API pool access to persistent local data.' }
+          & icacls.exe $storePath /grant 'IIS_IUSRS:(OI)(CI)(RX)' /T | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'Could not grant IIS read access to the storefront files.' }
+
+          $apiHost = 'api.example.test'
+          $storeHost = 'shop.example.test'
+          Add-Content -Path (Join-Path $env:windir 'System32\drivers\etc\hosts') -Value "`r`n127.0.0.1 $apiHost`r`n127.0.0.1 $storeHost"
+          $certificate = New-SelfSignedCertificate -DnsName $apiHost, $storeHost -CertStoreLocation 'Cert:\LocalMachine\My' -FriendlyName 'OneCart IIS CI'
+
+          function Add-OneCartHttpsSite([string] $name, [string] $hostName, [string] $path, [string] $pool) {
+            New-Website -Name $name -PhysicalPath $path -ApplicationPool $pool -Port 8081 -HostHeader $hostName | Out-Null
+            New-WebBinding -Name $name -Protocol https -Port 443 -HostHeader $hostName -SslFlags 1
+            (Get-WebBinding -Name $name -Protocol https -Port 443).AddSslCertificate($certificate.Thumbprint, 'My')
+          }
+
+          Add-OneCartHttpsSite 'OneCartApi' $apiHost $apiPath 'OneCartApi'
+          New-WebAppPool -Name 'OneCartStorefront'
+          Set-ItemProperty 'IIS:\AppPools\OneCartStorefront' -Name managedRuntimeVersion -Value ''
+          Add-OneCartHttpsSite 'OneCartStorefront' $storeHost $storePath 'OneCartStorefront'
+          iisreset /restart
+
+          $apiHealthy = $false
+          for ($attempt = 0; $attempt -lt 30; $attempt++) {
+            try {
+              $health = Invoke-WebRequest "https://$apiHost/health" -SkipCertificateCheck -TimeoutSec 3
+              if ($health.StatusCode -eq 200 -and $health.Content -match '"service":"OneCart.Api"') { $apiHealthy = $true; break }
+            } catch { Start-Sleep -Seconds 1 }
+          }
+          if (-not $apiHealthy) {
+            Get-WebAppPoolState 'OneCartApi' | Format-List | Out-String | Write-Host
+            Get-Content (Join-Path $apiPath 'web.config') | Write-Host
+            throw 'Published API did not start behind IIS HTTPS.'
+          }
+          $plainHttp = Invoke-WebRequest "http://${apiHost}:8081/health" -SkipCertificateCheck -SkipHttpErrorCheck -TimeoutSec 10
+          if ($plainHttp.StatusCode -ne 400) { throw "API must reject HTTP traffic with 400, but returned $($plainHttp.StatusCode)." }
+          $store = Invoke-WebRequest "https://$storeHost/" -SkipCertificateCheck -TimeoutSec 10
+          if ($store.StatusCode -ne 200 -or $store.Content -notmatch 'id="root"') { throw 'IIS storefront site did not serve the built SPA over HTTPS.' }
 
   containers:
     name: Container packaging
