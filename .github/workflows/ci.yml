@@ -211,6 +211,11 @@ jobs:
           $installer = Start-Process -FilePath $hostingBundle -ArgumentList '/install', '/quiet', '/norestart' -Wait -PassThru
           if ($installer.ExitCode -notin @(0, 3010)) { throw "ASP.NET Core Hosting Bundle install failed: $($installer.ExitCode)." }
 
+          $rewriteInstaller = Join-Path $env:RUNNER_TEMP 'rewrite_amd64_en-US.msi'
+          Invoke-WebRequest 'https://download.microsoft.com/download/1/2/8/128E2E22-C1B9-44A4-BE2A-5859ED1D4592/rewrite_amd64_en-US.msi' -OutFile $rewriteInstaller
+          $rewriteInstall = Start-Process -FilePath msiexec.exe -ArgumentList @('/i', $rewriteInstaller, '/qn', '/norestart') -Wait -PassThru
+          if ($rewriteInstall.ExitCode -notin @(0, 3010, 1641)) { throw "IIS URL Rewrite installation failed: $($rewriteInstall.ExitCode)." }
+
           $apiOutput = Join-Path $env:RUNNER_TEMP 'onecart-api'
           $apiPath = Join-Path $env:ProgramFiles 'OneCart\IIS\api'
           $storePath = Join-Path $env:ProgramFiles 'OneCart\IIS\storefront'
