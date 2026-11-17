@@ -199,11 +199,11 @@ jobs:
           if (-not $apiConfig.SelectSingleNode('/configuration/location/system.webServer/aspNetCore')) { throw 'IIS ASP.NET Core process configuration is missing.' }
           if (-not $storeConfig.SelectSingleNode('/configuration/system.webServer/rewrite')) { throw 'IIS SPA route rewrite configuration is missing.' }
       - name: Rehearse IIS runtime and HTTPS host bindings
-        shell: pwsh
+        shell: powershell
         run: |
           $iisFeatures = Install-WindowsFeature Web-Server, Web-Mgmt-Tools, Web-Http-Logging, Web-Request-Monitor, Web-Filtering -IncludeManagementTools
           if (-not $iisFeatures.Success) { throw "IIS role installation failed: $($iisFeatures.ExitCode)." }
-          Import-Module WebAdministration -SkipEditionCheck
+          Import-Module WebAdministration
           Start-Service W3SVC
 
           $hostingBundle = Join-Path $env:RUNNER_TEMP 'dotnet-hosting-10.0.4-win.exe'
@@ -240,6 +240,9 @@ jobs:
           $storeHost = 'shop.example.test'
           Add-Content -Path (Join-Path $env:windir 'System32\drivers\etc\hosts') -Value "`r`n127.0.0.1 $apiHost`r`n127.0.0.1 $storeHost"
           $certificate = New-SelfSignedCertificate -DnsName $apiHost, $storeHost -CertStoreLocation 'Cert:\LocalMachine\My' -FriendlyName 'OneCart IIS CI'
+          $certificateFile = Join-Path $env:RUNNER_TEMP 'onecart-iis.cer'
+          Export-Certificate -Cert $certificate -FilePath $certificateFile | Out-Null
+          Import-Certificate -FilePath $certificateFile -CertStoreLocation 'Cert:\LocalMachine\Root' | Out-Null
 
           function Add-OneCartHttpsSite([string] $name, [string] $hostName, [string] $path, [string] $pool) {
             New-Website -Name $name -PhysicalPath $path -ApplicationPool $pool -Port 8081 -HostHeader $hostName | Out-Null
@@ -256,7 +259,7 @@ jobs:
           $apiHealthy = $false
           for ($attempt = 0; $attempt -lt 30; $attempt++) {
             try {
-              $health = Invoke-WebRequest "https://$apiHost/health" -SkipCertificateCheck -TimeoutSec 3
+              $health = Invoke-WebRequest "https://$apiHost/health" -UseBasicParsing -TimeoutSec 3
               if ($health.StatusCode -eq 200 -and $health.Content -match '"service":"OneCart.Api"') { $apiHealthy = $true; break }
             } catch { Start-Sleep -Seconds 1 }
           }
@@ -265,9 +268,19 @@ jobs:
             Get-Content (Join-Path $apiPath 'web.config') | Write-Host
             throw 'Published API did not start behind IIS HTTPS.'
           }
-          $plainHttp = Invoke-WebRequest "http://${apiHost}:8081/health" -SkipCertificateCheck -SkipHttpErrorCheck -TimeoutSec 10
-          if ($plainHttp.StatusCode -ne 400) { throw "API must reject HTTP traffic with 400, but returned $($plainHttp.StatusCode)." }
-          $store = Invoke-WebRequest "https://$storeHost/" -SkipCertificateCheck -TimeoutSec 10
+          $httpStatus = $null
+          try {
+            $plainHttp = Invoke-WebRequest "http://${apiHost}:8081/health" -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
+            $httpStatus = [int]$plainHttp.StatusCode
+          } catch {
+            if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
+              $httpStatus = [int]$_.Exception.Response.StatusCode
+            } else {
+              throw
+            }
+          }
+          if ($httpStatus -ne 400) { throw "API must reject HTTP traffic with 400, but returned $httpStatus." }
+          $store = Invoke-WebRequest "https://$storeHost/" -UseBasicParsing -TimeoutSec 10
           if ($store.StatusCode -ne 200 -or $store.Content -notmatch 'id="root"') { throw 'IIS storefront site did not serve the built SPA over HTTPS.' }
 
   containers:
