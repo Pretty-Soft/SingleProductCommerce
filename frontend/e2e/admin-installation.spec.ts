@@ -287,7 +287,7 @@ test("creates a limited Catalog Manager account from the System Admin workspace"
   await page.getByLabel("Password").fill("OneCart-Test-Admin-2026!");
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
-  await page.getByRole("navigation", { name: "Admin sections" }).getByRole("button", { name: "Accounts & roles", exact: true }).click();
+  await page.getByRole("navigation", { name: "Admin sections" }).getByRole("button", { name: "Accounts", exact: true }).click();
 
   const accounts = page.locator("#accounts");
   const createForm = accounts.locator("form.user-form");
@@ -312,7 +312,7 @@ test("saves About Us, multiline usage, and an unpublished admin-managed review",
   await page.getByLabel("Email address").fill("owner@example.test");
   await page.getByLabel("Password").fill("OneCart-Test-Admin-2026!");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.getByRole("navigation", { name: "Admin sections" }).getByRole("button", { name: "Storefront settings", exact: true }).click();
+  await page.getByRole("navigation", { name: "Admin sections" }).getByRole("button", { name: "Storefront", exact: true }).click();
   const settings = page.getByRole("heading", { name: "Storefront settings" }).locator("xpath=../../..");
 
   await settings.getByLabel("About Us", { exact: true }).fill("A neighborhood shop serving local families.");
@@ -358,6 +358,23 @@ test("moves a Pending COD order into Processing from the admin order workspace",
   await expect(orders.getByText("Order status saved.")).toBeVisible();
   expect(savedStatus).toBe("Processing");
   await expect(orders.locator(".order-details .eyebrow")).toHaveText("Processing");
+});
+
+test("keeps the order list and details readable on a phone", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.route(`${apiOrigin}/api/**`, mockSystemAdminApi(product => product, () => adminUser));
+  await page.goto("/admin");
+  await page.getByLabel("Email address").fill("owner@example.test");
+  await page.getByLabel("Password").fill("OneCart-Test-Admin-2026!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Menu" }).click();
+  await page.getByRole("navigation", { name: "Admin sections" }).getByRole("button", { name: "Orders", exact: true }).click();
+  await expect(page.locator(".order-list-item")).toBeVisible();
+  await expect(page.locator(".order-details")).toBeVisible();
+  const orderWidth = await page.locator(".orders-layout").evaluate(element => element.getBoundingClientRect().width);
+  expect(orderWidth).toBeLessThanOrEqual(375);
+  const pageWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  expect(pageWidth).toBeLessThanOrEqual(375);
 });
 
 test("requires an authenticator code after password sign-in when MFA is enrolled", async ({ page }) => {
@@ -504,8 +521,8 @@ test("shows only the workspace sections assigned to a Catalog Manager", async ({
   const nav = page.getByRole("navigation", { name: "Admin sections" });
   await expect(nav.getByRole("button", { name: "Catalog", exact: true })).toBeVisible();
   await expect(nav.getByRole("button", { name: "Orders", exact: true })).toHaveCount(0);
-  await expect(nav.getByRole("button", { name: "Storefront settings", exact: true })).toHaveCount(0);
-  await expect(nav.getByRole("button", { name: "Accounts & roles", exact: true })).toHaveCount(0);
+  await expect(nav.getByRole("button", { name: "Storefront", exact: true })).toHaveCount(0);
+  await expect(nav.getByRole("button", { name: "Accounts", exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Product information" })).toBeVisible();
 });
 
@@ -522,8 +539,8 @@ test("shows only order and customer sections assigned to an Order Manager", asyn
   await expect(nav.getByRole("button", { name: "Orders", exact: true })).toBeVisible();
   await expect(nav.getByRole("button", { name: "Customers", exact: true })).toBeVisible();
   await expect(nav.getByRole("button", { name: "Catalog", exact: true })).toHaveCount(0);
-  await expect(nav.getByRole("button", { name: "Storefront settings", exact: true })).toHaveCount(0);
-  await expect(nav.getByRole("button", { name: "Accounts & roles", exact: true })).toHaveCount(0);
+  await expect(nav.getByRole("button", { name: "Storefront", exact: true })).toHaveCount(0);
+  await expect(nav.getByRole("button", { name: "Accounts", exact: true })).toHaveCount(0);
 });
 
 test("shows only storefront settings assigned to a Store Manager", async ({ page }) => {
@@ -536,8 +553,8 @@ test("shows only storefront settings assigned to a Store Manager", async ({ page
   await page.getByRole("button", { name: "Sign in" }).click();
 
   const nav = page.getByRole("navigation", { name: "Admin sections" });
-  await expect(nav.getByRole("button", { name: "Storefront settings", exact: true })).toBeVisible();
+  await expect(nav.getByRole("button", { name: "Storefront", exact: true })).toBeVisible();
   await expect(nav.getByRole("button", { name: "Catalog", exact: true })).toHaveCount(0);
   await expect(nav.getByRole("button", { name: "Orders", exact: true })).toHaveCount(0);
-  await expect(nav.getByRole("button", { name: "Accounts & roles", exact: true })).toHaveCount(0);
+  await expect(nav.getByRole("button", { name: "Accounts", exact: true })).toHaveCount(0);
 });
