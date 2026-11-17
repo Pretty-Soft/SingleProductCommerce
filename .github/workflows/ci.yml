@@ -12,7 +12,7 @@ jobs:
     name: Backend tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
@@ -45,7 +45,7 @@ jobs:
     env:
       ONECART_POSTGRES_TEST_CONNECTION: Host=localhost;Port=5432;Database=postgres;Username=onecart_test;Password=onecart_ci_only;Pooling=false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
@@ -84,7 +84,7 @@ jobs:
     env:
       ONECART_SQLSERVER_TEST_CONNECTION: Server=localhost,1433;User ID=sa;Password=OneCart_CI_2026_Test!;Encrypt=False;TrustServerCertificate=True;Pooling=False
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
@@ -110,7 +110,7 @@ jobs:
     env:
       ONECART_MYSQL_TEST_CONNECTION: Server=127.0.0.1;Port=3306;User ID=root;Password=OneCart_MySql_CI_Test_2026;SslMode=Disabled;AllowPublicKeyRetrieval=True;Pooling=False
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
@@ -124,7 +124,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -141,7 +141,7 @@ jobs:
     name: Linux systemd and Nginx packaging
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
@@ -194,7 +194,7 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
@@ -222,7 +222,7 @@ jobs:
     name: Windows IIS package validation
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
@@ -345,7 +345,7 @@ jobs:
     name: Container packaging
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Validate Compose configuration
         env:
           ONECART_DOMAIN: shop.example.test
@@ -371,7 +371,7 @@ jobs:
       ONECART_CADDY_IP: 10.254.240.2
       ONECART_API_IP: 10.254.240.3
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Boot an isolated HTTPS deployment
         run: |
           set -euo pipefail
