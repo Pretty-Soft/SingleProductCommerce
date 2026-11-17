@@ -108,12 +108,12 @@ export default function AdminOrders() {
   return (
     <section className="admin-card">
       <div className="section-heading">
-        <div><h2>Orders</h2><p className="admin-muted">Recent Cash on Delivery orders. Cancelling a pending or processing order restores its stock.</p></div>
-        <span className="user-count">Latest {orders.length}</span>
+        <div><h2>Orders</h2><p className="admin-muted">COD orders · Cancel to restore stock.</p></div>
+        <span className="user-count">{orders.length} shown</span>
       </div>
       <section className="order-summary" aria-label="Order totals by currency and status">
         <div className="section-heading">
-          <div><h3>Order totals</h3><p className="admin-muted">All recorded orders, grouped by their saved currency and current status.</p></div>
+          <div><h3>Totals</h3><p className="admin-muted">By currency and status</p></div>
         </div>
         {totals.map((currency) => (
           <div className="order-currency-summary" key={currency.currencyCode}>
@@ -123,7 +123,7 @@ export default function AdminOrders() {
                 <article className="order-total-card" key={`${currency.currencyCode}-${summary.status}`}>
                   <span>{summary.status}</span>
                   <strong>{summary.orderCount} {summary.orderCount === 1 ? "order" : "orders"}</strong>
-                  <small>{formatPrice(summary.orderTotal, currency.currencyCode)} order value</small>
+                  <small>{formatPrice(summary.orderTotal, currency.currencyCode)}</small>
                 </article>
               ))}
             </div>
@@ -135,9 +135,9 @@ export default function AdminOrders() {
         <div className="orders-list">
           {orders.map((order) => (
             <button className={`order-list-item${selected?.id === order.id ? " selected" : ""}`} type="button" key={order.id} onClick={() => void selectOrder(order.id)}>
-              <strong>{order.orderNumber}</strong>
-              <span>{order.customerName} · {order.status}</span>
-              <span>{formatPrice(order.total, order.currencyCode)} · {order.itemCount} items</span>
+              <span className="order-list-top"><strong>{order.orderNumber}</strong><span className="order-list-status">{order.status}</span></span>
+              <span className="order-list-customer">{order.customerName}</span>
+              <span className="order-list-bottom"><strong>{formatPrice(order.total, order.currencyCode)}</strong><span>{order.itemCount} {order.itemCount === 1 ? "item" : "items"}</span></span>
             </button>
           ))}
           {orders.length === 0 && <p className="admin-muted">No orders have been placed.</p>}
@@ -148,7 +148,7 @@ export default function AdminOrders() {
             <dl className="order-customer-details">
               <dt>Customer</dt><dd>{selected.customerName}</dd>
               <dt>Phone</dt><dd><a href={`tel:${encodeURIComponent(selected.phoneNumber)}`}>{selected.phoneNumber}</a></dd>
-              <dt>Delivery address</dt><dd>{selected.deliveryAddress}</dd>
+              <dt>Address</dt><dd>{selected.deliveryAddress}</dd>
             </dl>
             <ul className="order-lines">
               {selected.lines.map((line, index) => (

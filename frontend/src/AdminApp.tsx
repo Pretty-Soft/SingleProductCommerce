@@ -509,13 +509,13 @@ export default function AdminApp() {
 }
 
 const adminMenuItems = [
-  { id: "overview", label: "Overview", description: "Store workspace summary" },
-  { id: "catalog", label: "Catalog", description: "Product, pricing, and storefront" },
-  { id: "orders", label: "Orders", description: "Review and update customer orders" },
-  { id: "customers", label: "Customers", description: "Search contact details from orders" },
-  { id: "storefront", label: "Storefront settings", description: "Brand, promotions, contact and trust details" },
-  { id: "accounts", label: "Accounts & roles", description: "Manage administrator access" },
-  { id: "audit", label: "Audit history", description: "Review administrator activity" }
+  { id: "overview", label: "Overview", description: "Store summary" },
+  { id: "catalog", label: "Catalog", description: "Product and prices" },
+  { id: "orders", label: "Orders", description: "Manage orders" },
+  { id: "customers", label: "Customers", description: "Order contacts" },
+  { id: "storefront", label: "Storefront", description: "Brand and promotions" },
+  { id: "accounts", label: "Accounts", description: "Admin access" },
+  { id: "audit", label: "Audit", description: "Admin activity" }
 ];
 
 function AdminMenuIcon({ name }: { name: string }) {
