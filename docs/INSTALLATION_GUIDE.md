@@ -65,6 +65,8 @@ dotnet dev-certs https --trust
 
 The development certificate is stored in the current Windows user's certificate store. Run this command and the API under the same Windows account: a certificate trusted in a different account is not automatically trusted by that user's browser, and its private key is unavailable to an API process running there. Check it with `dotnet dev-certs https --check --trust` from the account that runs Visual Studio or the API.
 
+After installing frontend packages and setting the API user secrets, run `./start-local.ps1` from that account to start both servers. The script checks certificate trust and port availability, waits for the HTTPS API and storefront, and prints their URLs and process IDs. Logs are in the Git-ignored `backend/OneCart.Api/App_Data/logs` directory. If the certificate check fails, rerun `dotnet dev-certs https --trust` in the same Windows account; a certificate created for another account cannot be used by the API process.
+
 Run the API from the repository root in a terminal:
 
 ```powershell

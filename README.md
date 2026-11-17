@@ -55,6 +55,8 @@ dotnet dev-certs https --trust
 
 The development certificate and browser trust are scoped to the current Windows user. Trust it and run the API under that account (including when switching between Visual Studio, a terminal, or an elevated shell); check that account's certificate with `dotnet dev-certs https --check --trust`.
 
+On Windows, `./start-local.ps1` starts both the API at `https://localhost:44300` and the storefront at `http://127.0.0.1:5175`. Run it from your own Windows account after configuring local user secrets and installing frontend packages. It checks certificate trust and port availability, waits for both servers, and writes Git-ignored logs under `backend/OneCart.Api/App_Data/logs`. It reports the process IDs to stop when finished.
+
 The System Admin can make authenticator-app MFA optional or mandatory for all administrators; it is optional by default. Enrolled admins enter a code from their authenticator app at sign-in. Configure SMTP and the HTTPS frontend reset URL in user secrets to enable email password recovery; SMTP credentials must never be stored in source control:
 
 ```powershell
