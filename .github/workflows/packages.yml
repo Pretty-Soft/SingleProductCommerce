@@ -57,7 +57,7 @@ jobs:
           archive="onecart-docker-source-${PACKAGE_VERSION}.zip"
           git archive --format=zip --prefix=onecart/ HEAD -o "$RUNNER_TEMP/$archive"
           (cd "$RUNNER_TEMP" && sha256sum "$archive" > "$archive.sha256" && sha256sum -c "$archive.sha256")
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: onecart-linux-and-docker-${{ env.PACKAGE_VERSION }}
           path: |
@@ -111,7 +111,7 @@ jobs:
           Compress-Archive -Path (Join-Path $packageRoot '*') -DestinationPath $archive -Force
           $hash = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
           "$hash  $(Split-Path $archive -Leaf)" | Set-Content "${archive}.sha256"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: onecart-windows-iis-${{ env.PACKAGE_VERSION }}
           path: |
